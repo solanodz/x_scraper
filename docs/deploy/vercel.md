@@ -16,7 +16,7 @@ Set in Vercel → Project → **Settings → Environment Variables** (Production
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `NEXT_PUBLIC_API_URL` | yes | `https://xscraper-api.up.railway.app` |
+| `NEXT_PUBLIC_API_URL` | yes | `https://xscraper-api.up.railway.app` (**incluí `https://`**) |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | `eyJ...` (anon public key) |
 

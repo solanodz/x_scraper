@@ -3,7 +3,15 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FeedFilterQuery } from "./feedFilters";
 import type { ChatCitation, Quote, SignalDetail, SignalSummary, TickerSuggestion } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+function normalizeApiUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+const API_URL = normalizeApiUrl(
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
+);
 
 export function getApiUrl(): string {
   return API_URL;
