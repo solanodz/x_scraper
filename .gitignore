@@ -1,0 +1,16 @@
+.env
+.env.local
+accounts.db
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+output/
+.DS_Store
+node_modules/
+.next/
+frontend/.next/
+frontend/node_modules/
+*.tsbuildinfo
+.cursor/
+terminals/

@@ -1,0 +1,45 @@
+services:
+  store:
+    image: pgvector/pgvector:pg16
+    container_name: xscraper_store
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-xscraper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xscraper}
+      POSTGRES_DB: ${POSTGRES_DB:-xscraper}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - store_data:/var/lib/postgresql/data
+      - ./infra/store/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-xscraper} -d ${POSTGRES_DB:-xscraper}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Worker (Ingestion + Vector Index). Ejecutar localmente con:
+  #   python -m scraper.worker --once
+  #   python -m scraper.worker --interval 1800
+  # worker:
+  #   build: .
+  #   env_file: .env
+  #   depends_on:
+  #     store:
+  #       condition: service_healthy
+  #   command: python -m scraper.worker --interval 1800
+
+  # API (FastAPI). Ejecutar localmente con:
+  #   uvicorn backend.app.main:app --reload --port 8000
+  # api:
+  #   build: .
+  #   env_file: .env
+  #   depends_on:
+  #     store:
+  #       condition: service_healthy
+  #   ports:
+  #     - "8000:8000"
+  #   command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  store_data:

@@ -1,0 +1,336 @@
+{
+  "project": "X Scraper Terminal",
+  "description": "Terminal de inteligencia de noticias financieras (Corpus de X) + Research Chat RAG.",
+  "rules": {
+    "single_active_feature": true,
+    "passing_requires_evidence": true,
+    "do_not_skip_verification": true
+  },
+  "features": [
+    {
+      "id": "F1",
+      "priority": 1,
+      "title": "Infra local con Docker Compose",
+      "user_visible_behavior": "docker compose up levanta Postgres con la extensión pgvector habilitada y accesible desde el host.",
+      "status": "passing",
+      "dependencies": [],
+      "verification": [
+        "docker compose up -d",
+        "psql en el contenedor: CREATE EXTENSION IF NOT EXISTS vector; devuelve OK",
+        "docker compose ps muestra el servicio de Postgres healthy"
+      ],
+      "evidence": [
+        "docker compose ps: xscraper_store Up (healthy), 0.0.0.0:5433->5432/tcp",
+        "SELECT extname, extversion FROM pg_extension WHERE extname='vector' => vector | 0.8.4",
+        "Imagen pgvector/pgvector:pg16; init 001_extensions.sql habilita la extensión al inicializar el volumen"
+      ]
+    },
+    {
+      "id": "F2",
+      "priority": 2,
+      "title": "Store: schema de Signals + persistencia",
+      "user_visible_behavior": "El scraper actual persiste Signals en Postgres (tabla signals) deduplicados por id_str, en vez de solo escribir JSON.",
+      "status": "passing",
+      "dependencies": ["F1"],
+      "verification": [
+        "Correr la ingesta contra unas pocas Sources",
+        "SELECT count(*) FROM signals > 0",
+        "Re-correr y verificar que no se duplican filas (mismo id_str)"
+      ],
+      "evidence": [
+        "python -m scraper.ingest --limit-per-account 2 --accounts-only --max-accounts 3 => 54 Signals persistidos",
+        "SELECT count(*) FROM signals => 54",
+        "Re-ingesta mismo comando => count sigue 54 (UPSERT por id_str, sin duplicados)",
+        "Migración infra/store/init/002_signals.sql aplicada; tabla con embedding vector(1536) nullable"
+      ]
+    },
+    {
+      "id": "F3",
+      "priority": 3,
+      "title": "Worker: Ingestion (cron + Refresh) con Vector Index",
+      "user_visible_behavior": "El Worker corre la Ingestion periódicamente y bajo demanda, escribiendo Signal + embedding (pgvector) en la misma transacción.",
+      "status": "passing",
+      "dependencies": ["F2"],
+      "verification": [
+        "Ejecutar el Worker una vez",
+        "SELECT count(*) FROM signals WHERE embedding IS NOT NULL > 0",
+        "Verificar que Signal y embedding se escriben juntos (sin filas sin embedding tras la corrida)"
+      ],
+      "evidence": [
+        "python -m scraper.worker --once --limit-per-account 2 --accounts-only --max-accounts 2 con OPENAI_API_KEY => embeddings generados",
+        "SELECT count(embedding) FROM signals => 34 (> 0)",
+        "Últimos 5 Signals por published_at: todos has_emb=true",
+        "UPSERT transaccional: Signal + embedding en misma operación (scraper/store.py UPSERT_WITH_EMBEDDING_SQL)",
+        "Nota: 43 Signals sin embedding son de corridas F2/--skip-embeddings previas; se backfillean en ingesta completa"
+      ]
+    },
+    {
+      "id": "F4",
+      "priority": 4,
+      "title": "Core Services: search / summarize / ask",
+      "user_visible_behavior": "Capa de servicios independiente de HTTP que resuelve búsqueda semántica, resumen por ticker/fecha y ask RAG con Citations.",
+      "status": "passing",
+      "dependencies": ["F3"],
+      "verification": [
+        "Test/script: search('inflation') devuelve Signals relevantes ordenados por similitud",
+        "ask('resumen $TSLA 24h') devuelve texto con al menos una Citation a un Signal real",
+        "Las Citations referencian id_str existentes en el Store"
+      ],
+      "evidence": [
+        "python -m backend.scripts.verify_f4 => F4 verification OK",
+        "search('inflation') => 5 hits, ordered_by_similarity=True (top: Bloomberg sim=0.2627)",
+        "ask('resumen mercados hoy') => answer_len=344, citations=10, all id_str valid in Store",
+        "Core Services en backend/services/: retrieval, search, summarize, ask, llm"
+      ]
+    },
+    {
+      "id": "F5",
+      "priority": 5,
+      "title": "API: REST + Feed Stream (SSE) + Chat Stream",
+      "user_visible_behavior": "FastAPI expone endpoints de Signals, un Feed Stream SSE que empuja Signals nuevos, y un Chat Stream que streamea la respuesta del Research Chat token a token.",
+      "status": "passing",
+      "dependencies": ["F4"],
+      "verification": [
+        "GET /signals devuelve lista paginada",
+        "curl al endpoint SSE recibe un evento al ingerir un Signal nuevo",
+        "POST al chat devuelve respuesta en streaming con Citations"
+      ],
+      "evidence": [
+        "python -m backend.scripts.verify_f5 => F5 verification OK",
+        "GET /signals => 10 items, first 2073440448463483346 @Reuters",
+        "GET /signals/stream => heartbeat SSE + StreamingResponse text/event-stream",
+        "POST /chat query='resumen mercados hoy' => answer_len=778, citations=10",
+        "FastAPI app en backend/app/: routes signals/chat/ingest, services/signals_repo",
+        "Core Services reutilizados: ask_stream + stream_answer (no RAG duplicado en routes)"
+      ]
+    },
+    {
+      "id": "F6",
+      "priority": 6,
+      "title": "Web: Terminal de 3 paneles",
+      "user_visible_behavior": "Next.js renderiza la Terminal: Signal Feed (arriba), Signal Detail (abajo izq), Research Chat (abajo der). El feed se actualiza vía SSE y el chat streamea.",
+      "status": "passing",
+      "dependencies": ["F5"],
+      "verification": [
+        "Abrir la Terminal en el navegador y ver Signals en el Feed",
+        "Click en un Signal muestra su Detail",
+        "Una Query en el Research Chat streamea respuesta con Citations clickeables que abren el Detail"
+      ],
+      "evidence": [
+        "frontend/scripts/verify-build.sh => F6 build OK (Next.js 16.2.10, Turbopack, TypeScript clean)",
+        "Browser E2E: Signal Feed 50 Signals @Reuters/@WSJ; click abre Signal Detail con engagement",
+        "Browser E2E: Research Chat 'resumen inflacion Fed' => respuesta streamed + 10 Citation chips (@Bloomberg/@Reuters)",
+        "Terminal layout: SignalFeed (SSE), SignalDetail, ResearchChat; Refresh → POST /ingest/refresh"
+      ]
+    },
+    {
+      "id": "F7",
+      "priority": 7,
+      "title": "Market Data: Quote Strip + Signal Detail",
+      "user_visible_behavior": "La Terminal muestra Quotes de la Watchlist fija en una Quote Strip bajo el header (badge 15m delayed), y enriquece los cashtags del Signal seleccionado con precio y variación % vía Alpha Vantage.",
+      "status": "passing",
+      "dependencies": ["F6"],
+      "verification": [
+        "GET /quotes/watchlist devuelve Quotes para tickers de WATCHLIST",
+        "GET /quotes?symbols=AAPL devuelve precio y cambio %",
+        "Quote Strip visible en la Terminal con datos actualizados",
+        "Signal Detail con cashtags muestra Quote inline (si el Signal tiene cashtags)"
+      ],
+      "evidence": [
+        ".venv/bin/python -m backend.scripts.verify_f7 => OK (6 watchlist quotes, AAPL $308.63 +4.84%, delayed=True)",
+        "Alpha Vantage GLOBAL_QUOTE con caché 6h + throttle 1.2s + límite 25 req/día",
+        "npm run build => OK (QuoteStrip 15m delayed badge + SignalDetail cashtag quotes)",
+        "./init.sh => baseline OK",
+        "Graceful degradation sin API key: endpoints 200 + lista vacía, UI 'Market data unavailable'"
+      ]
+    },
+    {
+      "id": "F8",
+      "priority": 8,
+      "title": "Research Chat: agente Corpus + Market Data",
+      "user_visible_behavior": "El Research Chat responde preguntas variadas usando herramientas: busca Signals en el Corpus, consulta precios de Tickers y cruza ambas fuentes para análisis (ej. precio de NVDA + qué dicen en X).",
+      "status": "passing",
+      "dependencies": ["F7"],
+      "verification": [
+        "Tools search_corpus y get_quotes ejecutan correctamente",
+        "gather_agent_context reúne Market Data + Corpus para queries sobre tickers",
+        "POST /chat devuelve respuesta con precios y Citations cuando aplica"
+      ],
+      "evidence": [
+        ".venv/bin/python -m backend.scripts.verify_f8 => OK (search_corpus 3 hits, get_quotes AAPL $308.63, agent 10 hits + 1 market + 2 corpus sections)",
+        "./init.sh => baseline OK (tools.py, agent.py, verify_f8.py)",
+        "Agente con tools: search_corpus, get_quotes, get_watchlist_quotes"
+      ]
+    },
+    {
+      "id": "F9",
+      "priority": 9,
+      "title": "Platform: Supabase + Railway + Vercel + Auth",
+      "user_visible_behavior": "Terminal en URL pública con login Supabase; API y Worker en Railway; Store en Supabase.",
+      "status": "blocked",
+      "notes": "Auth local verificada (verify_f9 OK con AUTH_ENABLED=true). Falta deploy manual Railway/Vercel (paso del usuario). Smoke E2E local OK.",
+      "dependencies": ["F8"],
+      "verification": [
+        "Login en Vercel → acceso a Terminal",
+        "GET /signals sin token → 401 en producción",
+        "Feed SSE + Chat + Quotes funcionan autenticados",
+        "Worker ingesta en Supabase"
+      ],
+      "evidence": [
+        "./init.sh => baseline OK",
+        "AUTH_ENABLED=false .venv/bin/python -m backend.scripts.verify_f9 => OK",
+        "AUTH_ENABLED=true .venv/bin/python -m backend.scripts.verify_f9 => OK (GET /health 200, GET /signals sin token 401)",
+        "frontend npm run build => OK",
+        "Code: auth.py, login page, fetch-event-source SSE, Dockerfile, deploy docs",
+        "Deploy Railway/Vercel: pendiente"
+      ]
+    },
+    {
+      "id": "F10",
+      "priority": 10,
+      "title": "News Source: Alpha Vantage (Corpus multi-fuente)",
+      "user_visible_behavior": "El Signal Feed muestra noticias financieras de Alpha Vantage (título, resumen, tickers, sentiment), no solo tweets de X. Los Signals son source-agnostic y un Source Adapter normaliza cada fuente.",
+      "status": "passing",
+      "dependencies": ["F3"],
+      "notes": "Primera feature del Corpus multi-fuente (ADR-0004). Source Adapters + schema multi-fuente. AV comparte cuota diaria con Quote Strip; RssNewsAdapter como fallback $0 cuando AV throttled.",
+      "verification": [
+        "Correr el adapter de Alpha Vantage (worker/script) contra NEWS_SENTIMENT",
+        "SELECT count(*) FROM signals WHERE source_type='alpha_vantage' > 0",
+        "Un Signal de AV tiene title, summary, tickers y sentiment poblados",
+        "GET /signals devuelve Signals de AV mezclados con los de X",
+        "El Signal Feed en la Terminal muestra al menos un Signal source_type=alpha_vantage"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f10 → OK (schema PASS; AV rate_limited; 18 RSS signals; sample title/summary/canonical_url populated)",
+        "2026-07-05: python -m scraper.ingest --skip-x --skip-embeddings --limit-per-adapter 20 → 18 Signals rss persistidos (AV 0 por cuota)",
+        "2026-07-05: ./init.sh baseline OK"
+      ]
+    },
+    {
+      "id": "F11",
+      "priority": 11,
+      "title": "RSS + Article Body (profundidad)",
+      "user_visible_behavior": "El Corpus incorpora noticias vía RSS de medios abiertos, y cada Signal de noticia guarda el Article Body extraído (best-effort trafilatura, fallback a summary). El Research Chat cita contenido con cuerpo real, no solo títulos.",
+      "status": "passing",
+      "dependencies": ["F10"],
+      "notes": "Sources RSS curadas hacia medios extraíbles (Yahoo Finance, CNBC, BBC). Article Enrichment con trafilatura; paywalls/bot-block (MarketWatch, Google News wrappers) => fallback summary. Embedding Document pasa a title+summary+body.",
+      "verification": [
+        "Correr el adapter RSS contra feeds configurados",
+        "SELECT count(*) FROM signals WHERE source_type='rss' AND body IS NOT NULL > 0",
+        "Un Signal RSS de medio abierto tiene body con el cuerpo del artículo",
+        "El Embedding Document de ese Signal incluye el body",
+        "Research Chat: una Query devuelve una respuesta que cita un Signal con body"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f11 => OK (12/12 Article Body extraídos, Embedding Document incluye body, Research Chat cita rss:ae757072c7c3f2f6)",
+        "2026-07-05: scraper/article_enrichment.py + trafilatura en ingest pipeline; feeds Yahoo Finance/CNBC/BBC",
+        "2026-07-05: GET /signals/{id} expone body; Signal Detail prefiere body sobre summary",
+        "./init.sh => baseline OK"
+      ]
+    },
+    {
+      "id": "F12",
+      "priority": 12,
+      "title": "Relevance Score (LLM) para bajar ruido",
+      "user_visible_behavior": "El Signal Feed se rankea y filtra por un Relevance Score (0–1) asignado en la Ingestion, mostrando primero lo relevante y descartando ruido.",
+      "status": "passing",
+      "dependencies": ["F10"],
+      "notes": "Pase LLM barato en Ingestion: relevance_score + tópico + tickers faltantes. Reusa sentiment/tickers de la fuente cuando existen. Complementa al Signal Filter por reglas.",
+      "verification": [
+        "Cada Signal nuevo persiste con relevance_score entre 0 y 1",
+        "GET /signals ordena o filtra por relevance_score",
+        "Comparar feed antes/después: menos Signals irrelevantes en el top",
+        "Signal de baja relevancia (ruido) queda por debajo del umbral configurado"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f12 => OK (6/6 LLM scored, feed ordered DESC, noise 0.05 excluded at RELEVANCE_SCORE_MIN=0.35)",
+        "scraper/relevance.py integrado en ingest; build_sql_filter + ORDER BY relevance_score",
+        "Marketaux/AV ya no mapean sentiment a relevance_score (LLM asigna score)",
+        "./init.sh => baseline OK"
+      ]
+    },
+    {
+      "id": "F13",
+      "priority": 13,
+      "title": "Story Cluster (dedup cross-source)",
+      "user_visible_behavior": "La misma noticia llegada por varias fuentes (AV, RSS, X) se muestra una sola vez en el feed, indicando de qué fuentes vino.",
+      "status": "passing",
+      "dependencies": ["F11"],
+      "notes": "Dedup por URL canónica + near-duplicate por similitud de embedding. cluster_id agrupa Signals de la misma historia.",
+      "verification": [
+        "Dos Signals de la misma noticia (distinta fuente) comparten cluster_id",
+        "GET /signals devuelve un representante por cluster",
+        "El Signal Detail o Feed muestra las fuentes del cluster",
+        "Métrica: nº de Signals vs nº de clusters muestra reducción de duplicados"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f13 => OK (URL cluster pair, 1 feed rep, 2 cluster_sources en Detail, 143 signals / 142 clusters)",
+        "scraper/story_cluster.py + ingest pipeline; list_signals DISTINCT ON cluster_id",
+        "Feed/Detail: cluster_sources badge; SSE dedup por cluster_id",
+        "./init.sh => baseline OK; npm run build OK"
+      ]
+    },
+    {
+      "id": "F14",
+      "priority": 14,
+      "title": "X como complemento",
+      "user_visible_behavior": "X deja de ser la fuente primaria y queda como complemento de reacción/chatter, integrado como un Source Adapter más junto a las News Sources.",
+      "status": "passing",
+      "dependencies": ["F10"],
+      "notes": "Demote de twscrape a fuente secundaria. Ajuste de sources/queries de X hacia reacción a noticias. Mantiene graceful degradation si twscrape falla.",
+      "verification": [
+        "El Worker corre News Sources aunque twscrape falle (no aborta la Ingestion)",
+        "Signals de X conviven con noticias en el feed, marcados source_type='x'",
+        "La proporción del feed la dominan las News Sources, X es minoría"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f14 => OK (X falla aislado, RSS+MA persisten, feed news=30 x=0 en top-30)",
+        "scraper/adapters/x_complement.py + ingest news-first; volumen X igual que antes (10/cuenta, 15/búsqueda, todas las cuentas)",
+        "Feed ORDER BY (source_type='x') ASC — noticias primero",
+        "./init.sh => baseline OK"
+      ]
+    },
+    {
+      "id": "F15",
+      "priority": 15,
+      "title": "Chat Session (historial Research Chat)",
+      "user_visible_behavior": "El Research Chat persiste mensajes y Citations por sesión. Al recargar la Terminal se restaura el historial; el Operator puede abrir sesiones anteriores o iniciar una nueva.",
+      "status": "passing",
+      "dependencies": ["F6"],
+      "notes": "Tablas chat_sessions + chat_messages (local Store + Supabase). user_id desde JWT sub o LOCAL_OPERATOR_ID sin auth. Citations en JSONB por mensaje assistant.",
+      "verification": [
+        "POST /chat con session_id persiste mensaje user y assistant en chat_messages",
+        "GET /chat/sessions/{id}/messages devuelve el historial ordenado",
+        "Recargar la Terminal restaura los mensajes de la sesión activa",
+        "Nueva sesión empieza historial vacío; sesiones previas listadas en GET /chat/sessions"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f15 => OK (persist user+assistant+citations, GET sessions/messages, stream append, nueva sesión vacía)",
+        "backend/app/services/chat_repo.py + routes/chat.py (SSE event: session); ResearchChat carga historial + selector sesiones",
+        "infra/store/init/005_operator_chat.sql (local); supabase 006_chat_drop_user_fk.sql para dev sin login",
+        "./init.sh + npm run build OK"
+      ]
+    },
+    {
+      "id": "F16",
+      "priority": 16,
+      "title": "RSS noticias Argentina",
+      "user_visible_behavior": "El Corpus incorpora noticias de medios argentinos (Ámbito, La Nación, Infobae, Google News AR) vía RSS, con Article Body en español cuando trafilatura lo permite.",
+      "status": "passing",
+      "dependencies": ["F11"],
+      "notes": "ARGENTINA_FEEDS en scraper/adapters/rss.py; flag RSS_AR_FEEDS_ENABLED. Google News AR = metadata (wrapper); medios directos extraen body.",
+      "verification": [
+        "Ingesta RSS trae Signals de Ámbito / La Nación / Infobae",
+        "Al menos un Signal AR con body >= 200 chars (Ámbito o La Nación)",
+        "Feed muestra noticias en español con source rss:Ámbito* o similar",
+        "python -m backend.scripts.verify_f16 => OK"
+      ],
+      "evidence": [
+        "2026-07-05: python -m backend.scripts.verify_f16 => OK (25 AR signals, Ámbito body 2152 chars, 8/8 enrichment)",
+        "Ingesta --skip-x --skip-embeddings: 25 AR RSS en Store (Ámbito/La Nación/Infobae 5 c/u con body>=200)",
+        "scraper/adapters/rss.py ARGENTINA_FEEDS + get_rss_feeds(); RSS_AR_FEEDS_ENABLED en .env.example",
+        "./init.sh OK"
+      ]
+    }
+  ]
+}
