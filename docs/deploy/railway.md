@@ -16,18 +16,26 @@ Deploy both backend services from the monorepo root using the root `Dockerfile`.
 
 | Service | Start command |
 |---------|---------------|
-| `xscraper-api` | `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT` |
+| `xscraper-api` | *(vacío — usa `CMD` del Dockerfile)* o ver abajo |
 | `xscraper-worker` | `python -m scraper.worker --interval 1800` |
 
 Both services use the same Dockerfile build; only the start command differs.
 
+> **API y `$PORT`:** con Dockerfile, Railway no expande `$PORT` en exec form. El `CMD` del Dockerfile ya usa `sh -c` con `${PORT}`. Dejá el **Custom Start Command vacío** en el API, o usá:
+>
+> ```bash
+> sh -c "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+> ```
+
 ## Service 1: `xscraper-api`
 
-**Start command:**
+**Start command:** dejá vacío (usa el `CMD` del Dockerfile) **o**:
 
 ```bash
-uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+sh -c "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
 ```
+
+No uses `uvicorn ... --port $PORT` a secas: Docker exec form no expande `$PORT` y el healthcheck falla.
 
 **Health check:** path `/health` (public, no auth). Expected response:
 

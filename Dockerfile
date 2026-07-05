@@ -6,3 +6,5 @@ COPY backend ./backend
 COPY scraper ./scraper
 COPY infra ./infra
 ENV PYTHONPATH=/app
+# Railway inyecta PORT en runtime; shell form expande la variable (exec form no).
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
