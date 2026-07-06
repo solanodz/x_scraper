@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.services.market_data import fetch_quotes, get_watchlist
+from backend.services.market_data import fetch_quotes
 from backend.services.recent_signals import get_recent_signals
 from backend.services.retrieval import excerpt, retrieve
+from backend.services.ticker_catalog import get_quote_strip_symbols, resolve_ticker_input
 from backend.services.types import SignalHit
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
@@ -30,7 +31,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     },
                     "ticker": {
                         "type": "string",
-                        "description": "Opcional. Filtra por cashtag, ej. AAPL o $NVDA.",
+                        "description": (
+                            "Opcional. Ticker o nombre de empresa "
+                            "(ej. INTC, Intel, NVDA)."
+                        ),
                     },
                     "since_hours": {
                         "type": "integer",
@@ -61,7 +65,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "properties": {
                     "ticker": {
                         "type": "string",
-                        "description": "Opcional. Filtra por cashtag, ej. MSFT o $AAPL.",
+                        "description": (
+                            "Opcional. Ticker o nombre de empresa "
+                            "(ej. MSFT, Microsoft, INTC, Intel)."
+                        ),
                     },
                     "source_type": {
                         "type": "string",
@@ -180,7 +187,7 @@ def execute_tool(
         hits = retrieve(
             query,
             limit=limit,
-            ticker=str(ticker) if ticker else None,
+            ticker=resolve_ticker_input(str(ticker)) if ticker else None,
             since_hours=int(since_hours) if since_hours else None,
         )
         return _format_hits_for_tool(hits), hits
@@ -192,7 +199,7 @@ def execute_tool(
         limit = int(arguments.get("limit") or 10)
         limit = max(1, min(limit, 50))
         hits = get_recent_signals(
-            ticker=str(ticker) if ticker else None,
+            ticker=resolve_ticker_input(str(ticker)) if ticker else None,
             source_type=str(source_type) if source_type else None,
             hours=int(hours) if hours else None,
             limit=limit,
@@ -201,14 +208,20 @@ def execute_tool(
 
     if name == "get_quotes":
         raw_symbols = arguments.get("symbols") or []
-        symbols = [str(s).strip() for s in raw_symbols if str(s).strip()]
+        symbols = []
+        for s in raw_symbols:
+            resolved = resolve_ticker_input(str(s).strip())
+            if resolved:
+                symbols.append(resolved)
+            elif str(s).strip():
+                symbols.append(str(s).strip().lstrip("$").upper())
         if not symbols:
             return json.dumps({"error": "symbols requerido"}), []
         quotes = fetch_quotes(symbols)
         return _format_quotes_for_tool(quotes), []
 
     if name == "get_watchlist_quotes":
-        symbols = get_watchlist()
+        symbols = get_quote_strip_symbols()
         quotes = fetch_quotes(symbols)
         payload = json.loads(_format_quotes_for_tool(quotes))
         payload["watchlist"] = symbols

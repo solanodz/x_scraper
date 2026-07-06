@@ -53,7 +53,6 @@ No uses `uvicorn ... --port $PORT` a secas: Docker exec form no expande `$PORT` 
 | `OPENAI_API_KEY` | yes | Embeddings + Research Chat |
 | `FINNHUB_API_KEY` | yes | Market Data primario (Quote Strip + Signal Detail) |
 | `ALPHA_VANTAGE_API_KEY` | no | Fallback quotes + news ingest; graceful degradation if empty |
-| `WATCHLIST` | no | Default watchlist tickers (see `.env.example`) |
 | `SIGNAL_FILTER` | no | `relevant` (default), `cashtag`, `strict`, or `off` |
 | `SIGNAL_MIN_LIKES` | no | Minimum likes filter (default `0`) |
 | `SIGNAL_REQUIRE_LINK` | no | `true` / `false` (default `false`) |
@@ -101,7 +100,6 @@ Railway → Worker service → **Volumes** → add volume, mount path `/data`.
 | `X_ACCOUNT_NAME` | yes | twscrape account label |
 | `ACCOUNTS_DB` | yes | `/data/accounts.db` (on mounted volume) |
 | `SIGNAL_FILTER` | no | Same modes as API |
-| `WATCHLIST` | no | Same as API (for consistency) |
 | `SIGNAL_MIN_LIKES` | no | Same as API |
 | `SIGNAL_REQUIRE_LINK` | no | Same as API |
 

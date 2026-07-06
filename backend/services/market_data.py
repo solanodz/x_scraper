@@ -85,14 +85,10 @@ def get_max_daily_requests() -> int:
 
 
 def get_watchlist() -> list[str]:
-    _load_env()
-    raw = os.getenv("WATCHLIST", DEFAULT_WATCHLIST)
-    symbols: list[str] = []
-    for part in raw.split(","):
-        symbol = normalize_symbol(part.strip())
-        if symbol and symbol not in symbols:
-            symbols.append(symbol)
-    return symbols
+    """Símbolos del carrusel Quote Strip (dinámico desde Corpus, sin WATCHLIST)."""
+    from backend.services.ticker_catalog import get_quote_strip_symbols
+
+    return get_quote_strip_symbols()
 
 
 def normalize_symbol(ticker: str) -> str:
@@ -577,16 +573,7 @@ def _curated_ticker_catalog() -> list[TickerSuggestion]:
 
 
 def search_tickers(prefix: str = "", *, limit: int = 50) -> list[TickerSuggestion]:
-    """Sugerencias para autocompletado ($) — carrusel + tickers conocidos."""
-    limit = max(1, min(limit, 100))
-    prefix_clean = prefix.strip().lstrip("$").upper()
+    """Sugerencias para autocompletado — Corpus + catálogo curado."""
+    from backend.services.ticker_catalog import search_ticker_suggestions
 
-    results: list[TickerSuggestion] = []
-    for item in _curated_ticker_catalog():
-        if prefix_clean and not item.symbol.startswith(prefix_clean):
-            continue
-        results.append(item)
-        if len(results) >= limit:
-            break
-
-    return results
+    return search_ticker_suggestions(prefix, limit=limit)

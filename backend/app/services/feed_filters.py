@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.services.retrieval import normalize_ticker
+from backend.services.ticker_catalog import append_ticker_match_conditions
 
 VALID_SOURCE_TYPES = frozenset({"x", "rss", "marketaux", "alpha_vantage", "news"})
 VALID_SENTIMENTS = frozenset({"positive", "negative", "neutral", "bullish", "bearish"})
@@ -58,19 +59,8 @@ def build_feed_filter_conditions(
             f") ILIKE %({key})s"
         )
 
-    normalized_ticker = normalize_ticker(filters.ticker)
-    if normalized_ticker:
-        params["ticker"] = normalized_ticker
-        params["ticker_pattern"] = f"%{normalized_ticker}%"
-        conditions.append(
-            "("
-            "%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
-            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers) "
-            "OR COALESCE(title, '') ILIKE %(ticker_pattern)s "
-            "OR COALESCE(summary, '') ILIKE %(ticker_pattern)s "
-            "OR COALESCE(raw_content, '') ILIKE %(ticker_pattern)s"
-            ")"
-        )
+    if filters.ticker:
+        append_ticker_match_conditions(conditions, params, raw_ticker=filters.ticker)
 
     username = _clean_text(filters.username)
     if username:

@@ -53,7 +53,7 @@ Barra bajo el header de la Terminal que muestra Quotes de la Watchlist fija en c
 _Avoid_: Ticker tape, price bar, market strip
 
 **Watchlist**:
-Lista fija de tickers configurada en `.env` (`WATCHLIST`) cuyas Quotes aparecen en la Quote Strip. Los cashtags del Signal seleccionado se enriquecen con Quote en Signal Detail.
+Tickers mostrados en la Quote Strip y usados para Market Data del carrusel. Se derivan dinámicamente del Corpus (cashtags/tickers más activos en Signals recientes) más anclas fijas en código (BTC, ETH, SPY, QQQ). No hay lista fija en `.env`. `get_quotes` acepta cualquier símbolo bajo demanda.
 _Avoid_: Portfolio, favorites, bookmarks
 
 ## Terminal Layout

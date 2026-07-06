@@ -5,6 +5,7 @@ from __future__ import annotations
 from backend.app.schemas import SignalSummary
 from backend.app.services.feed_filters import feed_filters_from_query
 from backend.app.services.signals_repo import list_recent_signals
+from backend.services.ticker_catalog import resolve_ticker_input
 from backend.services.types import SignalHit
 
 
@@ -24,7 +25,7 @@ def get_recent_signals(
 ) -> list[SignalHit]:
     """Devuelve Signals ordenados por published_at DESC (como el Signal Feed)."""
     filters = feed_filters_from_query(
-        ticker=ticker,
+        ticker=resolve_ticker_input(ticker) if ticker else None,
         source_type=source_type,
         since_hours=hours,
     )

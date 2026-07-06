@@ -8,6 +8,10 @@ from scraper.embeddings import embed_texts
 from scraper.filters import build_sql_filter
 from scraper.store import connect
 
+from backend.services.ticker_catalog import (
+    append_ticker_match_conditions,
+    build_ticker_match,
+)
 from backend.services.types import SignalHit
 
 SEARCH_BASE_SQL = """
@@ -135,19 +139,11 @@ def _append_common_filters(
     ticker: str | None,
     since_hours: int | None,
 ) -> None:
-    normalized_ticker = normalize_ticker(ticker)
-    if normalized_ticker:
-        params["ticker"] = normalized_ticker
-        params["ticker_pattern"] = f"%{normalized_ticker}%"
-        conditions.append(
-            "("
-            "%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
-            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers) "
-            "OR COALESCE(title, '') ILIKE %(ticker_pattern)s "
-            "OR COALESCE(summary, '') ILIKE %(ticker_pattern)s "
-            "OR COALESCE(raw_content, '') ILIKE %(ticker_pattern)s"
-            ")"
-        )
+    append_ticker_match_conditions(
+        conditions,
+        params,
+        raw_ticker=ticker,
+    )
 
     if since_hours is not None:
         conditions.append(
@@ -164,8 +160,8 @@ def search_by_keywords(
 ) -> list[SignalHit]:
     """Recupera Signals por coincidencia de keywords en title/summary/raw_content."""
     keywords = _extract_keywords(query)
-    normalized_ticker = normalize_ticker(ticker)
-    if not keywords and not normalized_ticker:
+    match = build_ticker_match(ticker)
+    if not keywords and match is None:
         return []
 
     conditions: list[str] = []
