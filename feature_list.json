@@ -384,7 +384,7 @@
       "priority": 19,
       "title": "Ticker Watch (lista personal del Operator)",
       "user_visible_behavior": "El Operator sigue Tickers a mano desde la Terminal: los agrega por símbolo o nombre de empresa (Intel → INTC), los ve listados y los quita. La lista persiste por Operator entre sesiones.",
-      "status": "pending",
+      "status": "passing",
       "dependencies": ["F9"],
       "notes": "Tabla dedicada ticker_watch (no JSONB en operator_settings). Supabase: user_id UUID + FK auth.users + RLS (migración 007_ticker_watch.sql). Store local: user_id TEXT sin FK (006_ticker_watch.sql), patrón chat. Símbolo canónico vía resolve_ticker_input; canonicalizar + aceptar (sin validar contra quote). Repo filtra por user_id explícito (como chat_repo) + operator_id_from_user. Columna note/thesis nullable desde ya para interpretación futura. UI: popover 'Watch' en TerminalHeader, add con autocomplete fetchTickerSuggestions, quitar con ×. Filtro 'Mis tickers' en el feed queda fuera de alcance (requiere multi-ticker backend).",
       "verification": [
@@ -395,14 +395,19 @@
         "Aislamiento: otro operator_id no ve los Tickers ajenos",
         "python -m backend.scripts.verify_f19 => OK"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f19 => OK (Intel→INTC, GET/DELETE, isolation, duplicate)",
+        "infra/store/init/006_ticker_watch.sql + supabase 007/008; ticker_watch_repo + routes/watch.py",
+        "frontend TickerWatchPopover en TerminalHeader; fetchTickerWatch/add/remove API",
+        "./init.sh + npm run build OK"
+      ]
     },
     {
       "id": "F20",
       "priority": 20,
       "title": "Briefing on-demand del Ticker Watch",
       "user_visible_behavior": "El Operator pide un Briefing de sus Tickers seguidos y recibe, por cada Ticker con novedad, precio + Signals recientes + una interpretación 'qué implica / qué mirar', con Citations. Se muestra como mensaje del Research Chat y permite follow-up.",
-      "status": "pending",
+      "status": "passing",
       "dependencies": ["F18", "F19"],
       "notes": "Ver ADR-0007. Servicio determinístico backend/services/briefing.py: por cada Ticker del Ticker Watch llama get_recent_signals (default 24h) + fetch_quotes, luego una síntesis grounded única (reusa stream_answer + Citations). Cobertura garantizada (itera en código, no vía agente). Interpretación analítica: sin recomendaciones compra/venta ni predicción de precios; toda afirmación respaldada por Signal. Orden por relevancia/movimiento; Tickers sin novedad en línea compacta 'Sin novedades'. Entrega streaming SSE reusando contrato Chat Stream + ResearchStepLoader (pasos 'Revisando NVDA…'). Render como mensaje del Research Chat (queda en Chat Session, habilita follow-up). On-demand (botón), sin cron. Ventana configurable (BRIEFING_WINDOW_HOURS default 24).",
       "verification": [
@@ -414,7 +419,74 @@
         "Follow-up sobre el Briefing usa la memoria de la Chat Session",
         "python -m backend.scripts.verify_f20 => OK"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f20 => OK (iter_briefing_stream, POST /chat/briefing SSE, synthesis)",
+        "backend/services/briefing.py determinístico + stream_briefing_answer en llm.py",
+        "frontend: botón Briefing en ResearchChat + TickerWatchPopover (evento xscraper:briefing)",
+        "./init.sh + npm run build OK"
+      ]
+    },
+    {
+      "id": "F21",
+      "priority": 21,
+      "title": "Briefing memo de decisión",
+      "user_visible_behavior": "El Briefing prioriza lo material: resumen ejecutivo, hasta 2 tickers en prioridad alta (hecho → implicación → qué mirar → riesgo), otras novedades compactas, lista de sin novedades, temas cruzados y preguntas abiertas. Sin calls compra/venta.",
+      "status": "passing",
+      "dependencies": ["F20"],
+      "notes": "Memo B (grill). Top 2 prioridad_alta en código (_slice_sort_key). Reescribir BRIEFING_SYSTEM_PROMPT + _build_context con tags prioridad_alta. verify_f21.py.",
+      "verification": [
+        "Contexto marca top 2 tickers con novedad como prioridad_alta: true",
+        "Briefing output sigue estructura memo (6 bloques en prompt)",
+        "python -m backend.scripts.verify_f21 => OK"
+      ],
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f21 => OK (prioridad_alta NVDA top, max 2 markers, iter_briefing_stream)",
+        "backend/services/briefing.py: _mark_prioridad_alta + contexto agrupado (prioridad_alta/otras/sin_novedad)",
+        "backend/services/llm.py: BRIEFING_SYSTEM_PROMPT memo 6 bloques en español",
+        "./init.sh OK"
+      ]
+    },
+    {
+      "id": "F23",
+      "priority": 23,
+      "title": "Thesis por ticker en Ticker Watch",
+      "user_visible_behavior": "El Operator escribe una Thesis opcional por ticker en Watch (expand inline). El Briefing incluye alineación refuerza/neutral/tensiona en tickers con novedad.",
+      "status": "passing",
+      "dependencies": ["F21"],
+      "notes": "Columna note=Thesis. PATCH /watch/{symbol}. UI TickerWatchPopover expand inline. briefing.py incluye thesis en contexto. verify_f23.py.",
+      "verification": [
+        "PATCH /watch/NVDA persiste thesis",
+        "Briefing context incluye Thesis cuando existe",
+        "python -m backend.scripts.verify_f23 => OK"
+      ],
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f23 => OK (PATCH/GET note, Thesis in _build_context, max 280)",
+        "backend/app/routes/watch.py PATCH /watch/{symbol}; ticker_watch_repo.update_watch",
+        "backend/services/briefing.py thesis en slices + llm BRIEFING_SYSTEM_PROMPT alineación",
+        "frontend TickerWatchPopover inline Mi tesis + amber dot; ./init.sh + npm run build OK"
+      ]
+    },
+    {
+      "id": "F22",
+      "priority": 22,
+      "title": "Briefing delta vs anterior",
+      "user_visible_behavior": "Si existe un Briefing previo (sesión Briefing %), el nuevo abre con delta: nuevo / sin cambio material / cambió el tono.",
+      "status": "passing",
+      "dependencies": ["F21"],
+      "notes": "chat_repo.get_previous_briefing. Una pasada LLM con briefing anterior en contexto (cap 6k). Omitir bloque si no hay previo. verify_f22.py.",
+      "verification": [
+        "Con Briefing previo, contexto incluye texto anterior",
+        "Sin Briefing previo, no hay sección delta",
+        "python -m backend.scripts.verify_f22 => OK"
+      ],
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f22 => OK (get_previous_briefing, wrap context, exclude_session_id, no wrapper sin previo)",
+        "backend/app/services/chat_repo.py: get_previous_briefing (Briefing % sessions, last assistant msg, cap 6k)",
+        "backend/services/briefing.py: _wrap_with_previous_briefing + exclude_session_id en iter_briefing_stream",
+        "backend/services/llm.py: BRIEFING_SYSTEM_PROMPT bloque ## Desde el último Briefing (Nuevo/Sin cambio material/Cambió el tono)",
+        "backend/app/routes/chat.py: stream_factory pasa sid como exclude_session_id",
+        "./init.sh OK"
+      ]
     }
   ]
 }

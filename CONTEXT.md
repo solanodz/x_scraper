@@ -186,9 +186,13 @@ _Avoid_: News table, tweets table
 ## Ticker Watch & Briefing
 
 **Ticker Watch**:
-Lista personal del Operator de Tickers que sigue deliberadamente. Distinta de la Watchlist (carrusel derivado dinámicamente del Corpus, no personal): el Ticker Watch lo arma el Operator a mano y se persiste por usuario. Alimenta el Briefing. Los símbolos se guardan canónicos (mayúsculas, sin `$`, resueltos desde nombres de empresa: Intel → INTC).
+Lista personal del Operator de Tickers que sigue deliberadamente. Distinta de la Watchlist (carrusel derivado dinámicamente del Corpus, no personal): el Ticker Watch lo arma el Operator a mano y se persiste por usuario. Alimenta el Briefing. Los símbolos se guardan canónicos (mayúsculas, sin `$`, resueltos desde nombres de empresa: Intel → INTC). Cada Ticker puede tener una **Thesis** opcional del Operator.
 _Avoid_: Watchlist, favorites, portfolio, following
 
+**Thesis**:
+Hipótesis de inversión del Operator sobre un Ticker en su Ticker Watch: por qué lo sigue y qué riesgos tiene en mente. Una oración corta, opcional. El Briefing evalúa **alineación** (refuerza / neutral / tensiona) entre la Thesis y los Signals recientes.
+_Avoid_: Note, watch note, investment thesis document, conviction score
+
 **Briefing**:
-Resumen on-demand, grounded y con Citations, de los Tickers del Ticker Watch. Por cada Ticker con novedad en la ventana (default 24h): precio y variación %, Signals recientes relevantes, y una interpretación de "qué implica / qué mirar". Es analítico: no da recomendaciones de compra/venta ni predice precios; toda afirmación se respalda con un Signal. Se genera bajo demanda y se muestra como un mensaje del Research Chat (permite follow-up sobre el mismo hilo).
+Memo de decisión on-demand, grounded y con Citations, sobre los Tickers del Ticker Watch. Prioriza lo material (lo más relevante hoy, hasta dos Tickers en prioridad alta con hecho → implicación → qué mirar → riesgo), resume el resto con novedad en formato compacto, lista los Tickers sin novedad en bloque, y cierra con temas cruzados y preguntas abiertas. Si existe un Briefing anterior del Operator, abre con un delta (nuevo / sin cambio material / cambió el tono) respecto a ese Briefing. Es analítico: no da recomendaciones de compra/venta ni predice precios; toda afirmación se respalda con un Signal. Se genera bajo demanda en una Chat Session dedicada (permite follow-up).
 _Avoid_: Digest, report, newsletter, resumen

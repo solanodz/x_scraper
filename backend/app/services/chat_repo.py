@@ -163,6 +163,55 @@ def append_message(
     return _row_to_message(row)
 
 
+def get_previous_briefing(
+    *,
+    user_id: str,
+    exclude_session_id: str | None = None,
+) -> str | None:
+    """Último assistant message de la sesión Briefing % más reciente (excluye sesión actual)."""
+    if exclude_session_id:
+        session_sql = """
+            SELECT id
+            FROM chat_sessions
+            WHERE user_id = %(user_id)s
+              AND title LIKE 'Briefing %%'
+              AND id::text != %(exclude_id)s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        session_params = {"user_id": user_id, "exclude_id": exclude_session_id}
+    else:
+        session_sql = """
+            SELECT id
+            FROM chat_sessions
+            WHERE user_id = %(user_id)s
+              AND title LIKE 'Briefing %%'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        session_params = {"user_id": user_id}
+    message_sql = """
+        SELECT content
+        FROM chat_messages
+        WHERE session_id = %(session_id)s AND role = 'assistant'
+        ORDER BY created_at DESC
+        LIMIT 1
+    """
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(session_sql, session_params)
+            row = cur.fetchone()
+            if row is None:
+                return None
+            session_id = row[0]
+            cur.execute(message_sql, {"session_id": session_id})
+            msg_row = cur.fetchone()
+    if msg_row is None:
+        return None
+    content = (msg_row[0] or "").strip()
+    return content or None
+
+
 def ensure_session(
     *,
     user_id: str,

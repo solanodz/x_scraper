@@ -2,13 +2,13 @@
 
 ## Estado actual
 
-**F18 `passing`.** Research Agent LangGraph verificado localmente. F9 `passing`. Próximo: cutover prod `RESEARCH_ENGINE=langgraph` en Railway API.
+**F22 `passing`.** Briefing delta vs anterior (Nuevo / Sin cambio material / Cambió el tono). Próximo: redeploy prod.
 
 ## Próximo paso
 
-1. Railway API: `RESEARCH_ENGINE=langgraph` + redeploy
-2. Probar follow-up en prod: "¿y comparado con el mes pasado?" tras una query de NVDA
-3. Elegir siguiente feature (quick win UX o GDELT)
+1. Redeploy API + frontend (Railway + Vercel)
+2. Probar delta Briefing en prod (segundo Briefing del día vs primero)
+3. Elegir siguiente feature del backlog
 
 ## Roadmap Corpus multi-fuente (ADR-0004)
 
@@ -25,11 +25,29 @@
 - **F17** Acceso confiable al Corpus (retrieval) (`passing`)
 - **F18** Research Agent con LangGraph (`passing`)
 
+## Roadmap Ticker Watch & Briefing (ADR-0007)
+
+- **F19** Ticker Watch (`passing`)
+- **F20** Briefing on-demand (`passing`)
+- **F21** Briefing memo de decisión (`passing`)
+- **F22** Briefing delta vs anterior (`passing`)
+- **F23** Thesis por ticker (`passing`)
+
 ## Deploy F9 (`passing`)
 
 Railway (API + Worker) + Vercel (frontend) + Supabase — prod operativo.
 
 ## Log
+
+- 2026-07-06 — F22 PASSING. Briefing delta vs anterior: `get_previous_briefing` (sesión Briefing %, último assistant, exclude current), contexto wrap cap 6k, prompt `## Desde el último Briefing` (Nuevo/Sin cambio material/Cambió el tono). Verificado: `python -m backend.scripts.verify_f22` OK; `verify_f21` regression OK.
+
+- 2026-07-06 — F23 PASSING. Thesis por ticker: PATCH /watch/{symbol} (note max 280), TickerWatchPopover expand inline "Mi tesis" + amber dot, briefing context `Thesis:` + prompt alineación refuerza/neutral/tensiona. Verificado: `python -m backend.scripts.verify_f23` OK; `./init.sh` + `npm run build` OK.
+
+- 2026-07-06 — F21 PASSING. Briefing memo de decisión: prioridad_alta top 2 determinístico (_mark_prioridad_alta), contexto agrupado, BRIEFING_SYSTEM_PROMPT 6 bloques (Lo más relevante / Prioridad alta / Otras novedades / Sin novedades / Temas cruzados / Preguntas abiertas). Verificado: `python -m backend.scripts.verify_f21` OK; `./init.sh` OK.
+
+- 2026-07-06 — F20 PASSING. Briefing on-demand: `briefing.py` determinístico (get_recent_signals + fetch_quotes por ticker), `POST /chat/briefing` SSE, botón Briefing en Watch popover y Research Chat. Verificado: `python -m backend.scripts.verify_f20` OK; `npm run build` OK.
+
+- 2026-07-06 — F19 PASSING. Ticker Watch: tabla `ticker_watch`, repo + GET/POST/DELETE `/watch`, popover en TerminalHeader con autocomplete. Intel→INTC canonical. Verificado: `python -m backend.scripts.verify_f19` OK; `./init.sh` + `npm run build` OK.
 
 - 2026-07-06 — F18 PASSING. LangGraph ReAct (`research_agent.py`), 7 tools, memoria vía chat_messages, flag `RESEARCH_ENGINE`. Verificado: `python -m backend.scripts.verify_f18` OK; `./init.sh` OK.
 
