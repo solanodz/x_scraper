@@ -50,6 +50,14 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   citations?: ChatCitation[];
+  /** Pasos del agente (solo durante streaming; no persistidos). */
+  steps?: ResearchStep[];
+}
+
+export interface ResearchStep {
+  tool: string;
+  label: string;
+  status: "running" | "done";
 }
 
 export interface ChatSessionSummary {

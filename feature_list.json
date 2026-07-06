@@ -167,8 +167,8 @@
       "priority": 9,
       "title": "Platform: Supabase + Railway + Vercel + Auth",
       "user_visible_behavior": "Terminal en URL pública con login Supabase; API y Worker en Railway; Store en Supabase.",
-      "status": "blocked",
-      "notes": "Auth local verificada (verify_f9 OK con AUTH_ENABLED=true). Falta deploy manual Railway/Vercel (paso del usuario). Smoke E2E local OK.",
+      "status": "passing",
+      "notes": "Deploy prod completo: Railway API+Worker, Vercel frontend, Supabase Store. Auth + SSE + Chat + Quotes + ingesta verificados en producción.",
       "dependencies": ["F8"],
       "verification": [
         "Login en Vercel → acceso a Terminal",
@@ -182,7 +182,8 @@
         "AUTH_ENABLED=true .venv/bin/python -m backend.scripts.verify_f9 => OK (GET /health 200, GET /signals sin token 401)",
         "frontend npm run build => OK",
         "Code: auth.py, login page, fetch-event-source SSE, Dockerfile, deploy docs",
-        "Deploy Railway/Vercel: pendiente"
+        "Deploy Railway/Vercel: OK (2026-07-06)",
+        "Prod: Terminal en Vercel, API/Worker Railway, Store Supabase; tickers dinámicos + F17 en prod"
       ]
     },
     {
@@ -359,7 +360,7 @@
       "priority": 18,
       "title": "Research Agent con LangGraph",
       "user_visible_behavior": "El Research Chat orquesta research multi-paso con LangGraph: filtra por ticker/tipo/fecha/relevancia, hace análisis de mercado y tendencias (precio + narrativa), lectura profunda de artículos, y recuerda el hilo de la conversación. Streaming y Citations sin cambios visibles de contrato.",
-      "status": "pending",
+      "status": "passing",
       "dependencies": ["F15", "F17"],
       "notes": "Ver ADR-0006. LangGraph + langchain-core + langchain-openai; retrieval propio. ReAct prebuilt primero (create_react_agent), grafo custom después. 7 tools: search_corpus (+source_type,+min_relevance), get_recent_signals, get_signal_detail, corpus_stats, get_quotes, get_watchlist_quotes, get_price_history (yfinance). Citations derivadas del estado. Memoria vía chat_messages (sin checkpointer). Modelo configurable (RESEARCH_MODEL/SYNTHESIS_MODEL, default gpt-4o-mini). LangSmith opt-in. Flag RESEARCH_ENGINE=langgraph|legacy (default legacy hasta verificar). Backend-only, contrato SSE intacto.",
       "verification": [
@@ -370,7 +371,13 @@
         "Rollback: RESEARCH_ENGINE=legacy restaura el motor previo sin cambios de frontend",
         "python -m backend.scripts.verify_f18 => OK"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f18 => OK (7 tools, corpus_stats, get_price_history, search_corpus filters, LangGraph gather_research_context, legacy rollback)",
+        "backend/services/research_agent.py: create_react_agent + dynamic TOOL_DEFINITIONS + session history",
+        "backend/services/corpus_stats.py, tools extended (get_signal_detail, corpus_stats, get_price_history)",
+        "ask.py RESEARCH_ENGINE=langgraph|legacy; chat.py pasa historial de sesión",
+        "./init.sh OK"
+      ]
     }
   ]
 }

@@ -27,6 +27,7 @@ from backend.app.services.chat_repo import (
     tables_ready,
 )
 from backend.services.ask import ask_stream
+from backend.services.research_steps import ResearchStepEvent
 from backend.services.types import Citation
 from fastapi.responses import StreamingResponse
 
@@ -129,6 +130,19 @@ async def _sse_chat_stream(
     sid = session["id"]
     yield f"event: session\ndata: {json.dumps({'session_id': sid})}\n\n"
 
+    chat_history: list[dict] = []
+    if tables_ready():
+        try:
+            prior = list_messages(user_id=operator_id, session_id=sid)
+            chat_history = [
+                {"role": row["role"], "content": row["content"]}
+                for row in prior
+                if row.get("role") in {"user", "assistant"}
+                and (row.get("content") or "").strip()
+            ]
+        except ChatRepoError:
+            chat_history = []
+
     append_message(
         user_id=operator_id,
         session_id=sid,
@@ -138,7 +152,7 @@ async def _sse_chat_stream(
     set_session_title_if_empty(sid, query)
 
     loop = asyncio.get_event_loop()
-    stream = ask_stream(query)
+    stream = ask_stream(query, history=chat_history)
     answer_parts: list[str] = []
     citations: list[Citation] = []
 
@@ -146,7 +160,10 @@ async def _sse_chat_stream(
         chunk = await loop.run_in_executor(None, lambda: next(stream, None))
         if chunk is None:
             break
-        if isinstance(chunk, list):
+        if isinstance(chunk, ResearchStepEvent):
+            payload = chunk.to_dict()
+            yield f"event: step\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        elif isinstance(chunk, list):
             citations = chunk
             payload = _citation_payload(citations)
             yield f"event: citations\ndata: {json.dumps(payload)}\n\n"

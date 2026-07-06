@@ -138,6 +138,8 @@ def _append_common_filters(
     *,
     ticker: str | None,
     since_hours: int | None,
+    source_type: str | None = None,
+    min_relevance: float | None = None,
 ) -> None:
     append_ticker_match_conditions(
         conditions,
@@ -151,12 +153,30 @@ def _append_common_filters(
         )
         params["since_hours"] = since_hours
 
+    if source_type:
+        lowered = source_type.strip().lower()
+        if lowered == "news":
+            conditions.append(
+                "source_type IN ('rss', 'marketaux', 'alpha_vantage')"
+            )
+        elif lowered == "x":
+            conditions.append("(source_type = 'x' OR source_type IS NULL)")
+        elif lowered in ("rss", "marketaux", "alpha_vantage"):
+            conditions.append("source_type = %(source_type)s")
+            params["source_type"] = lowered
+
+    if min_relevance is not None:
+        conditions.append("relevance_score >= %(min_relevance)s")
+        params["min_relevance"] = float(min_relevance)
+
 
 def search_by_keywords(
     query: str,
     limit: int = 10,
     ticker: str | None = None,
     since_hours: int | None = None,
+    source_type: str | None = None,
+    min_relevance: float | None = None,
 ) -> list[SignalHit]:
     """Recupera Signals por coincidencia de keywords en title/summary/raw_content."""
     keywords = _extract_keywords(query)
@@ -177,6 +197,8 @@ def search_by_keywords(
         params,
         ticker=ticker,
         since_hours=since_hours,
+        source_type=source_type,
+        min_relevance=min_relevance,
     )
 
     for index, keyword in enumerate(keywords):
@@ -206,6 +228,8 @@ def retrieve(
     limit: int = 10,
     ticker: str | None = None,
     since_hours: int | None = None,
+    source_type: str | None = None,
+    min_relevance: float | None = None,
 ) -> list[SignalHit]:
     """Recupera Signals por similitud semántica; fallback a keywords si no hay hits."""
     query_vector = _format_embedding(embed_texts([query])[0])
@@ -226,6 +250,8 @@ def retrieve(
         params,
         ticker=ticker,
         since_hours=since_hours,
+        source_type=source_type,
+        min_relevance=min_relevance,
     )
 
     sql = SEARCH_BASE_SQL.format(where_clause=" AND ".join(conditions))
@@ -239,4 +265,11 @@ def retrieve(
 
     if hits:
         return hits
-    return search_by_keywords(query, limit=limit, ticker=ticker, since_hours=since_hours)
+    return search_by_keywords(
+        query,
+        limit=limit,
+        ticker=ticker,
+        since_hours=since_hours,
+        source_type=source_type,
+        min_relevance=min_relevance,
+    )

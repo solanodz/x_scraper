@@ -1,7 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FeedFilterQuery } from "./feedFilters";
-import type { ChatCitation, Quote, SignalDetail, SignalSummary, TickerSuggestion } from "./types";
+import type {
+  ChatCitation,
+  Quote,
+  ResearchStep,
+  SignalDetail,
+  SignalSummary,
+  TickerSuggestion,
+} from "./types";
 
 function normalizeApiUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, "");
@@ -214,6 +221,7 @@ export async function streamChat(
   callbacks: {
     onToken: (token: string) => void;
     onCitations: (citations: ChatCitation[]) => void;
+    onStep?: (step: ResearchStep) => void;
     onSession?: (sessionId: string) => void;
     onError?: (error: Error) => void;
   },
@@ -271,6 +279,9 @@ export async function streamChat(
             if (payload.session_id) {
               callbacks.onSession?.(payload.session_id);
             }
+            currentEvent = "";
+          } else if (currentEvent === "step") {
+            callbacks.onStep?.(JSON.parse(raw) as ResearchStep);
             currentEvent = "";
           } else {
             const token = JSON.parse(raw) as string;

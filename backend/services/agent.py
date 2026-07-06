@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from openai.types.chat import ChatCompletionMessage
 
 from backend.services.llm import _get_client
+from backend.services.research_steps import (
+    GatherResult,
+    ResearchStepEvent,
+    format_tool_step_label,
+)
 from backend.services.retrieval import retrieve
 from backend.services.tools import (
     TOOL_DEFINITIONS,
@@ -109,12 +115,34 @@ def _record_tool_result(
 
 def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
     """Ejecuta el loop de herramientas y devuelve contexto para sintetizar."""
+    for item in iter_gather_agent_context(query, max_turns=max_turns):
+        if isinstance(item, GatherResult):
+            return AgentContext(
+                query=query,
+                hits=item.hits,
+                market_sections=item.market_sections or [],
+                corpus_sections=item.corpus_sections or [],
+            )
+    raise RuntimeError("iter_gather_agent_context no devolvió GatherResult")
+
+
+def iter_gather_agent_context(
+    query: str,
+    max_turns: int = 6,
+) -> Iterator[ResearchStepEvent | GatherResult]:
+    """Loop legacy con emisión de pasos por tool."""
     context = AgentContext(query=query)
     messages: list[dict] = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": query},
     ]
     client = _get_client()
+
+    yield ResearchStepEvent(
+        tool="agent",
+        label="Investigando consulta…",
+        status="running",
+    )
 
     for _ in range(max_turns):
         response = client.chat.completions.create(
@@ -138,6 +166,13 @@ def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
             except json.JSONDecodeError:
                 arguments = {}
 
+            label = format_tool_step_label(fn.name, arguments)
+            yield ResearchStepEvent(
+                tool=fn.name,
+                label=label,
+                status="running",
+            )
+
             result, hits = execute_tool(fn.name, arguments)
             _record_tool_result(context, fn.name, arguments, result, hits)
             messages.append(
@@ -148,7 +183,18 @@ def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
                 }
             )
 
+            yield ResearchStepEvent(
+                tool=fn.name,
+                label=label,
+                status="done",
+            )
+
     if not context.hits:
+        yield ResearchStepEvent(
+            tool="search_corpus",
+            label="Búsqueda de respaldo en el Corpus",
+            status="running",
+        )
         fallback_hits = retrieve(query, limit=10)
         context.hits.extend(fallback_hits)
         if fallback_hits:
@@ -158,9 +204,26 @@ def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
                 "### search_corpus (fallback)\n"
                 + _format_hits_for_tool(fallback_hits)
             )
+        yield ResearchStepEvent(
+            tool="search_corpus",
+            label="Búsqueda de respaldo en el Corpus",
+            status="done",
+        )
 
     context.hits = dedupe_hits(context.hits)
-    return context
+
+    yield ResearchStepEvent(
+        tool="agent",
+        label="Investigando consulta…",
+        status="done",
+    )
+
+    yield GatherResult(
+        context=format_agent_context(context),
+        hits=context.hits,
+        market_sections=list(context.market_sections),
+        corpus_sections=list(context.corpus_sections),
+    )
 
 
 def format_agent_context(context: AgentContext) -> str:

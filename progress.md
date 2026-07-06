@@ -2,13 +2,13 @@
 
 ## Estado actual
 
-**F17 `in_progress` → verificación OK.** Acceso confiable al Corpus: `get_recent_signals`, keyword fallback, `EMBEDDING_BACKFILL_LIMIT=200`. F16 `passing`. F9 `blocked` (deploy).
+**F18 `passing`.** Research Agent LangGraph verificado localmente. F9 `passing`. Próximo: cutover prod `RESEARCH_ENGINE=langgraph` en Railway API.
 
 ## Próximo paso
 
-1. Marcar **F17 `passing`** tras redeploy API/Worker (Railway) con `EMBEDDING_BACKFILL_LIMIT=200`
-2. Probar en prod: "última noticia de MSFT" en Research Chat
-3. Arrancar **F18** (LangGraph) cuando F17 esté en prod
+1. Railway API: `RESEARCH_ENGINE=langgraph` + redeploy
+2. Probar follow-up en prod: "¿y comparado con el mes pasado?" tras una query de NVDA
+3. Elegir siguiente feature (quick win UX o GDELT)
 
 ## Roadmap Corpus multi-fuente (ADR-0004)
 
@@ -22,14 +22,20 @@
 
 ## Roadmap Research Agent (ADR-0006)
 
-- **F17** Acceso confiable al Corpus (retrieval) (`in_progress` — verify OK local) — `get_recent_signals` + keyword fallback + `EMBEDDING_BACKFILL_LIMIT=200`.
-- **F18** Research Agent con LangGraph (`pending`, desbloqueado por F17) — siguiente feature activa.
+- **F17** Acceso confiable al Corpus (retrieval) (`passing`)
+- **F18** Research Agent con LangGraph (`passing`)
 
-## Deploy F9 (blocked, manual)
+## Deploy F9 (`passing`)
 
-Deploy Railway (API + Worker) + Vercel (frontend) — `docs/deploy/`. Al cerrar: re-correr smoke en prod y marcar F9 `passing`.
+Railway (API + Worker) + Vercel (frontend) + Supabase — prod operativo.
 
 ## Log
+
+- 2026-07-06 — F18 PASSING. LangGraph ReAct (`research_agent.py`), 7 tools, memoria vía chat_messages, flag `RESEARCH_ENGINE`. Verificado: `python -m backend.scripts.verify_f18` OK; `./init.sh` OK.
+
+- 2026-07-06 — F9 PASSING. Deploy prod confirmado: Vercel Terminal, Railway API/Worker, Supabase Store. Auth, Feed SSE, Chat, Quotes, ingesta Worker OK en producción.
+
+- 2026-07-06 — Tickers dinámicos (`9a444ab`). Sin WATCHLIST: Quote Strip desde Corpus, resolve Intel→INTC, get_quotes cualquier símbolo. `verify_ticker_catalog` OK.
 
 - 2026-07-06 — F17 PASSING. Acceso confiable al Corpus: `get_recent_signals` (por fecha, como feed), `search_by_keywords` fallback en `retrieve()`, `EMBEDDING_BACKFILL_LIMIT=200`, filtro ticker en title/summary. Verificado: `python -m backend.scripts.verify_f17` OK; `./init.sh` OK.
 

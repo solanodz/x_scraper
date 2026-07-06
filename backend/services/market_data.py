@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -430,6 +431,56 @@ def fetch_quotes(symbols: list[str]) -> list[Quote]:
                     quotes.append(quote)
 
     return quotes
+
+
+VALID_PRICE_PERIODS = frozenset({"1mo", "3mo", "6mo", "1y"})
+
+
+def fetch_price_history(symbol: str, period: str = "1mo") -> dict[str, Any]:
+    """Historial de precios vía yfinance (OHLC diario)."""
+    normalized = normalize_symbol(symbol)
+    if not normalized:
+        return {"error": "symbol inválido", "symbol": symbol, "period": period}
+
+    effective_period = (period or "1mo").strip()
+    if effective_period not in VALID_PRICE_PERIODS:
+        effective_period = "1mo"
+
+    try:
+        import yfinance as yf
+
+        ticker = yf.Ticker(normalized)
+        history = ticker.history(period=effective_period, auto_adjust=True)
+        if history is None or history.empty:
+            return {
+                "error": "sin datos históricos",
+                "symbol": normalized,
+                "period": effective_period,
+            }
+
+        close = history["Close"]
+        start_price = float(close.iloc[0])
+        end_price = float(close.iloc[-1])
+        change_percent = (
+            (end_price - start_price) / start_price * 100 if start_price else 0.0
+        )
+
+        return {
+            "symbol": normalized,
+            "period": effective_period,
+            "start_price": round(start_price, 2),
+            "end_price": round(end_price, 2),
+            "change_percent": round(change_percent, 2),
+            "high": round(float(history["High"].max()), 2),
+            "low": round(float(history["Low"].min()), 2),
+            "data_points": len(history),
+        }
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "symbol": normalized,
+            "period": effective_period,
+        }
 
 
 CURATED_EXTRA_SYMBOLS: tuple[str, ...] = (

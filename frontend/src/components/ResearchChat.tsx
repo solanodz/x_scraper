@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import ChatSessionSelect from "@/components/ChatSessionSelect";
+import ResearchStepLoader from "@/components/ResearchStepLoader";
 import {
   createChatSession,
   fetchChatMessages,
@@ -15,6 +16,7 @@ import type {
   ChatMessage,
   ChatMessageRecord,
   ChatSessionSummary,
+  ResearchStep,
 } from "@/lib/types";
 
 const ACTIVE_SESSION_KEY = "xscraper:activeChatSession";
@@ -134,7 +136,7 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     setStreaming(true);
 
     const assistantIndex = messages.length + 1;
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    setMessages((prev) => [...prev, { role: "assistant", content: "", steps: [] }]);
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -147,6 +149,28 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
           onSession: (sessionId) => {
             persistActiveSession(sessionId);
             refreshSessions().then(setSessions).catch(() => undefined);
+          },
+          onStep: (step: ResearchStep) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const msg = updated[assistantIndex];
+              if (msg?.role !== "assistant") return prev;
+
+              const prior = msg.steps ?? [];
+              const existingIdx = prior.findIndex(
+                (s) => s.tool === step.tool && s.label === step.label,
+              );
+              let nextSteps: ResearchStep[];
+              if (existingIdx >= 0) {
+                nextSteps = [...prior];
+                nextSteps[existingIdx] = step;
+              } else {
+                nextSteps = [...prior, step];
+              }
+
+              updated[assistantIndex] = { ...msg, steps: nextSteps };
+              return updated;
+            });
           },
           onToken: (token) => {
             setMessages((prev) => {
@@ -242,10 +266,21 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
               </div>
             ) : (
               <div className="space-y-2">
-                <ChatMarkdown
-                  content={msg.content}
-                  streaming={streaming && i === messages.length - 1}
-                />
+                {msg.steps && msg.steps.length > 0 && (
+                  <ResearchStepLoader
+                    steps={msg.steps}
+                    active={streaming && i === messages.length - 1 && !msg.content}
+                  />
+                )}
+                {streaming && i === messages.length - 1 && !msg.content && !msg.steps?.length && (
+                  <ResearchStepLoader steps={[]} active />
+                )}
+                {(msg.content || !(streaming && i === messages.length - 1)) && (
+                  <ChatMarkdown
+                    content={msg.content}
+                    streaming={streaming && i === messages.length - 1}
+                  />
+                )}
                 {msg.citations && msg.citations.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {msg.citations.map((c) => (

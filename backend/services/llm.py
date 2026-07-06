@@ -65,8 +65,9 @@ def hits_to_citations(hits: list) -> list:
 def generate_answer(context: str, query: str) -> str:
     """Genera respuesta grounded en Signals provistos."""
     client = _get_client()
+    model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -82,8 +83,9 @@ def generate_answer(context: str, query: str) -> str:
 def stream_answer(context: str, query: str) -> Iterator[str]:
     """Genera respuesta en streaming grounded en Signals provistos."""
     client = _get_client()
+    model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
     stream = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {

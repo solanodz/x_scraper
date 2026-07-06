@@ -38,6 +38,9 @@ python -m py_compile \
   backend/services/llm.py \
   backend/services/tools.py \
   backend/services/agent.py \
+  backend/services/research_steps.py \
+  backend/services/research_agent.py \
+  backend/services/corpus_stats.py \
   backend/services/market_data.py \
   backend/app/__init__.py \
   backend/app/auth.py \
@@ -65,7 +68,8 @@ python -m py_compile \
   backend/scripts/verify_f14.py \
   backend/scripts/verify_f15.py \
   backend/scripts/verify_f16.py \
-  backend/scripts/verify_f17.py
+  backend/scripts/verify_f17.py \
+  backend/scripts/verify_f18.py
 
 # --- Docker services (Store: Postgres + pgvector) ---
 if [ -f "docker-compose.yml" ] || [ -f "compose.yaml" ]; then
