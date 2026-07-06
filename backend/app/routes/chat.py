@@ -27,6 +27,7 @@ from backend.app.services.chat_repo import (
     tables_ready,
 )
 from backend.services.ask import ask_stream
+from backend.services.chat_history import prepare_chat_history
 from backend.services.research_steps import ResearchStepEvent
 from backend.services.types import Citation
 from fastapi.responses import StreamingResponse
@@ -134,12 +135,12 @@ async def _sse_chat_stream(
     if tables_ready():
         try:
             prior = list_messages(user_id=operator_id, session_id=sid)
-            chat_history = [
-                {"role": row["role"], "content": row["content"]}
-                for row in prior
-                if row.get("role") in {"user", "assistant"}
-                and (row.get("content") or "").strip()
-            ]
+            chat_history = prepare_chat_history(
+                [
+                    {"role": row["role"], "content": row["content"]}
+                    for row in prior
+                ]
+            )
         except ChatRepoError:
             chat_history = []
 

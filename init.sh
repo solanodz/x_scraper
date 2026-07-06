@@ -38,6 +38,7 @@ python -m py_compile \
   backend/services/llm.py \
   backend/services/tools.py \
   backend/services/agent.py \
+  backend/services/chat_history.py \
   backend/services/research_steps.py \
   backend/services/research_agent.py \
   backend/services/corpus_stats.py \

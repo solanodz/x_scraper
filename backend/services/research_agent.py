@@ -14,6 +14,7 @@ from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field, create_model
 
 from backend.services.agent import AgentContext, format_agent_context
+from backend.services.chat_history import prepare_chat_history
 from backend.services.research_steps import (
     GatherResult,
     ResearchStepEvent,
@@ -246,19 +247,12 @@ def _build_langchain_tools(
 
 
 def _history_to_messages(history: list[dict] | None) -> list[BaseMessage]:
-    if not history:
-        return []
-
     messages: list[BaseMessage] = []
-    for entry in history:
-        role = entry.get("role")
-        content = (entry.get("content") or "").strip()
-        if not content:
-            continue
-        if role == "user":
-            messages.append(HumanMessage(content=content))
-        elif role == "assistant":
-            messages.append(AIMessage(content=content))
+    for entry in prepare_chat_history(history):
+        if entry["role"] == "user":
+            messages.append(HumanMessage(content=entry["content"]))
+        elif entry["role"] == "assistant":
+            messages.append(AIMessage(content=entry["content"]))
     return messages
 
 

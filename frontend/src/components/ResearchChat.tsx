@@ -42,8 +42,10 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   const [loading, setLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const persistActiveSession = useCallback((sessionId: string | null) => {
+    sessionIdRef.current = sessionId;
     setActiveSessionId(sessionId);
     if (sessionId) {
       sessionStorage.setItem(ACTIVE_SESSION_KEY, sessionId);
@@ -142,6 +144,21 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    let sessionId = sessionIdRef.current ?? activeSessionId;
+    if (!sessionId) {
+      try {
+        const session = await createChatSession();
+        sessionId = session.id;
+        persistActiveSession(sessionId);
+        const list = await refreshSessions();
+        setSessions([session, ...list.filter((s) => s.id !== session.id)]);
+      } catch {
+        setHistoryError("No se pudo iniciar la sesión de chat");
+        setStreaming(false);
+        return;
+      }
+    }
+
     try {
       await streamChat(
         query,
@@ -197,7 +214,7 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
           },
         },
         controller.signal,
-        activeSessionId,
+        sessionId,
       );
     } catch {
       setMessages((prev) => {

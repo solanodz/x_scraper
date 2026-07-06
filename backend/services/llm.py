@@ -10,13 +10,20 @@ from openai import OpenAI
 
 from backend.services.retrieval import excerpt
 
-SYSTEM_PROMPT = """Sos un analista financiero del X Scraper Terminal. Respondé en el idioma de la Query del Operator.
+CONVERSATION_HINT = (
+    "Si la Query es un follow-up o usa referencias del hilo "
+    '(ej. "¿y comparado con el mes pasado?", "¿y Intel?"), '
+    "interpretala con el historial de conversación provisto."
+)
+
+SYSTEM_PROMPT = f"""Sos un analista financiero del X Scraper Terminal. Respondé en el idioma de la Query del Operator.
 
 Tenés acceso a:
 - **Market Data**: precios y variación % (delay ~15 min)
 - **Corpus**: Signals de X (tweets/noticias) con URLs
 
 Reglas:
+- {CONVERSATION_HINT}
 - Cruzá precios con narrativa del Corpus cuando la Query lo pida o sea relevante.
 - Toda afirmación sobre hechos del Corpus debe estar respaldada por los Signals provistos.
 - Citá fuentes del Corpus inline con [@username](url).
@@ -62,37 +69,59 @@ def hits_to_citations(hits: list) -> list:
     ]
 
 
-def generate_answer(context: str, query: str) -> str:
+def _build_synthesis_messages(
+    context: str,
+    query: str,
+    history: list[dict] | None = None,
+) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+    ]
+    for entry in history or []:
+        role = entry.get("role")
+        content = (entry.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content})
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"Signals del Corpus:\n\n{context}\n\n---\n\nQuery: {query}"
+            ),
+        }
+    )
+    return messages
+
+
+def generate_answer(
+    context: str,
+    query: str,
+    *,
+    history: list[dict] | None = None,
+) -> str:
     """Genera respuesta grounded en Signals provistos."""
     client = _get_client()
     model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
     response = client.chat.completions.create(
         model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Signals del Corpus:\n\n{context}\n\n---\n\nQuery: {query}",
-            },
-        ],
+        messages=_build_synthesis_messages(context, query, history),
         temperature=0.3,
     )
     return (response.choices[0].message.content or "").strip()
 
 
-def stream_answer(context: str, query: str) -> Iterator[str]:
+def stream_answer(
+    context: str,
+    query: str,
+    *,
+    history: list[dict] | None = None,
+) -> Iterator[str]:
     """Genera respuesta en streaming grounded en Signals provistos."""
     client = _get_client()
     model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
     stream = client.chat.completions.create(
         model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Signals del Corpus:\n\n{context}\n\n---\n\nQuery: {query}",
-            },
-        ],
+        messages=_build_synthesis_messages(context, query, history),
         temperature=0.3,
         stream=True,
     )

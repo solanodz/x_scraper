@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from typing import Union
 
 from backend.services.agent import iter_gather_agent_context
+from backend.services.chat_history import prepare_chat_history
 from backend.services.llm import (
     hits_to_citations,
     stream_answer,
@@ -22,13 +23,14 @@ def _research_engine() -> str:
 
 
 def _iter_gather(query: str, history: list[dict] | None = None):
+    prior = prepare_chat_history(history)
     if _research_engine() == "langgraph":
         from backend.services.research_agent import iter_gather_research_context
 
-        yield from iter_gather_research_context(query, history=history)
+        yield from iter_gather_research_context(query, history=prior)
         return
 
-    yield from iter_gather_agent_context(query)
+    yield from iter_gather_agent_context(query, history=prior)
 
 
 def ask(
@@ -51,7 +53,7 @@ def ask(
             citations=[],
         )
 
-    answer = generate_answer(context, query)
+    answer = generate_answer(context, query, history=prepare_chat_history(history))
     citations: list[Citation] = hits_to_citations(hits)
     return AskResult(answer=answer, citations=citations)
 
@@ -62,6 +64,7 @@ def ask_stream(
     history: list[dict] | None = None,
 ) -> Iterator[AskStreamChunk]:
     """Streamea pasos del agente, tokens de respuesta y Citations finales."""
+    prior = prepare_chat_history(history)
     context = ""
     hits: list = []
 
@@ -83,7 +86,7 @@ def ask_stream(
     )
 
     citations = hits_to_citations(hits)
-    for token in stream_answer(context, query):
+    for token in stream_answer(context, query, history=prior):
         yield token
 
     yield ResearchStepEvent(

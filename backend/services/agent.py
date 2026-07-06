@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from openai.types.chat import ChatCompletionMessage
 
 from backend.services.llm import _get_client
+from backend.services.chat_history import prepare_chat_history
 from backend.services.research_steps import (
     GatherResult,
     ResearchStepEvent,
@@ -129,13 +130,15 @@ def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
 def iter_gather_agent_context(
     query: str,
     max_turns: int = 6,
+    *,
+    history: list[dict] | None = None,
 ) -> Iterator[ResearchStepEvent | GatherResult]:
     """Loop legacy con emisión de pasos por tool."""
     context = AgentContext(query=query)
-    messages: list[dict] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "user", "content": query},
-    ]
+    messages: list[dict] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    for entry in prepare_chat_history(history):
+        messages.append({"role": entry["role"], "content": entry["content"]})
+    messages.append({"role": "user", "content": query})
     client = _get_client()
 
     yield ResearchStepEvent(
