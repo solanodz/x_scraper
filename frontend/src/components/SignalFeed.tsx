@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   authHeaders,
   createSignalStreamUrl,
+  fetchSignalCount,
   fetchSignals,
   getAccessToken,
   isSupabaseConfigured,
@@ -27,6 +28,8 @@ import {
 } from "@/lib/signalSource";
 import type { SignalSummary } from "@/lib/types";
 import SignalFeedFilters from "@/components/SignalFeedFilters";
+
+const FEED_PAGE_SIZE = 200;
 
 interface SignalFeedProps {
   selectedId: string | null;
@@ -66,6 +69,17 @@ function mergeSignal(
   return [...next, incoming].sort(byPublishedDesc);
 }
 
+function mergeSignalLists(
+  existing: SignalSummary[],
+  incoming: SignalSummary[],
+): SignalSummary[] {
+  let next = existing;
+  for (const signal of incoming) {
+    next = mergeSignal(next, signal);
+  }
+  return next;
+}
+
 function displayHeadline(signal: SignalSummary): string {
   return signal.title?.trim() || signal.raw_content;
 }
@@ -75,7 +89,10 @@ export default function SignalFeed({
   onSelectSignal,
 }: SignalFeedProps) {
   const [signals, setSignals] = useState<SignalSummary[]>([]);
+  const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
+  const [loadedOffset, setLoadedOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [filterDraft, setFilterDraft] =
@@ -84,15 +101,76 @@ export default function SignalFeed({
 
   const loadSignals = useCallback(async (filters: FeedFilterQuery) => {
     try {
-      const data = await fetchSignals(50, filters);
+      const [data, total] = await Promise.all([
+        fetchSignals(FEED_PAGE_SIZE, filters, 0),
+        fetchSignalCount(filters),
+      ]);
       setSignals(data);
+      setLoadedOffset(data.length);
+      setTotalAvailable(total);
       setError(null);
     } catch {
       setError("Failed to load signals");
+      setTotalAvailable(null);
+      setLoadedOffset(0);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
+
+  const loadMoreSignals = useCallback(async () => {
+    if (loadingMore || totalAvailable == null || loadedOffset >= totalAvailable) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const data = await fetchSignals(
+        FEED_PAGE_SIZE,
+        activeFilters,
+        loadedOffset,
+      );
+      if (data.length > 0) {
+        setSignals((prev) => mergeSignalLists(prev, data));
+        setLoadedOffset((prev) => prev + data.length);
+      }
+    } catch {
+      setError("Failed to load signals");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeFilters, loadedOffset, loadingMore, totalAvailable]);
+
+  const loadAllSignals = useCallback(async () => {
+    if (loadingMore || totalAvailable == null || loadedOffset >= totalAvailable) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      let offset = loadedOffset;
+      const batches: SignalSummary[][] = [];
+      while (offset < totalAvailable) {
+        const data = await fetchSignals(FEED_PAGE_SIZE, activeFilters, offset);
+        if (data.length === 0) break;
+        batches.push(data);
+        offset += data.length;
+      }
+      if (batches.length > 0) {
+        setSignals((prev) => {
+          let merged = prev;
+          for (const batch of batches) {
+            merged = mergeSignalLists(merged, batch);
+          }
+          return merged;
+        });
+        setLoadedOffset(offset);
+      }
+    } catch {
+      setError("Failed to load signals");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeFilters, loadedOffset, loadingMore, totalAvailable]);
 
   useEffect(() => {
     loadSignals(activeFilters);
@@ -151,25 +229,37 @@ export default function SignalFeed({
     const next = override ?? filterDraft;
     if (override) setFilterDraft(next);
     setActiveFilters(draftToQuery(next));
+    setLoadedOffset(0);
     setLoading(true);
   }
 
   function clearFilters() {
     setFilterDraft(EMPTY_FEED_FILTERS);
     setActiveFilters({});
+    setLoadedOffset(0);
     setLoading(true);
   }
 
   const filterLabels = activeFilterLabels(activeFilters);
+  const hasMoreFromApi =
+    totalAvailable != null && loadedOffset < totalAvailable;
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
       <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
-        <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
-          Signal Feed
-        </h2>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
+            Signal Feed
+          </h2>
+          {!loading && totalAvailable != null && !error && (
+            <span className="truncate font-mono text-[10px] text-zinc-500">
+              {signals.length.toLocaleString("es-AR")} de{" "}
+              {totalAvailable.toLocaleString("es-AR")} en pantalla
+            </span>
+          )}
+        </div>
         <span
-          className={`font-mono text-[10px] ${connected ? "text-emerald-500" : "text-zinc-600"}`}
+          className={`shrink-0 font-mono text-[10px] ${connected ? "text-emerald-500" : "text-zinc-600"}`}
         >
           {connected ? "● LIVE" : "○ OFFLINE"}
         </span>
@@ -267,6 +357,33 @@ export default function SignalFeed({
             </div>
           </button>
         ))}
+        {!loading && !error && hasMoreFromApi && (
+          <div className="flex flex-col gap-2 border-t border-zinc-800/60 px-3 py-3">
+            <button
+              type="button"
+              onClick={() => void loadMoreSignals()}
+              disabled={loadingMore}
+              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-[11px] text-zinc-300 transition-colors hover:border-amber-700 hover:text-amber-400 disabled:opacity-50"
+            >
+              {loadingMore
+                ? "Cargando…"
+                : `Cargar más (${Math.min(
+                    FEED_PAGE_SIZE,
+                    totalAvailable! - loadedOffset,
+                  )} de ${(totalAvailable! - loadedOffset).toLocaleString("es-AR")} restantes)`}
+            </button>
+            {totalAvailable! - loadedOffset > FEED_PAGE_SIZE && (
+              <button
+                type="button"
+                onClick={() => void loadAllSignals()}
+                disabled={loadingMore}
+                className="font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-amber-500 hover:underline disabled:opacity-50"
+              >
+                Cargar todas ({totalAvailable!.toLocaleString("es-AR")})
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

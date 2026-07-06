@@ -2,13 +2,13 @@
 
 ## Estado actual
 
-**F16 `passing` — RSS Argentina.** Medios AR (Ámbito, La Nación, Infobae, Google News AR) vía `ARGENTINA_FEEDS`; Article Body en español con trafilatura. F15, F14, F13, F10–F12 `passing`. F9 `blocked` (deploy).
+**F17 `in_progress` → verificación OK.** Acceso confiable al Corpus: `get_recent_signals`, keyword fallback, `EMBEDDING_BACKFILL_LIMIT=200`. F16 `passing`. F9 `blocked` (deploy).
 
 ## Próximo paso
 
-1. **F9 deploy** — Railway + Vercel + Supabase (Terminal en URL pública)
-2. Smoke E2E en producción y marcar F9 `passing`
-3. Opcional: Marketaux `countries=ar` o más medios AR (Cronista cuando vuelva el feed)
+1. Marcar **F17 `passing`** tras redeploy API/Worker (Railway) con `EMBEDDING_BACKFILL_LIMIT=200`
+2. Probar en prod: "última noticia de MSFT" en Research Chat
+3. Arrancar **F18** (LangGraph) cuando F17 esté en prod
 
 ## Roadmap Corpus multi-fuente (ADR-0004)
 
@@ -20,13 +20,18 @@
 - **F15** Chat Session / historial Research Chat (`passing`)
 - **F16** RSS noticias Argentina (`passing`)
 
+## Roadmap Research Agent (ADR-0006)
+
+- **F17** Acceso confiable al Corpus (retrieval) (`in_progress` — verify OK local) — `get_recent_signals` + keyword fallback + `EMBEDDING_BACKFILL_LIMIT=200`.
+- **F18** Research Agent con LangGraph (`pending`, desbloqueado por F17) — siguiente feature activa.
+
 ## Deploy F9 (blocked, manual)
 
 Deploy Railway (API + Worker) + Vercel (frontend) — `docs/deploy/`. Al cerrar: re-correr smoke en prod y marcar F9 `passing`.
 
 ## Log
 
-- 2026-07-05 — Feed cronológico. `GET /signals` ordena por `published_at DESC` (sin priorizar fuente ni relevance_score). Representante de Story Cluster = más reciente del grupo. Frontend SSE reordena por fecha. `verify_feed_filters` + `verify_f12` actualizados. CONTEXT.md Signal Feed actualizado.
+- 2026-07-06 — F17 PASSING. Acceso confiable al Corpus: `get_recent_signals` (por fecha, como feed), `search_by_keywords` fallback en `retrieve()`, `EMBEDDING_BACKFILL_LIMIT=200`, filtro ticker en title/summary. Verificado: `python -m backend.scripts.verify_f17` OK; `./init.sh` OK.
 
 - 2026-07-05 — F16 PASSING. `ARGENTINA_FEEDS` en `scraper/adapters/rss.py` (Ámbito economía/finanzas, La Nación, Infobae, Google News AR). Flag `RSS_AR_FEEDS_ENABLED`. Verificado: `python -m backend.scripts.verify_f16` OK (25 signals, Ámbito body 2152 chars). Ingesta: 25 AR RSS en Store con body>=200 en medios directos. `./init.sh` OK.
 

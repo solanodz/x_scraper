@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from backend.services.market_data import fetch_quotes, get_watchlist
+from backend.services.recent_signals import get_recent_signals
 from backend.services.retrieval import excerpt, retrieve
 from backend.services.types import SignalHit
 
@@ -16,8 +17,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "name": "search_corpus",
             "description": (
                 "Busca Signals del Corpus (tweets y noticias scrapeadas de X) "
-                "por similitud semántica. Usar para narrativa, catalizadores, "
-                "sentimiento y contexto de Tickers o temas."
+                "por similitud semántica, con fallback por keywords en "
+                "título/resumen cuando no hay hits vectoriales. Usar para "
+                "narrativa, catalizadores, sentimiento y contexto de Tickers o temas."
             ),
             "parameters": {
                 "type": "object",
@@ -40,6 +42,43 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     },
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_recent_signals",
+            "description": (
+                "Lista los Signals más recientes del Corpus ordenados por fecha "
+                "(published_at DESC), como el Signal Feed. Usar para "
+                "'última noticia', 'noticias recientes', 'qué pasó hoy', "
+                "'what happened today' o la noticia más nueva de un Ticker. "
+                "Preferir sobre search_corpus cuando la Query pida lo más reciente."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Opcional. Filtra por cashtag, ej. MSFT o $AAPL.",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "description": (
+                            "Opcional. Filtra por fuente: x, rss, marketaux, "
+                            "alpha_vantage o news (rss+marketaux+alpha_vantage)."
+                        ),
+                    },
+                    "hours": {
+                        "type": "integer",
+                        "description": "Opcional. Ventana temporal en horas (ej. 24, 72).",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Máximo de Signals a devolver (default 10, max 50).",
+                    },
+                },
             },
         },
     },
@@ -143,6 +182,20 @@ def execute_tool(
             limit=limit,
             ticker=str(ticker) if ticker else None,
             since_hours=int(since_hours) if since_hours else None,
+        )
+        return _format_hits_for_tool(hits), hits
+
+    if name == "get_recent_signals":
+        ticker = arguments.get("ticker")
+        source_type = arguments.get("source_type")
+        hours = arguments.get("hours")
+        limit = int(arguments.get("limit") or 10)
+        limit = max(1, min(limit, 50))
+        hits = get_recent_signals(
+            ticker=str(ticker) if ticker else None,
+            source_type=str(source_type) if source_type else None,
+            hours=int(hours) if hours else None,
+            limit=limit,
         )
         return _format_hits_for_tool(hits), hits
 

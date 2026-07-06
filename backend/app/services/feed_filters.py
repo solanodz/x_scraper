@@ -60,11 +60,17 @@ def build_feed_filter_conditions(
 
     normalized_ticker = normalize_ticker(filters.ticker)
     if normalized_ticker:
-        conditions.append(
-            "(%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
-            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers))"
-        )
         params["ticker"] = normalized_ticker
+        params["ticker_pattern"] = f"%{normalized_ticker}%"
+        conditions.append(
+            "("
+            "%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
+            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers) "
+            "OR COALESCE(title, '') ILIKE %(ticker_pattern)s "
+            "OR COALESCE(summary, '') ILIKE %(ticker_pattern)s "
+            "OR COALESCE(raw_content, '') ILIKE %(ticker_pattern)s"
+            ")"
+        )
 
     username = _clean_text(filters.username)
     if username:

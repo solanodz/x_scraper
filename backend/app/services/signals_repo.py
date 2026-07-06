@@ -179,17 +179,14 @@ def _clustered_list_sql(where_clause: str) -> str:
     """
 
 
-def list_signals(
+def _build_signal_query(
     *,
-    limit: int = 50,
-    offset: int = 0,
     filters: FeedFilters | None = None,
     username: str | None = None,
     ticker: str | None = None,
-) -> list[SignalSummary]:
-    """Lista representantes de Story Cluster ordenados por fecha (más reciente primero)."""
+) -> tuple[str, dict[str, Any]]:
     conditions = ["TRUE"]
-    params: dict[str, Any] = {"limit": limit, "offset": offset}
+    params: dict[str, Any] = {}
 
     relevance_sql, relevance_params = build_sql_filter()
     if relevance_sql != "TRUE":
@@ -209,7 +206,91 @@ def list_signals(
     conditions.extend(filter_conditions)
     params.update(filter_params)
 
-    where_clause = " AND ".join(conditions)
+    return " AND ".join(conditions), params
+
+
+def _clustered_count_sql(where_clause: str) -> str:
+    return f"""
+        WITH filtered AS (
+            SELECT cluster_id, id_str, published_at
+            FROM signals
+            WHERE {where_clause}
+        ),
+        ranked AS (
+            SELECT
+                cluster_id,
+                id_str,
+                ROW_NUMBER() OVER (
+                    PARTITION BY COALESCE(cluster_id, id_str)
+                    ORDER BY published_at DESC
+                ) AS cluster_rn
+            FROM filtered
+        )
+        SELECT COUNT(*)::int
+        FROM ranked
+        WHERE cluster_rn = 1
+    """
+
+
+def count_signals(
+    *,
+    filters: FeedFilters | None = None,
+    username: str | None = None,
+    ticker: str | None = None,
+) -> int:
+    """Cuenta representantes de Story Cluster que coinciden con filtros."""
+    where_clause, params = _build_signal_query(
+        filters=filters,
+        username=username,
+        ticker=ticker,
+    )
+    sql = _clustered_count_sql(where_clause)
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            row = cur.fetchone()
+    return int(row[0]) if row else 0
+
+
+def list_signals(
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    filters: FeedFilters | None = None,
+    username: str | None = None,
+    ticker: str | None = None,
+) -> list[SignalSummary]:
+    """Lista representantes de Story Cluster ordenados por fecha (más reciente primero)."""
+    where_clause, params = _build_signal_query(
+        filters=filters,
+        username=username,
+        ticker=ticker,
+    )
+    params["limit"] = limit
+    params["offset"] = offset
+    sql = _clustered_list_sql(where_clause)
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            rows = _fetchall_as_dicts(cur)
+
+    summaries = [_row_to_summary(row) for row in rows]
+    return _attach_cluster_sources(summaries)
+
+
+def list_recent_signals(
+    *,
+    limit: int = 10,
+    offset: int = 0,
+    filters: FeedFilters | None = None,
+) -> list[SignalSummary]:
+    """Lista Signals recientes por published_at DESC (misma lógica que el Signal Feed)."""
+    clamped_limit = max(1, min(limit, 50))
+    where_clause, params = _build_signal_query(filters=filters)
+    params["limit"] = clamped_limit
+    params["offset"] = offset
     sql = _clustered_list_sql(where_clause)
 
     with connect() as conn:

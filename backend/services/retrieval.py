@@ -14,7 +14,7 @@ SEARCH_BASE_SQL = """
 SELECT
     id_str,
     username,
-    raw_content,
+    COALESCE(NULLIF(title, ''), raw_content) AS raw_content,
     published_at,
     source,
     payload,
@@ -24,6 +24,38 @@ WHERE {where_clause}
 ORDER BY embedding <=> %(query_vector)s::vector
 LIMIT %(limit)s
 """
+
+KEYWORD_SEARCH_SQL = """
+SELECT
+    id_str,
+    username,
+    COALESCE(NULLIF(title, ''), raw_content) AS raw_content,
+    published_at,
+    source,
+    payload,
+    0.5 AS similarity
+FROM signals
+WHERE {where_clause}
+ORDER BY published_at DESC
+LIMIT %(limit)s
+"""
+
+_STOPWORDS = frozenset({
+    "de",
+    "la",
+    "el",
+    "en",
+    "y",
+    "the",
+    "a",
+    "an",
+    "for",
+    "about",
+    "última",
+    "ultima",
+    "noticia",
+    "noticias",
+})
 
 
 def _format_embedding(embedding: list[float]) -> str:
@@ -66,15 +98,121 @@ def excerpt(text: str, max_len: int = 200) -> str:
     return text[: max_len - 3].rstrip() + "..."
 
 
+def _extract_keywords(query: str) -> list[str]:
+    keywords: list[str] = []
+    for part in query.split():
+        cleaned = part.strip().strip(".,!?;:")
+        if not cleaned or cleaned.lower() in _STOPWORDS:
+            continue
+        keywords.append(cleaned)
+    return keywords
+
+
+def _row_to_signal_hit(row: tuple[Any, ...]) -> SignalHit:
+    id_str, username, raw_content, published_at, source, payload, similarity = row
+    payload_dict = payload if isinstance(payload, dict) else {}
+    return SignalHit(
+        id_str=id_str,
+        username=username,
+        raw_content=raw_content,
+        published_at=published_at,
+        source=source,
+        similarity=float(similarity),
+        url=signal_url(
+            payload_dict,
+            username,
+            id_str,
+            source_type=str(payload_dict.get("source_type") or "x"),
+            canonical_url=payload_dict.get("canonical_url"),
+        ),
+    )
+
+
+def _append_common_filters(
+    conditions: list[str],
+    params: dict[str, Any],
+    *,
+    ticker: str | None,
+    since_hours: int | None,
+) -> None:
+    normalized_ticker = normalize_ticker(ticker)
+    if normalized_ticker:
+        params["ticker"] = normalized_ticker
+        params["ticker_pattern"] = f"%{normalized_ticker}%"
+        conditions.append(
+            "("
+            "%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
+            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers) "
+            "OR COALESCE(title, '') ILIKE %(ticker_pattern)s "
+            "OR COALESCE(summary, '') ILIKE %(ticker_pattern)s "
+            "OR COALESCE(raw_content, '') ILIKE %(ticker_pattern)s"
+            ")"
+        )
+
+    if since_hours is not None:
+        conditions.append(
+            "published_at >= now() - make_interval(hours => %(since_hours)s)"
+        )
+        params["since_hours"] = since_hours
+
+
+def search_by_keywords(
+    query: str,
+    limit: int = 10,
+    ticker: str | None = None,
+    since_hours: int | None = None,
+) -> list[SignalHit]:
+    """Recupera Signals por coincidencia de keywords en title/summary/raw_content."""
+    keywords = _extract_keywords(query)
+    normalized_ticker = normalize_ticker(ticker)
+    if not keywords and not normalized_ticker:
+        return []
+
+    conditions: list[str] = []
+    params: dict[str, Any] = {"limit": limit}
+
+    relevance_sql, relevance_params = build_sql_filter()
+    if relevance_sql != "TRUE":
+        conditions.append(f"({relevance_sql})")
+        params.update(relevance_params)
+
+    _append_common_filters(
+        conditions,
+        params,
+        ticker=ticker,
+        since_hours=since_hours,
+    )
+
+    for index, keyword in enumerate(keywords):
+        key = f"kw_{index}"
+        params[key] = f"%{keyword}%"
+        conditions.append(
+            "("
+            f"COALESCE(title, '') ILIKE %({key})s OR "
+            f"COALESCE(summary, '') ILIKE %({key})s OR "
+            f"COALESCE(raw_content, '') ILIKE %({key})s"
+            ")"
+        )
+
+    sql = KEYWORD_SEARCH_SQL.format(where_clause=" AND ".join(conditions))
+
+    hits: list[SignalHit] = []
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            for row in cur.fetchall():
+                hits.append(_row_to_signal_hit(row))
+    return hits
+
+
 def retrieve(
     query: str,
     limit: int = 10,
     ticker: str | None = None,
     since_hours: int | None = None,
 ) -> list[SignalHit]:
-    """Recupera Signals por similitud semántica con filtros opcionales."""
+    """Recupera Signals por similitud semántica; fallback a keywords si no hay hits."""
     query_vector = _format_embedding(embed_texts([query])[0])
-    normalized_ticker = normalize_ticker(ticker)
 
     conditions = ["embedding IS NOT NULL"]
     params: dict[str, Any] = {
@@ -87,18 +225,12 @@ def retrieve(
         conditions.append(f"({relevance_sql})")
         params.update(relevance_params)
 
-    if normalized_ticker:
-        conditions.append(
-            "(%(ticker)s = ANY(cashtags) OR ('$' || %(ticker)s) = ANY(cashtags) "
-            "OR %(ticker)s = ANY(tickers) OR ('$' || %(ticker)s) = ANY(tickers))"
-        )
-        params["ticker"] = normalized_ticker
-
-    if since_hours is not None:
-        conditions.append(
-            "published_at >= now() - make_interval(hours => %(since_hours)s)"
-        )
-        params["since_hours"] = since_hours
+    _append_common_filters(
+        conditions,
+        params,
+        ticker=ticker,
+        since_hours=since_hours,
+    )
 
     sql = SEARCH_BASE_SQL.format(where_clause=" AND ".join(conditions))
 
@@ -107,23 +239,8 @@ def retrieve(
         with conn.cursor() as cur:
             cur.execute(sql, params)
             for row in cur.fetchall():
-                id_str, username, raw_content, published_at, source, payload, similarity = row
-                payload_dict = payload if isinstance(payload, dict) else {}
-                hits.append(
-                    SignalHit(
-                        id_str=id_str,
-                        username=username,
-                        raw_content=raw_content,
-                        published_at=published_at,
-                        source=source,
-                        similarity=float(similarity),
-                        url=signal_url(
-                            payload_dict,
-                            username,
-                            id_str,
-                            source_type=str(payload_dict.get("source_type") or "x"),
-                            canonical_url=payload_dict.get("canonical_url"),
-                        ),
-                    )
-                )
-    return hits
+                hits.append(_row_to_signal_hit(row))
+
+    if hits:
+        return hits
+    return search_by_keywords(query, limit=limit, ticker=ticker, since_hours=since_hours)

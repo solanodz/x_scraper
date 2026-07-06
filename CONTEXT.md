@@ -141,8 +141,12 @@ _Avoid_: Business logic, service layer, use cases
 ## Research Chat Behavior
 
 **Query**:
-Consulta en lenguaje natural del Operator al Research Chat. El agente puede usar herramientas: búsqueda semántica en el Corpus, cotizaciones de Tickers (Market Data) y la Watchlist. Cruza precios con Signals cuando aplica. Cubre preguntas abiertas, análisis por Ticker, resúmenes temporales y comparaciones básicas.
+Consulta en lenguaje natural del Operator al Research Chat. El Research Agent puede usar herramientas: búsqueda semántica en el Corpus (con filtros de ticker, tipo de fuente, ventana temporal y relevancia), noticias recientes por fecha, detalle de un Signal (Article Body), estadísticas/tendencias del Corpus, cotizaciones de Tickers e histórico de precios (Market Data), y la Watchlist. Cruza precios con Signals cuando aplica. Cubre preguntas abiertas, análisis por Ticker, research multi-paso, resúmenes temporales, tendencias y comparaciones.
 _Avoid_: Prompt, question, command
+
+**Research Agent**:
+El agente que responde una Query orquestando herramientas sobre el Corpus y el Market Data antes de sintetizar la respuesta. Planifica qué herramientas usar, puede encadenar varias rondas (research multi-paso) y produce una respuesta grounded con Citations obligatorias derivadas de los Signals que las herramientas devolvieron. Recuerda el hilo de la Chat Session para responder follow-ups. Ver ADR-0006.
+_Avoid_: Bot, assistant, copilot, chain
 
 **Citation**:
 Referencia a un Signal fuente que respalda una afirmación de la respuesta del Research Chat. Obligatoria en toda respuesta; clickeable, abre el Signal Detail.

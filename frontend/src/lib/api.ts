@@ -59,8 +59,26 @@ export async function authHeaders(): Promise<Record<string, string>> {
 export async function fetchSignals(
   limit = 50,
   options?: FeedFilterQuery,
+  offset = 0,
 ): Promise<SignalSummary[]> {
-  const params = new URLSearchParams({ limit: String(limit) });
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  appendFeedFilterParams(params, options);
+  const res = await fetch(`${API_URL}/signals?${params}`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch signals: ${res.status}`);
+  }
+  return res.json();
+}
+
+function appendFeedFilterParams(
+  params: URLSearchParams,
+  options?: FeedFilterQuery,
+): void {
   if (options?.q) params.set("q", options.q);
   if (options?.ticker) {
     params.set("ticker", options.ticker.replace(/^\$/, ""));
@@ -69,13 +87,23 @@ export async function fetchSignals(
   if (options?.since_hours) {
     params.set("since_hours", String(options.since_hours));
   }
-  const res = await fetch(`${API_URL}/signals?${params}`, {
-    headers: await authHeaders(),
-  });
+}
+
+export async function fetchSignalCount(
+  options?: FeedFilterQuery,
+): Promise<number> {
+  const params = new URLSearchParams();
+  appendFeedFilterParams(params, options);
+  const query = params.toString();
+  const res = await fetch(
+    `${API_URL}/signals/count${query ? `?${query}` : ""}`,
+    { headers: await authHeaders() },
+  );
   if (!res.ok) {
-    throw new Error(`Failed to fetch signals: ${res.status}`);
+    throw new Error(`Failed to fetch signal count: ${res.status}`);
   }
-  return res.json();
+  const data = (await res.json()) as { total: number };
+  return data.total;
 }
 
 export async function fetchTickerSuggestions(

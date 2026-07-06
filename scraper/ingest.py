@@ -186,7 +186,7 @@ def _run_post_ingestion_steps(args: argparse.Namespace) -> None:
             print(f"→ Backfill Article Body: {updated} Signal(s) enriquecidos")
 
     if not args.skip_embeddings:
-        updated = backfill_embeddings(limit=50)
+        updated = backfill_embeddings()
         if updated:
             print(f"→ Backfill Vector Index: {updated} embedding(s) actualizados")
 

@@ -64,7 +64,8 @@ python -m py_compile \
   backend/scripts/verify_f13.py \
   backend/scripts/verify_f14.py \
   backend/scripts/verify_f15.py \
-  backend/scripts/verify_f16.py
+  backend/scripts/verify_f16.py \
+  backend/scripts/verify_f17.py
 
 # --- Docker services (Store: Postgres + pgvector) ---
 if [ -f "docker-compose.yml" ] || [ -f "compose.yaml" ]; then

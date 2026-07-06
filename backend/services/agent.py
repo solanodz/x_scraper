@@ -19,17 +19,19 @@ from backend.services.types import SignalHit
 AGENT_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de X Scraper Terminal.
 
 Tenés herramientas para:
-- search_corpus: Signals (tweets/noticias) del Corpus de X
+- search_corpus: búsqueda semántica en el Corpus (narrativa, temas, contexto)
+- get_recent_signals: Signals más recientes por fecha (como el Signal Feed)
 - get_quotes: precios y variación % de Tickers
 - get_watchlist_quotes: panel de la Watchlist del Terminal
 
 Según la Query del Operator, llamá las herramientas necesarias antes de redactar la respuesta final.
 
 Guía:
-- Preguntas sobre un Ticker (precio, qué pasó, análisis): get_quotes + search_corpus con ticker
-- Comparar activos: get_quotes para todos los tickers mencionados + search_corpus si aporta contexto
-- Solo noticias o narrativa: search_corpus (usá ticker y since_hours si aplica)
-- Mercado en general / watchlist: get_watchlist_quotes + search_corpus sobre el tema
+- Última noticia / noticias recientes / qué pasó hoy: get_recent_signals (con ticker y hours si aplica). Preferir sobre search_corpus para "última noticia de X".
+- Preguntas sobre un Ticker (precio, qué pasó, análisis): get_quotes + get_recent_signals o search_corpus según si pide lo reciente o contexto semántico
+- Comparar activos: get_quotes para todos los tickers mencionados + get_recent_signals o search_corpus si aporta contexto
+- Solo narrativa o tema amplio (no reciente): search_corpus (usá ticker y since_hours si aplica)
+- Mercado en general / watchlist: get_watchlist_quotes + get_recent_signals o search_corpus sobre el tema
 - Cruce precio + noticias: siempre ambas fuentes cuando el Ticker sea relevante
 
 Podés llamar varias herramientas en una o más rondas. Cuando tengas datos suficientes, respondé exactamente: LISTO"""
@@ -81,6 +83,19 @@ def _record_tool_result(
         if arguments.get("since_hours"):
             label += f", since_hours={arguments.get('since_hours')}"
         label += ")"
+        context.corpus_sections.append(f"### {label}\n{result}")
+
+    elif tool_name == "get_recent_signals":
+        parts: list[str] = []
+        if arguments.get("ticker"):
+            parts.append(f"ticker={arguments.get('ticker')!r}")
+        if arguments.get("source_type"):
+            parts.append(f"source_type={arguments.get('source_type')!r}")
+        if arguments.get("hours"):
+            parts.append(f"hours={arguments.get('hours')}")
+        if arguments.get("limit"):
+            parts.append(f"limit={arguments.get('limit')}")
+        label = f"get_recent_signals({', '.join(parts)})"
         context.corpus_sections.append(f"### {label}\n{result}")
 
     elif tool_name in {"get_quotes", "get_watchlist_quotes"}:

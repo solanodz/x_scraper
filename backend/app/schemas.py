@@ -81,6 +81,10 @@ class ChatSessionCreate(BaseModel):
     title: str | None = None
 
 
+class SignalCountResponse(BaseModel):
+    total: int = Field(ge=0)
+
+
 class IngestRefreshResponse(BaseModel):
     status: str = "started"
 

@@ -331,6 +331,46 @@
         "scraper/adapters/rss.py ARGENTINA_FEEDS + get_rss_feeds(); RSS_AR_FEEDS_ENABLED en .env.example",
         "./init.sh OK"
       ]
+    },
+    {
+      "id": "F17",
+      "priority": 17,
+      "title": "Acceso confiable al Corpus (retrieval)",
+      "user_visible_behavior": "El Research Chat encuentra de forma confiable las noticias recientes y relevantes que aparecen en el Signal Feed (ej. 'dame la última noticia de MSFT' devuelve la del feed, no una vieja o ninguna).",
+      "status": "passing",
+      "dependencies": ["F8", "F12"],
+      "notes": "Prerrequisito duro de F18 (LangGraph). Tres partes: (1) cobertura de embeddings — subir/forzar backfill para reducir Signals sin vector; (2) tool get_recent_signals(ticker?, source_type?, hours?, limit?) ordenada por published_at (lee del Store como el feed); (3) fallback por keyword en título/summary recientes cuando la búsqueda vectorial no trae hits. Recency boost y re-embed on Refresh quedan fuera de alcance.",
+      "verification": [
+        "Query 'última noticia de MSFT' en el Research Chat cita el Signal más reciente de MSFT del feed",
+        "get_recent_signals devuelve Signals ordenados por fecha, con filtros ticker/source_type/hours",
+        "Fallback keyword devuelve resultados cuando el Signal no tiene embedding",
+        "SELECT en Supabase: proporción de Signals recientes (24h) sin embedding baja tras el fix",
+        "python -m backend.scripts.verify_f17 => OK"
+      ],
+      "evidence": [
+        "2026-07-06: python -m backend.scripts.verify_f17 => OK (EMBEDDING_BACKFILL_LIMIT default 200, get_recent_signals 5 hits DESC, keyword+retrieve 3 hits)",
+        "backend/services/recent_signals.py + list_recent_signals; tools get_recent_signals; agent prompt updated",
+        "backend/services/retrieval.py search_by_keywords fallback; ticker filter matches title/summary",
+        "scraper/backfill.py + ingest.py EMBEDDING_BACKFILL_LIMIT=200; init.sh includes verify_f17"
+      ]
+    },
+    {
+      "id": "F18",
+      "priority": 18,
+      "title": "Research Agent con LangGraph",
+      "user_visible_behavior": "El Research Chat orquesta research multi-paso con LangGraph: filtra por ticker/tipo/fecha/relevancia, hace análisis de mercado y tendencias (precio + narrativa), lectura profunda de artículos, y recuerda el hilo de la conversación. Streaming y Citations sin cambios visibles de contrato.",
+      "status": "pending",
+      "dependencies": ["F15", "F17"],
+      "notes": "Ver ADR-0006. LangGraph + langchain-core + langchain-openai; retrieval propio. ReAct prebuilt primero (create_react_agent), grafo custom después. 7 tools: search_corpus (+source_type,+min_relevance), get_recent_signals, get_signal_detail, corpus_stats, get_quotes, get_watchlist_quotes, get_price_history (yfinance). Citations derivadas del estado. Memoria vía chat_messages (sin checkpointer). Modelo configurable (RESEARCH_MODEL/SYNTHESIS_MODEL, default gpt-4o-mini). LangSmith opt-in. Flag RESEARCH_ENGINE=langgraph|legacy (default legacy hasta verificar). Backend-only, contrato SSE intacto.",
+      "verification": [
+        "Con RESEARCH_ENGINE=langgraph, /chat mantiene el contrato SSE (session, tokens, citations)",
+        "Paridad: preguntas de F8 devuelven respuesta grounded con Citations",
+        "Follow-up ('¿y comparado con el mes pasado?') usa el historial de la sesión",
+        "Research multi-paso: una query de 'tendencias de NVDA' combina get_price_history + corpus_stats/search_corpus",
+        "Rollback: RESEARCH_ENGINE=legacy restaura el motor previo sin cambios de frontend",
+        "python -m backend.scripts.verify_f18 => OK"
+      ],
+      "evidence": []
     }
   ]
 }

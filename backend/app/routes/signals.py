@@ -10,9 +10,14 @@ from typing import AsyncIterator
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from backend.app.schemas import SignalDetail, SignalSummary
+from backend.app.schemas import SignalCountResponse, SignalDetail, SignalSummary
 from backend.app.services.feed_filters import feed_filters_from_query
-from backend.app.services.signals_repo import get_signal, iter_poll_new_signals, list_signals
+from backend.app.services.signals_repo import (
+    count_signals,
+    get_signal,
+    iter_poll_new_signals,
+    list_signals,
+)
 
 router = APIRouter(prefix="/signals", tags=["signals"])
 
@@ -45,6 +50,34 @@ def get_signals(
         sentiment=sentiment,
     )
     return list_signals(limit=limit, offset=offset, filters=filters)
+
+
+@router.get("/count", response_model=SignalCountResponse)
+def get_signals_count(
+    q: str | None = Query(None, description="Palabras clave (todas deben aparecer)"),
+    username: str | None = Query(None, description="Fuente o cuenta (parcial)"),
+    ticker: str | None = Query(None, description="Ticker, ej. NVDA"),
+    source_type: str | None = Query(
+        None,
+        description="x | news | rss | marketaux | alpha_vantage",
+    ),
+    topic: str | None = Query(None, description="Tópico (parcial)"),
+    since_hours: int | None = Query(None, ge=1, le=24 * 90),
+    sentiment: str | None = Query(
+        None,
+        description="positive | negative | neutral | bullish | bearish",
+    ),
+) -> SignalCountResponse:
+    filters = feed_filters_from_query(
+        q=q,
+        ticker=ticker,
+        username=username,
+        source_type=source_type,
+        topic=topic,
+        since_hours=since_hours,
+        sentiment=sentiment,
+    )
+    return SignalCountResponse(total=count_signals(filters=filters))
 
 
 async def _sse_signal_stream(
