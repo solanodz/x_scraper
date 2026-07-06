@@ -182,3 +182,13 @@ _Avoid_: Thread, conversation history, chat log
 **Corpus en Store**:
 Los Signals (noticias filtradas) viven en `signals` en el mismo Postgres de Supabase; no son por usuario. El filtro `SIGNAL_FILTER=relevant` reduce ruido en Ingestion.
 _Avoid_: News table, tweets table
+
+## Ticker Watch & Briefing
+
+**Ticker Watch**:
+Lista personal del Operator de Tickers que sigue deliberadamente. Distinta de la Watchlist (carrusel derivado dinámicamente del Corpus, no personal): el Ticker Watch lo arma el Operator a mano y se persiste por usuario. Alimenta el Briefing. Los símbolos se guardan canónicos (mayúsculas, sin `$`, resueltos desde nombres de empresa: Intel → INTC).
+_Avoid_: Watchlist, favorites, portfolio, following
+
+**Briefing**:
+Resumen on-demand, grounded y con Citations, de los Tickers del Ticker Watch. Por cada Ticker con novedad en la ventana (default 24h): precio y variación %, Signals recientes relevantes, y una interpretación de "qué implica / qué mirar". Es analítico: no da recomendaciones de compra/venta ni predice precios; toda afirmación se respalda con un Signal. Se genera bajo demanda y se muestra como un mensaje del Research Chat (permite follow-up sobre el mismo hilo).
+_Avoid_: Digest, report, newsletter, resumen

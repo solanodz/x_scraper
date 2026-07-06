@@ -378,6 +378,43 @@
         "ask.py RESEARCH_ENGINE=langgraph|legacy; chat.py pasa historial de sesión",
         "./init.sh OK"
       ]
+    },
+    {
+      "id": "F19",
+      "priority": 19,
+      "title": "Ticker Watch (lista personal del Operator)",
+      "user_visible_behavior": "El Operator sigue Tickers a mano desde la Terminal: los agrega por símbolo o nombre de empresa (Intel → INTC), los ve listados y los quita. La lista persiste por Operator entre sesiones.",
+      "status": "pending",
+      "dependencies": ["F9"],
+      "notes": "Tabla dedicada ticker_watch (no JSONB en operator_settings). Supabase: user_id UUID + FK auth.users + RLS (migración 007_ticker_watch.sql). Store local: user_id TEXT sin FK (006_ticker_watch.sql), patrón chat. Símbolo canónico vía resolve_ticker_input; canonicalizar + aceptar (sin validar contra quote). Repo filtra por user_id explícito (como chat_repo) + operator_id_from_user. Columna note/thesis nullable desde ya para interpretación futura. UI: popover 'Watch' en TerminalHeader, add con autocomplete fetchTickerSuggestions, quitar con ×. Filtro 'Mis tickers' en el feed queda fuera de alcance (requiere multi-ticker backend).",
+      "verification": [
+        "POST /watch con 'Intel' persiste INTC canónico (una fila por operator+symbol)",
+        "GET /watch lista los Tickers seguidos del Operator",
+        "DELETE /watch/{symbol} quita el Ticker",
+        "Reload de la Terminal restaura la lista desde el backend",
+        "Aislamiento: otro operator_id no ve los Tickers ajenos",
+        "python -m backend.scripts.verify_f19 => OK"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F20",
+      "priority": 20,
+      "title": "Briefing on-demand del Ticker Watch",
+      "user_visible_behavior": "El Operator pide un Briefing de sus Tickers seguidos y recibe, por cada Ticker con novedad, precio + Signals recientes + una interpretación 'qué implica / qué mirar', con Citations. Se muestra como mensaje del Research Chat y permite follow-up.",
+      "status": "pending",
+      "dependencies": ["F18", "F19"],
+      "notes": "Ver ADR-0007. Servicio determinístico backend/services/briefing.py: por cada Ticker del Ticker Watch llama get_recent_signals (default 24h) + fetch_quotes, luego una síntesis grounded única (reusa stream_answer + Citations). Cobertura garantizada (itera en código, no vía agente). Interpretación analítica: sin recomendaciones compra/venta ni predicción de precios; toda afirmación respaldada por Signal. Orden por relevancia/movimiento; Tickers sin novedad en línea compacta 'Sin novedades'. Entrega streaming SSE reusando contrato Chat Stream + ResearchStepLoader (pasos 'Revisando NVDA…'). Render como mensaje del Research Chat (queda en Chat Session, habilita follow-up). On-demand (botón), sin cron. Ventana configurable (BRIEFING_WINDOW_HOURS default 24).",
+      "verification": [
+        "Con Tickers en el Ticker Watch, el Briefing cubre cada uno con novedad",
+        "Cada sección: precio + variación %, Signals recientes, 'qué implica' analítico (sin call compra/venta)",
+        "Citations clickeables abren Signal Detail",
+        "Tickers sin novedad aparecen en línea compacta 'Sin novedades'",
+        "Streaming: pasos 'Revisando <ticker>' antes del texto; render como mensaje del chat",
+        "Follow-up sobre el Briefing usa la memoria de la Chat Session",
+        "python -m backend.scripts.verify_f20 => OK"
+      ],
+      "evidence": []
     }
   ]
 }
