@@ -91,3 +91,10 @@ export interface TickerSuggestion {
   description: string;
   source: string;
 }
+
+export interface TickerWatchEntry {
+  id: string;
+  symbol: string;
+  note?: string | null;
+  created_at: string;
+}

@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.auth import get_current_user, operator_id_from_user
 from backend.app.schemas import (
+    BriefingRequest,
     ChatCitation,
     ChatMessageRecord,
     ChatRequest,
@@ -27,12 +29,20 @@ from backend.app.services.chat_repo import (
     tables_ready,
 )
 from backend.services.ask import ask_stream
+from backend.services.briefing import iter_briefing_stream
 from backend.services.chat_history import prepare_chat_history
 from backend.services.research_steps import ResearchStepEvent
 from backend.services.types import Citation
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+BRIEFING_USER_MESSAGE = "Briefing de mi Ticker Watch"
+
+
+def _briefing_session_title() -> str:
+    now = datetime.now()
+    return f"Briefing {now.day:02d}/{now.month:02d}/{now.year}"
 
 
 def _citation_to_schema(citation: Citation) -> ChatCitation:
@@ -121,11 +131,34 @@ def get_chat_messages(
     return [_message_to_schema(row) for row in rows]
 
 
-async def _sse_chat_stream(
-    query: str,
+async def _consume_stream_chunks(
+    stream,
+    loop,
+) -> AsyncIterator[str]:
+    """Convierte AskStreamChunk iterator en eventos SSE."""
+    while True:
+        chunk = await loop.run_in_executor(None, lambda: next(stream, None))
+        if chunk is None:
+            break
+        if isinstance(chunk, ResearchStepEvent):
+            payload = chunk.to_dict()
+            yield f"event: step\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        elif isinstance(chunk, list):
+            payload = _citation_payload(chunk)
+            yield f"event: citations\ndata: {json.dumps(payload)}\n\n"
+            yield ("__citations__", chunk)
+        else:
+            yield f"data: {json.dumps(chunk)}\n\n"
+            yield ("__token__", chunk)
+
+
+async def _sse_research_stream(
+    user_message: str,
     *,
     operator_id: str,
     session_id: str | None,
+    stream_factory,
+    session_title: str | None = None,
 ) -> AsyncIterator[str]:
     session = ensure_session(user_id=operator_id, session_id=session_id)
     sid = session["id"]
@@ -148,29 +181,24 @@ async def _sse_chat_stream(
         user_id=operator_id,
         session_id=sid,
         role="user",
-        content=query,
+        content=user_message,
     )
-    set_session_title_if_empty(sid, query)
+    set_session_title_if_empty(sid, session_title or user_message)
 
     loop = asyncio.get_event_loop()
-    stream = ask_stream(query, history=chat_history)
+    stream = stream_factory(chat_history, sid)
     answer_parts: list[str] = []
     citations: list[Citation] = []
 
-    while True:
-        chunk = await loop.run_in_executor(None, lambda: next(stream, None))
-        if chunk is None:
-            break
-        if isinstance(chunk, ResearchStepEvent):
-            payload = chunk.to_dict()
-            yield f"event: step\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-        elif isinstance(chunk, list):
-            citations = chunk
-            payload = _citation_payload(citations)
-            yield f"event: citations\ndata: {json.dumps(payload)}\n\n"
-        else:
-            answer_parts.append(chunk)
-            yield f"data: {json.dumps(chunk)}\n\n"
+    async for item in _consume_stream_chunks(stream, loop):
+        if isinstance(item, tuple):
+            kind, value = item
+            if kind == "__token__":
+                answer_parts.append(value)
+            elif kind == "__citations__":
+                citations = value
+            continue
+        yield item
 
     answer = "".join(answer_parts).strip()
     if answer:
@@ -181,6 +209,40 @@ async def _sse_chat_stream(
             content=answer,
             citations=_citation_payload(citations) if citations else None,
         )
+
+
+async def _sse_chat_stream(
+    query: str,
+    *,
+    operator_id: str,
+    session_id: str | None,
+) -> AsyncIterator[str]:
+    async for event in _sse_research_stream(
+        query,
+        operator_id=operator_id,
+        session_id=session_id,
+        stream_factory=lambda history, sid: ask_stream(query, history=history),
+    ):
+        yield event
+
+
+async def _sse_briefing_stream(
+    *,
+    operator_id: str,
+    session_id: str | None,
+) -> AsyncIterator[str]:
+    async for event in _sse_research_stream(
+        BRIEFING_USER_MESSAGE,
+        operator_id=operator_id,
+        session_id=session_id,
+        session_title=_briefing_session_title(),
+        stream_factory=lambda history, sid: iter_briefing_stream(
+            operator_id,
+            history=history,
+            exclude_session_id=sid,
+        ),
+    ):
+        yield event
 
 
 @router.post("")
@@ -195,6 +257,28 @@ async def chat(
             body.query.strip(),
             operator_id=operator_id,
             session_id=body.session_id,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/briefing")
+async def chat_briefing(
+    body: BriefingRequest | None = None,
+    user: dict | None = Depends(get_current_user),
+) -> StreamingResponse:
+    _require_chat_tables()
+    operator_id = operator_id_from_user(user)
+    session_id = body.session_id if body else None
+    return StreamingResponse(
+        _sse_briefing_stream(
+            operator_id=operator_id,
+            session_id=session_id,
         ),
         media_type="text/event-stream",
         headers={

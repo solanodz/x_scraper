@@ -1,18 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import ChatMarkdown from "@/components/ChatMarkdown";
+import ChatMarkdown, { isBriefingAssistantMessage } from "@/components/ChatMarkdown";
 import ChatSessionSelect from "@/components/ChatSessionSelect";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
 import {
   createChatSession,
   fetchChatMessages,
   fetchChatSessions,
+  fetchTickerWatch,
+  streamBriefing,
   streamChat,
+  type StreamChatCallbacks,
 } from "@/lib/api";
-import { citationChipLabel } from "@/lib/signalSource";
 import type {
-  ChatCitation,
   ChatMessage,
   ChatMessageRecord,
   ChatSessionSummary,
@@ -20,6 +21,21 @@ import type {
 } from "@/lib/types";
 
 const ACTIVE_SESSION_KEY = "xscraper:activeChatSession";
+const BRIEFING_USER_MESSAGE = "Briefing de mi Ticker Watch";
+
+function briefingSessionTitle(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  return `Briefing ${dd}/${mm}/${yyyy}`;
+}
+
+type AssistantStreamFn = (
+  callbacks: StreamChatCallbacks,
+  signal: AbortSignal,
+  sessionId: string,
+) => Promise<void>;
 
 interface ResearchChatProps {
   onCitationClick: (idStr: string) => void;
@@ -41,8 +57,13 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   const [streaming, setStreaming] = useState(false);
   const [loading, setLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [watchEmpty, setWatchEmpty] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const messagesRef = useRef(messages);
+  const streamingRef = useRef(streaming);
+  messagesRef.current = messages;
+  streamingRef.current = streaming;
 
   const persistActiveSession = useCallback((sessionId: string | null) => {
     sessionIdRef.current = sessionId;
@@ -63,6 +84,12 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     const list = await fetchChatSessions(20);
     setSessions(list);
     return list;
+  }, []);
+
+  useEffect(() => {
+    fetchTickerWatch()
+      .then((entries) => setWatchEmpty(entries.length === 0))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -128,43 +155,149 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     }
   }
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    const query = input.trim();
-    if (!query || streaming) return;
+  const runAssistantStream = useCallback(
+    async (streamFn: AssistantStreamFn, userDisplayMessage: string) => {
+      if (streamingRef.current) return;
 
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: query }]);
-    setStreaming(true);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: userDisplayMessage },
+      ]);
+      setStreaming(true);
 
-    const assistantIndex = messages.length + 1;
-    setMessages((prev) => [...prev, { role: "assistant", content: "", steps: [] }]);
+      const assistantIndex = messagesRef.current.length + 1;
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "", steps: [] },
+      ]);
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      let sessionId = sessionIdRef.current;
+      if (!sessionId) {
+        try {
+          const session = await createChatSession();
+          sessionId = session.id;
+          persistActiveSession(sessionId);
+          const list = await refreshSessions();
+          setSessions([session, ...list.filter((s) => s.id !== session.id)]);
+        } catch {
+          setHistoryError("No se pudo iniciar la sesión de chat");
+          setStreaming(false);
+          return;
+        }
+      }
+
+      try {
+        await streamFn(
+          {
+            onSession: (nextSessionId) => {
+              persistActiveSession(nextSessionId);
+              refreshSessions().then(setSessions).catch(() => undefined);
+            },
+            onStep: (step: ResearchStep) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIndex];
+                if (msg?.role !== "assistant") return prev;
+
+                const prior = msg.steps ?? [];
+                const existingIdx = prior.findIndex(
+                  (s) => s.tool === step.tool && s.label === step.label,
+                );
+                let nextSteps: ResearchStep[];
+                if (existingIdx >= 0) {
+                  nextSteps = [...prior];
+                  nextSteps[existingIdx] = step;
+                } else {
+                  nextSteps = [...prior, step];
+                }
+
+                updated[assistantIndex] = { ...msg, steps: nextSteps };
+                return updated;
+              });
+            },
+            onToken: (token) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIndex];
+                if (msg?.role === "assistant") {
+                  updated[assistantIndex] = {
+                    ...msg,
+                    content: msg.content + token,
+                  };
+                }
+                return updated;
+              });
+            },
+            onCitations: (citations) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIndex];
+                if (msg?.role === "assistant") {
+                  updated[assistantIndex] = { ...msg, citations };
+                }
+                return updated;
+              });
+            },
+          },
+          controller.signal,
+          sessionId,
+        );
+      } catch {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const msg = updated[assistantIndex];
+          if (msg?.role === "assistant" && !msg.content) {
+            updated[assistantIndex] = {
+              ...msg,
+              content: "Error: failed to get response.",
+            };
+          }
+          return updated;
+        });
+      } finally {
+        setStreaming(false);
+      }
+    },
+    [persistActiveSession, refreshSessions],
+  );
+
+  const runBriefing = useCallback(async () => {
+    if (streamingRef.current) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    setStreaming(true);
 
-    let sessionId = sessionIdRef.current ?? activeSessionId;
-    if (!sessionId) {
-      try {
-        const session = await createChatSession();
-        sessionId = session.id;
-        persistActiveSession(sessionId);
-        const list = await refreshSessions();
-        setSessions([session, ...list.filter((s) => s.id !== session.id)]);
-      } catch {
-        setHistoryError("No se pudo iniciar la sesión de chat");
-        setStreaming(false);
-        return;
-      }
+    let sessionId: string;
+    try {
+      const session = await createChatSession(briefingSessionTitle());
+      sessionId = session.id;
+      persistActiveSession(sessionId);
+      const list = await refreshSessions();
+      setSessions([session, ...list.filter((s) => s.id !== session.id)]);
+    } catch {
+      setHistoryError("No se pudo crear la sesión de Briefing");
+      setStreaming(false);
+      return;
     }
 
+    setMessages([
+      { role: "user", content: BRIEFING_USER_MESSAGE },
+      { role: "assistant", content: "", steps: [] },
+    ]);
+
+    const assistantIndex = 1;
+
     try {
-      await streamChat(
-        query,
+      await streamBriefing(
         {
-          onSession: (sessionId) => {
-            persistActiveSession(sessionId);
+          onSession: (nextSessionId) => {
+            persistActiveSession(nextSessionId);
             refreshSessions().then(setSessions).catch(() => undefined);
           },
           onStep: (step: ResearchStep) => {
@@ -231,6 +364,34 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     } finally {
       setStreaming(false);
     }
+  }, [persistActiveSession, refreshSessions]);
+
+  useEffect(() => {
+    function handleBriefingEvent() {
+      void runBriefing();
+    }
+
+    window.addEventListener("xscraper:briefing", handleBriefingEvent);
+    return () => {
+      window.removeEventListener("xscraper:briefing", handleBriefingEvent);
+    };
+  }, [runBriefing]);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    const query = input.trim();
+    if (!query || streaming) return;
+
+    setInput("");
+    await runAssistantStream(
+      (callbacks, signal, sessionId) =>
+        streamChat(query, callbacks, signal, sessionId),
+      query,
+    );
+  }
+
+  function handleBriefing() {
+    void runBriefing();
   }
 
 
@@ -240,14 +401,24 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
         <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
           Research Chat
         </h2>
-        <button
-          type="button"
-          onClick={handleNewChat}
-          disabled={streaming}
-          className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
-        >
-          Nueva
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleBriefing}
+            disabled={streaming || watchEmpty}
+            className="rounded border border-amber-800/60 bg-amber-950/30 px-2 py-0.5 font-mono text-[10px] text-amber-400 hover:border-amber-600 hover:text-amber-300 disabled:opacity-50"
+          >
+            Briefing
+          </button>
+          <button
+            type="button"
+            onClick={handleNewChat}
+            disabled={streaming}
+            className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
+          >
+            Nueva
+          </button>
+        </div>
       </div>
 
       {sessions.length > 0 && (
@@ -296,18 +467,14 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
                   <ChatMarkdown
                     content={msg.content}
                     streaming={streaming && i === messages.length - 1}
+                    citations={msg.citations}
+                    onCitationClick={onCitationClick}
+                    variant={
+                      isBriefingAssistantMessage(messages, i)
+                        ? "briefing"
+                        : "default"
+                    }
                   />
-                )}
-                {msg.citations && msg.citations.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {msg.citations.map((c) => (
-                      <CitationChip
-                        key={c.id_str}
-                        citation={c}
-                        onClick={() => onCitationClick(c.id_str)}
-                      />
-                    ))}
-                  </div>
                 )}
               </div>
             )}
@@ -336,24 +503,5 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
         </button>
       </form>
     </section>
-  );
-}
-
-function CitationChip({
-  citation,
-  onClick,
-}: {
-  citation: ChatCitation;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={`${citation.excerpt} — abrir en el panel`}
-      className="rounded border border-amber-800/50 bg-amber-950/30 px-2 py-0.5 font-mono text-[10px] text-amber-400 transition-colors hover:border-amber-600 hover:text-amber-300"
-    >
-      {citationChipLabel(citation.username, citation.id_str)}
-    </button>
   );
 }

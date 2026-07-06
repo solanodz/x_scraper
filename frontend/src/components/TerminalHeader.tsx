@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { clearAccessTokenCache, isSupabaseConfigured, refreshIngest } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import TickerWatchPopover from "@/components/TickerWatchPopover";
 
 interface TerminalHeaderProps {
   onRefreshComplete?: () => void;
@@ -50,6 +51,7 @@ export default function TerminalHeader({
         {status && (
           <span className="font-mono text-xs text-emerald-500">{status}</span>
         )}
+        <TickerWatchPopover />
         <button
           type="button"
           onClick={handleRefresh}

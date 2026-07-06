@@ -54,6 +54,10 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 
+class BriefingRequest(BaseModel):
+    session_id: str | None = None
+
+
 class ChatCitation(BaseModel):
     id_str: str
     username: str
@@ -103,3 +107,19 @@ class TickerSuggestion(BaseModel):
     symbol: str
     description: str = ""
     source: str = "finnhub"
+
+
+class TickerWatchEntry(BaseModel):
+    id: str
+    symbol: str
+    note: str | None = None
+    created_at: datetime
+
+
+class TickerWatchAddRequest(BaseModel):
+    symbol: str = Field(..., min_length=1)
+    note: str | None = None
+
+
+class TickerWatchUpdateRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=280)

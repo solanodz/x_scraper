@@ -14,6 +14,7 @@ from backend.app.routes.chat import router as chat_router
 from backend.app.routes.ingest import router as ingest_router
 from backend.app.routes.quotes import router as quotes_router
 from backend.app.routes.signals import router as signals_router
+from backend.app.routes.watch import router as watch_router
 
 load_dotenv()
 
@@ -71,6 +72,7 @@ app.include_router(signals_router)
 app.include_router(chat_router)
 app.include_router(ingest_router)
 app.include_router(quotes_router)
+app.include_router(watch_router)
 
 
 @app.get("/health")

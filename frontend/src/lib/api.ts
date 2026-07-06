@@ -8,6 +8,7 @@ import type {
   SignalDetail,
   SignalSummary,
   TickerSuggestion,
+  TickerWatchEntry,
 } from "./types";
 
 function normalizeApiUrl(raw: string): string {
@@ -113,6 +114,72 @@ export async function fetchSignalCount(
   return data.total;
 }
 
+export async function fetchTickerWatch(): Promise<TickerWatchEntry[]> {
+  const res = await fetch(`${API_URL}/watch`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ticker watch: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function addTickerWatch(
+  symbol: string,
+): Promise<TickerWatchEntry> {
+  const cleaned = symbol.replace(/^\$/, "").trim();
+  const res = await fetch(`${API_URL}/watch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify({ symbol: cleaned }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to add ticker watch: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function removeTickerWatch(symbol: string): Promise<void> {
+  const normalized = symbol.replace(/^\$/, "").trim().toUpperCase();
+  const res = await fetch(
+    `${API_URL}/watch/${encodeURIComponent(normalized)}`,
+    {
+      method: "DELETE",
+      headers: await authHeaders(),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to remove ticker watch: ${res.status}`);
+  }
+}
+
+export async function updateTickerWatchThesis(
+  symbol: string,
+  note: string | null,
+): Promise<TickerWatchEntry> {
+  const normalized = symbol.replace(/^\$/, "").trim().toUpperCase();
+  const trimmed = note?.trim() ?? "";
+  const payload = { note: trimmed.length > 0 ? trimmed : null };
+  const res = await fetch(
+    `${API_URL}/watch/${encodeURIComponent(normalized)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await authHeaders()),
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to update ticker thesis: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function fetchTickerSuggestions(
   prefix = "",
   limit = 50,
@@ -216,35 +283,19 @@ export async function fetchChatMessages(
   return res.json();
 }
 
-export async function streamChat(
-  query: string,
-  callbacks: {
-    onToken: (token: string) => void;
-    onCitations: (citations: ChatCitation[]) => void;
-    onStep?: (step: ResearchStep) => void;
-    onSession?: (sessionId: string) => void;
-    onError?: (error: Error) => void;
-  },
+export type StreamChatCallbacks = {
+  onToken: (token: string) => void;
+  onCitations: (citations: ChatCitation[]) => void;
+  onStep?: (step: ResearchStep) => void;
+  onSession?: (sessionId: string) => void;
+  onError?: (error: Error) => void;
+};
+
+async function readSseStream(
+  res: Response,
+  callbacks: StreamChatCallbacks,
   signal?: AbortSignal,
-  sessionId?: string | null,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
-    body: JSON.stringify({
-      query,
-      session_id: sessionId ?? undefined,
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Chat request failed: ${res.status}`);
-  }
-
   const reader = res.body?.getReader();
   if (!reader) {
     throw new Error("No response body");
@@ -298,4 +349,54 @@ export async function streamChat(
     callbacks.onError?.(error);
     throw error;
   }
+}
+
+export async function streamChat(
+  query: string,
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal,
+  sessionId?: string | null,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify({
+      query,
+      session_id: sessionId ?? undefined,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Chat request failed: ${res.status}`);
+  }
+
+  await readSseStream(res, callbacks, signal);
+}
+
+export async function streamBriefing(
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal,
+  sessionId?: string | null,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/chat/briefing`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify({
+      session_id: sessionId ?? undefined,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Briefing request failed: ${res.status}`);
+  }
+
+  await readSseStream(res, callbacks, signal);
 }
