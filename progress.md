@@ -2,13 +2,28 @@
 
 ## Estado actual
 
-**F22 `passing`.** Briefing delta vs anterior (Nuevo / Sin cambio material / Cambió el tono). Próximo: redeploy prod.
+**F34 `passing`.** Ticker Chart Operator-first + Lightweight Charts (ADR-0011).
 
 ## Próximo paso
 
-1. Redeploy API + frontend (Railway + Vercel)
-2. Probar delta Briefing en prod (segundo Briefing del día vs primero)
-3. Elegir siguiente feature del backlog
+1. Smoke manual UI: presets + indicadores en `/dossier` y Quote Strip
+2. Reiniciar API local si aún corre código viejo (`uvicorn --reload`)
+3. **F31** Fundamentals o polish Chart Agent
+
+## Roadmap Chart Plan (ADR-0010 / ADR-0011)
+
+- **F33** Chart Agent on-demand (`passing`)
+- **F34** Ticker Chart Operator-first (`passing`)
+
+## Roadmap Dossier (ADR-0009)
+
+- **F30** Dossier análisis integral (`passing`)
+- **F31** Fundamentals (bloque 5 real)
+- **F32** Provenance / Citations datos no-Signal
+
+## Roadmap Parallel Research (ADR-0008)
+
+- **F24** Parallel Research para cobertura garantizada (`passing`)
 
 ## Roadmap Corpus multi-fuente (ADR-0004)
 
@@ -38,6 +53,16 @@
 Railway (API + Worker) + Vercel (frontend) + Supabase — prod operativo.
 
 ## Log
+
+- 2026-07-10 — F33 PASSING. Chart Plan (ADR-0010): migración 010, Chart Agent ReAct acotado, SSE /chart-plan/analyze, split /dossier, ChartPlanPanel (TV+recharts+Pine), verify_f33 OK.
+
+- 2026-07-10 — F33 IN_PROGRESS (diseño). Chart Plan + Chart Agent: grill-with-docs + ADR-0010. On-demand, split /dossier, ReAct acotado, Pine 0–3, objetividad híbrida, SSE pasos, flag CHART_AGENT_ENABLED.
+
+- 2026-07-10 — F30 PASSING. Dossier (ADR-0009): migración ticker_dossier_versions, dossier.py determinístico (7 bloques), API GET/POST refresh, Briefing refresca prioridad alta + novedad, Signal Detail modo Dossier, links dossier:SYMBOL. Verificado: verify_f30 OK, verify_f20/21/23 regression OK, init.sh + npm run build OK.
+
+- 2026-07-10 — F30 IN_PROGRESS (diseño). Dossier + Briefing ejecutivo: grill-with-docs + ADR-0009. CONTEXT.md actualizado (Dossier, Briefing ejecutivo). Próximo: Store + dossier.py + Signal Detail modo Dossier.
+
+- 2026-07-09 — F24 PASSING. Parallel Research (ADR-0008): ticker_extract, research_plan, parallel_research, research_gather; router en research_agent (tickers→bundle, follow-up→Plan, resto ReAct). ResearchStepLoader pasos paralelos. Verificado: verify_f24 OK, verify_f18 regression OK, init.sh + npm run build OK.
 
 - 2026-07-06 — F22 PASSING. Briefing delta vs anterior: `get_previous_briefing` (sesión Briefing %, último assistant, exclude current), contexto wrap cap 6k, prompt `## Desde el último Briefing` (Nuevo/Sin cambio material/Cambió el tono). Verificado: `python -m backend.scripts.verify_f22` OK; `verify_f21` regression OK.
 

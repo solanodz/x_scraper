@@ -84,6 +84,12 @@ export interface Quote {
   timestamp: string | null;
   delayed?: boolean;
   available?: boolean;
+  logo?: string | null;
+}
+
+export interface TickerLogoEntry {
+  symbol: string;
+  logo: string | null;
 }
 
 export interface TickerSuggestion {
@@ -97,4 +103,115 @@ export interface TickerWatchEntry {
   symbol: string;
   note?: string | null;
   created_at: string;
+}
+
+export interface DossierBlockContent {
+  blocks: Record<string, string>;
+  sentiment_stats?: Record<string, number | string | Record<string, number>>;
+}
+
+export interface DossierVersion {
+  id: string;
+  symbol: string;
+  content: DossierBlockContent;
+  citations: ChatCitation[];
+  created_at: string;
+}
+
+export interface ChartPlanAssessment {
+  summary?: string;
+  conflicts: string[];
+  data_gaps: string[];
+  bias_check: string;
+  bullish_count?: number | null;
+  bearish_count?: number | null;
+}
+
+export interface ChartPlanView {
+  type: "tradingview" | "sentiment_bars" | "signals_timeline" | string;
+  enabled: boolean;
+  interval?: string | null;
+  rationale?: string | null;
+}
+
+export interface ChartPlanChartData {
+  sentiment_bars?: Array<{ label: string; count: number }>;
+  signals_timeline?: Array<{ date: string; count: number }>;
+}
+
+export interface ChartPlanPineScript {
+  title: string;
+  code: string;
+  purpose: string;
+  limitations: string;
+}
+
+export interface ChartPlanTimeframe {
+  interval?: string;
+  rationale?: string;
+}
+
+export interface ChartPlanTradingViewStudy {
+  id: string;
+  inputs?: Record<string, number | string>;
+}
+
+export interface ChartPlanIndicatorReading {
+  name: string;
+  stance: "alcista" | "bajista" | "neutral" | string;
+  reading: string;
+  tv_study?: ChartPlanTradingViewStudy | null;
+}
+
+/** Soft view for Operator-first Ticker Chart (ADR-0011). */
+export interface ChartPlanSuggestedView {
+  interval: string;
+  period: string;
+  sma_a: { enabled: boolean; length: number };
+  sma_b: { enabled: boolean; length: number };
+  donchian: { enabled: boolean; period: number };
+  fib: boolean;
+  volume: boolean;
+}
+
+export interface ChartPlanContent {
+  symbol?: string;
+  timeframes?: Array<ChartPlanTimeframe | string>;
+  views: ChartPlanView[];
+  chart_data?: ChartPlanChartData;
+  suggested_view?: ChartPlanSuggestedView;
+  /** Pine off for MVP; may be empty or omitted. */
+  pine_scripts?: ChartPlanPineScript[];
+  indicator_readings?: ChartPlanIndicatorReading[];
+  tradingview_studies?: ChartPlanTradingViewStudy[];
+  assessment: ChartPlanAssessment;
+  summary?: string | null;
+}
+
+export interface ChartPlanVersion {
+  id: string;
+  symbol: string;
+  content: ChartPlanContent;
+  dossier_version_id?: string | null;
+  created_at: string;
+}
+
+export interface PriceCandle {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  /** Unix seconds (opcional; intradía puede usar date ISO datetime). */
+  time?: number;
+}
+
+export interface PriceCandlesResponse {
+  symbol: string;
+  period: string;
+  interval?: string;
+  candles: PriceCandle[];
+  data_points: number;
+  error?: string | null;
 }

@@ -83,16 +83,31 @@ def _maybe_relax_supabase_fk() -> None:
     _apply_sql_file(MIGRATION_SUPABASE_FK)
 
 
+def _auth_schema_exists() -> bool:
+    from backend.app.db import connect
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM information_schema.schemata
+                WHERE schema_name = 'auth'
+                """
+            )
+            return cur.fetchone() is not None
+
+
 def _apply_migration_if_needed() -> None:
     if tables_ready():
-        if _user_id_is_text() and MIGRATION_SUPABASE.is_file():
+        if _user_id_is_text() and _auth_schema_exists() and MIGRATION_SUPABASE.is_file():
             _apply_sql_file(MIGRATION_SUPABASE)
         _maybe_relax_supabase_fk()
         return
     if not MIGRATION_LOCAL.is_file():
         raise RuntimeError(f"migration not found: {MIGRATION_LOCAL}")
     _apply_sql_file(MIGRATION_LOCAL)
-    if _user_id_is_text() and MIGRATION_SUPABASE.is_file():
+    if _user_id_is_text() and _auth_schema_exists() and MIGRATION_SUPABASE.is_file():
         _apply_sql_file(MIGRATION_SUPABASE)
     _maybe_relax_supabase_fk()
 

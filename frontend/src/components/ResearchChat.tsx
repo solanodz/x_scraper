@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ChatMarkdown, { isBriefingAssistantMessage } from "@/components/ChatMarkdown";
 import ChatSessionSelect from "@/components/ChatSessionSelect";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
@@ -13,6 +14,7 @@ import {
   streamChat,
   type StreamChatCallbacks,
 } from "@/lib/api";
+import { dossierPath } from "@/lib/dossierNav";
 import type {
   ChatMessage,
   ChatMessageRecord,
@@ -49,7 +51,16 @@ function recordsToMessages(records: ChatMessageRecord[]): ChatMessage[] {
   }));
 }
 
-export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
+export default function ResearchChat({
+  onCitationClick,
+}: ResearchChatProps) {
+  const router = useRouter();
+  const handleDossierClick = useCallback(
+    (symbol: string) => {
+      router.push(dossierPath(symbol));
+    },
+    [router],
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -469,6 +480,7 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
                     streaming={streaming && i === messages.length - 1}
                     citations={msg.citations}
                     onCitationClick={onCitationClick}
+                    onDossierClick={handleDossierClick}
                     variant={
                       isBriefingAssistantMessage(messages, i)
                         ? "briefing"

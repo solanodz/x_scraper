@@ -29,8 +29,7 @@ export default function ResearchStepLoader({
       <ul className="space-y-1">
         {visible.map((step, index) => {
           const isRunning = step.status === "running";
-          const isLast = index === visible.length - 1;
-          const showPulse = isRunning && (active || isLast);
+          const showPulse = isRunning && active;
 
           return (
             <li

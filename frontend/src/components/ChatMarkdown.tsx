@@ -25,6 +25,7 @@ interface ChatMarkdownProps {
   streaming?: boolean;
   citations?: ChatCitation[];
   onCitationClick?: (idStr: string) => void;
+  onDossierClick?: (symbol: string) => void;
   variant?: "default" | "briefing";
 }
 
@@ -69,6 +70,7 @@ function renderSentimentText(
 function createBaseComponents(
   urlToId: Map<string, string>,
   onCitationClick?: (idStr: string) => void,
+  onDossierClick?: (symbol: string) => void,
 ): Components {
   return {
     h1: ({ children }) => (
@@ -105,6 +107,22 @@ function createBaseComponents(
     ),
     li: ({ children }) => <li className="leading-relaxed">{children}</li>,
     a: ({ href, children }) => {
+      if (href?.startsWith("dossier:") && onDossierClick) {
+        const symbol = href.slice("dossier:".length).trim().toUpperCase();
+        if (symbol) {
+          return (
+            <button
+              type="button"
+              onClick={() => onDossierClick(symbol)}
+              title={`Abrir Dossier de ${symbol}`}
+              className={`${linkClassName} cursor-pointer bg-transparent p-0 font-inherit`}
+            >
+              {children}
+            </button>
+          );
+        }
+      }
+
       const normalized = href?.replace(/\/$/, "") ?? "";
       const idStr =
         (href ? urlToId.get(href) : undefined) ??
@@ -182,14 +200,31 @@ function createBaseComponents(
 function createBriefingComponents(
   urlToId: Map<string, string>,
   onCitationClick?: (idStr: string) => void,
+  onDossierClick?: (symbol: string) => void,
   inDeltaSection = false,
   inPrioritySection = false,
 ): Components {
-  const base = createBaseComponents(urlToId, onCitationClick);
+  const base = createBaseComponents(urlToId, onCitationClick, onDossierClick);
 
   return {
     ...base,
     a: ({ href, children }) => {
+      if (href?.startsWith("dossier:") && onDossierClick) {
+        const symbol = href.slice("dossier:".length).trim().toUpperCase();
+        if (symbol) {
+          return (
+            <button
+              type="button"
+              onClick={() => onDossierClick(symbol)}
+              title={`Abrir Dossier de ${symbol}`}
+              className={`${briefingLinkClassName} cursor-pointer bg-transparent p-0 font-inherit`}
+            >
+              {children}
+            </button>
+          );
+        }
+      }
+
       const normalized = href?.replace(/\/$/, "") ?? "";
       const idStr =
         (href ? urlToId.get(href) : undefined) ??
@@ -298,11 +333,13 @@ function BriefingSectionBlock({
   body,
   urlToId,
   onCitationClick,
+  onDossierClick,
 }: {
   title: string;
   body: string;
   urlToId: Map<string, string>;
   onCitationClick?: (idStr: string) => void;
+  onDossierClick?: (symbol: string) => void;
 }) {
   const wrapperClass = briefingSectionWrapperClass(title);
   const delta = isDeltaSection(title);
@@ -310,6 +347,7 @@ function BriefingSectionBlock({
   const components = createBriefingComponents(
     urlToId,
     onCitationClick,
+    onDossierClick,
     delta,
     priority,
   );
@@ -337,6 +375,7 @@ export default function ChatMarkdown({
   streaming,
   citations,
   onCitationClick,
+  onDossierClick,
   variant = "default",
 }: ChatMarkdownProps) {
   const urlToId = useMemo(
@@ -345,8 +384,8 @@ export default function ChatMarkdown({
   );
 
   const components = useMemo(
-    () => createBaseComponents(urlToId, onCitationClick),
-    [onCitationClick, urlToId],
+    () => createBaseComponents(urlToId, onCitationClick, onDossierClick),
+    [onCitationClick, onDossierClick, urlToId],
   );
 
   const briefingSections = useMemo(
@@ -366,6 +405,7 @@ export default function ChatMarkdown({
             body={section.body}
             urlToId={urlToId}
             onCitationClick={onCitationClick}
+            onDossierClick={onDossierClick}
           />
         ))
       ) : (

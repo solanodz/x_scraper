@@ -10,7 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.app.auth import PUBLIC_PATHS, auth_enabled, verify_token
+from backend.app.routes.chart_plan import router as chart_plan_router
 from backend.app.routes.chat import router as chat_router
+from backend.app.routes.dossier import router as dossier_router
 from backend.app.routes.ingest import router as ingest_router
 from backend.app.routes.quotes import router as quotes_router
 from backend.app.routes.signals import router as signals_router
@@ -70,6 +72,8 @@ app.add_middleware(
 
 app.include_router(signals_router)
 app.include_router(chat_router)
+app.include_router(dossier_router)
+app.include_router(chart_plan_router)
 app.include_router(ingest_router)
 app.include_router(quotes_router)
 app.include_router(watch_router)

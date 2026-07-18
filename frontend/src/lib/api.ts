@@ -1,8 +1,11 @@
+import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FeedFilterQuery } from "./feedFilters";
 import type {
+  ChartPlanVersion,
   ChatCitation,
+  DossierVersion,
   Quote,
   ResearchStep,
   SignalDetail,
@@ -242,6 +245,67 @@ export async function fetchQuotes(symbols: string[]): Promise<Quote[]> {
   return res.json();
 }
 
+export async function fetchTickerLogos(
+  symbols: string[],
+): Promise<Record<string, string | null>> {
+  if (symbols.length === 0) return {};
+  const normalized = [
+    ...new Set(symbols.map((s) => s.replace(/^\$/, "").toUpperCase())),
+  ];
+  const params = new URLSearchParams({ symbols: normalized.join(",") });
+  const res = await fetch(`${API_URL}/quotes/logos?${params}`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ticker logos: ${res.status}`);
+  }
+  const rows = (await res.json()) as import("./types").TickerLogoEntry[];
+  const map: Record<string, string | null> = {};
+  for (const row of rows) {
+    map[row.symbol] = row.logo;
+  }
+  return map;
+}
+
+export async function fetchPriceCandles(
+  symbol: string,
+  period = "1y",
+  interval = "1d",
+): Promise<import("./types").PriceCandlesResponse> {
+  const normalized = symbol.replace(/^\$/, "").toUpperCase();
+  const params = new URLSearchParams({
+    symbol: normalized,
+    period,
+    interval,
+  });
+
+  const backendRes = await fetch(`${API_URL}/quotes/candles?${params}`, {
+    headers: await authHeaders(),
+    cache: "no-store",
+  });
+
+  if (backendRes.ok) {
+    return backendRes.json();
+  }
+
+  // Fallback: API local sin redeploy o sin el endpoint nuevo
+  if (backendRes.status === 404 || backendRes.status === 401) {
+    const localRes = await fetch(`/api/candles?${params}`, { cache: "no-store" });
+    if (localRes.ok) {
+      return localRes.json();
+    }
+  }
+
+  let detail = `HTTP ${backendRes.status}`;
+  try {
+    const body = (await backendRes.json()) as { detail?: string };
+    if (body.detail) detail = body.detail;
+  } catch {
+    // ignore
+  }
+  throw new Error(`Failed to fetch candles: ${detail}`);
+}
+
 export async function fetchChatSessions(
   limit = 20,
 ): Promise<import("./types").ChatSessionSummary[]> {
@@ -399,4 +463,170 @@ export async function streamBriefing(
   }
 
   await readSseStream(res, callbacks, signal);
+}
+
+function normalizeDossierSymbol(symbol: string): string {
+  return symbol.replace(/^\$/, "").trim().toUpperCase();
+}
+
+export async function fetchDossier(symbol: string): Promise<DossierVersion | null> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const res = await fetch(`${API_URL}/dossier/${encodeURIComponent(normalized)}`, {
+    headers: await authHeaders(),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to fetch dossier: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchDossierVersions(
+  symbol: string,
+): Promise<DossierVersion[]> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const res = await fetch(
+    `${API_URL}/dossier/${encodeURIComponent(normalized)}/versions`,
+    { headers: await authHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch dossier versions: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function refreshDossier(symbol: string): Promise<DossierVersion> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const res = await fetch(
+    `${API_URL}/dossier/${encodeURIComponent(normalized)}/refresh`,
+    {
+      method: "POST",
+      headers: await authHeaders(),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to refresh dossier: ${res.status}`);
+  }
+  const body = (await res.json()) as { version: DossierVersion };
+  return body.version;
+}
+
+export async function fetchChartPlan(
+  symbol: string,
+): Promise<ChartPlanVersion | null> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const res = await fetch(
+    `${API_URL}/chart-plan/${encodeURIComponent(normalized)}`,
+    { headers: await authHeaders() },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to fetch chart plan: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchChartPlanVersions(
+  symbol: string,
+): Promise<ChartPlanVersion[]> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const res = await fetch(
+    `${API_URL}/chart-plan/${encodeURIComponent(normalized)}/versions`,
+    { headers: await authHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch chart plan versions: ${res.status}`);
+  }
+  return res.json();
+}
+
+export type StreamChartPlanCallbacks = {
+  onStep?: (step: ResearchStep) => void;
+  onVersion?: (version: ChartPlanVersion) => void;
+  onError?: (error: Error) => void;
+};
+
+export class ChartPlanAnalyzeError extends Error {
+  constructor(
+    message: string,
+    readonly code: "disabled" | "dossier_missing" | "failed",
+  ) {
+    super(message);
+    this.name = "ChartPlanAnalyzeError";
+  }
+}
+
+export async function streamChartPlanAnalyze(
+  symbol: string,
+  callbacks: StreamChartPlanCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const headers = await authHeaders();
+
+  try {
+    await fetchEventSource(
+      `${API_URL}/chart-plan/${encodeURIComponent(normalized)}/analyze`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...headers,
+        },
+        signal,
+        async onopen(res) {
+          if (res.status === 503) {
+            throw new ChartPlanAnalyzeError(
+              "Chart Agent deshabilitado en el servidor",
+              "disabled",
+            );
+          }
+          if (res.status === 404) {
+            throw new ChartPlanAnalyzeError(
+              "Generá el Dossier primero",
+              "dossier_missing",
+            );
+          }
+          if (!res.ok) {
+            throw new ChartPlanAnalyzeError(
+              `Chart plan analyze failed: ${res.status}`,
+              "failed",
+            );
+          }
+        },
+        onmessage(ev) {
+          if (ev.event === "step" && ev.data) {
+            callbacks.onStep?.(JSON.parse(ev.data) as ResearchStep);
+            return;
+          }
+          if (
+            (ev.event === "chart_plan" || ev.event === "version") &&
+            ev.data
+          ) {
+            callbacks.onVersion?.(JSON.parse(ev.data) as ChartPlanVersion);
+            return;
+          }
+          if (ev.event === "error" && ev.data) {
+            const payload = JSON.parse(ev.data) as { detail?: string };
+            throw new ChartPlanAnalyzeError(
+              payload.detail ?? "Chart plan analyze error",
+              "failed",
+            );
+          }
+        },
+        onerror(err) {
+          if (signal?.aborted) return;
+          const error =
+            err instanceof Error ? err : new Error(String(err ?? "SSE error"));
+          callbacks.onError?.(error);
+          throw error;
+        },
+      },
+    );
+  } catch (err) {
+    if (signal?.aborted) return;
+    const error = err instanceof Error ? err : new Error(String(err));
+    callbacks.onError?.(error);
+    throw error;
+  }
 }

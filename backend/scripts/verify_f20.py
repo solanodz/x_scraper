@@ -82,9 +82,28 @@ def _maybe_relax_fk(constraint: str, table: str, migration: Path) -> None:
     _apply_sql_file(migration)
 
 
+def _auth_schema_exists() -> bool:
+    from backend.app.db import connect
+
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM information_schema.schemata
+                WHERE schema_name = 'auth'
+                """
+            )
+            return cur.fetchone() is not None
+
+
 def _apply_watch_migration_if_needed() -> None:
     if watch_tables_ready():
-        if _user_id_is_text("ticker_watch") and MIGRATION_WATCH_SUPABASE.is_file():
+        if (
+            _user_id_is_text("ticker_watch")
+            and _auth_schema_exists()
+            and MIGRATION_WATCH_SUPABASE.is_file()
+        ):
             _apply_sql_file(MIGRATION_WATCH_SUPABASE)
         _maybe_relax_fk(
             "ticker_watch_user_id_fkey",
@@ -95,7 +114,11 @@ def _apply_watch_migration_if_needed() -> None:
     if not MIGRATION_WATCH_LOCAL.is_file():
         raise RuntimeError(f"migration not found: {MIGRATION_WATCH_LOCAL}")
     _apply_sql_file(MIGRATION_WATCH_LOCAL)
-    if _user_id_is_text("ticker_watch") and MIGRATION_WATCH_SUPABASE.is_file():
+    if (
+        _user_id_is_text("ticker_watch")
+        and _auth_schema_exists()
+        and MIGRATION_WATCH_SUPABASE.is_file()
+    ):
         _apply_sql_file(MIGRATION_WATCH_SUPABASE)
     _maybe_relax_fk(
         "ticker_watch_user_id_fkey",

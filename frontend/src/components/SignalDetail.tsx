@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TickerLogo from "@/components/TickerLogo";
 import { fetchQuotes, fetchSignal } from "@/lib/api";
 import { formatEngagement, timeAgo } from "@/lib/format";
 import {
@@ -100,7 +101,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
-      <div className="border-b border-zinc-800 px-3 py-1.5">
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-1.5">
         <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
           Signal Detail
         </h2>
@@ -237,11 +238,10 @@ function CashtagQuoteCard({ quote }: { quote: Quote }) {
   const colorClass = positive ? "text-emerald-400" : "text-red-400";
 
   return (
-    <div className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
+    <div className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
+      <TickerLogo symbol={quote.symbol} logoUrl={quote.logo} size="xs" />
       <span className="font-semibold text-zinc-300">{quote.symbol}</span>
-      <span className="mx-1.5 text-zinc-100">
-        ${quote.price.toFixed(2)}
-      </span>
+      <span className="text-zinc-100">${quote.price.toFixed(2)}</span>
       <span className={colorClass}>
         {(quote.change_percent ?? 0) >= 0 ? "+" : ""}
         {(quote.change_percent ?? 0).toFixed(2)}%

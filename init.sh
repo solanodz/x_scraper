@@ -41,6 +41,10 @@ python -m py_compile \
   backend/services/agent.py \
   backend/services/chat_history.py \
   backend/services/research_steps.py \
+  backend/services/ticker_extract.py \
+  backend/services/research_plan.py \
+  backend/services/parallel_research.py \
+  backend/services/research_gather.py \
   backend/services/research_agent.py \
   backend/services/corpus_stats.py \
   backend/services/market_data.py \
@@ -53,12 +57,17 @@ python -m py_compile \
   backend/app/services/signals_repo.py \
   backend/app/services/chat_repo.py \
   backend/app/services/ticker_watch_repo.py \
+  backend/app/services/dossier_repo.py \
+  backend/app/services/chart_plan_repo.py \
+  backend/services/dossier.py \
   backend/app/routes/__init__.py \
   backend/app/routes/signals.py \
   backend/app/routes/chat.py \
   backend/app/routes/ingest.py \
   backend/app/routes/quotes.py \
   backend/app/routes/watch.py \
+  backend/app/routes/dossier.py \
+  backend/app/routes/chart_plan.py \
   backend/scripts/__init__.py \
   backend/scripts/verify_f4.py \
   backend/scripts/verify_f5.py \
@@ -78,7 +87,22 @@ python -m py_compile \
   backend/scripts/verify_f20.py \
   backend/scripts/verify_f21.py \
   backend/scripts/verify_f22.py \
-  backend/scripts/verify_f23.py
+  backend/scripts/verify_f23.py \
+  backend/scripts/verify_f24.py
+
+if [ -f "backend/scripts/verify_f30.py" ]; then
+  python -m py_compile backend/scripts/verify_f30.py
+fi
+
+if [ -f "backend/services/chart_plan.py" ]; then
+  python -m py_compile backend/services/chart_plan.py
+fi
+if [ -f "backend/services/chart_agent.py" ]; then
+  python -m py_compile backend/services/chart_agent.py
+fi
+if [ -f "backend/scripts/verify_f33.py" ]; then
+  python -m py_compile backend/scripts/verify_f33.py
+fi
 
 # --- Docker services (Store: Postgres + pgvector) ---
 if [ -f "docker-compose.yml" ] || [ -f "compose.yaml" ]; then

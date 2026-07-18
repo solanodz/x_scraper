@@ -17,6 +17,7 @@ interface ResizableSplitProps {
   minFirst: number;
   minSecond: number;
   defaultSecond: number;
+  className?: string;
 }
 
 export default function ResizableSplit({
@@ -26,6 +27,7 @@ export default function ResizableSplit({
   minFirst,
   minSecond,
   defaultSecond,
+  className = "",
 }: ResizableSplitProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [secondSize, setSecondSize] = useState(defaultSecond);
@@ -95,12 +97,15 @@ export default function ResizableSplit({
     <div
       ref={containerRef}
       className={
-        isHorizontal
-          ? "flex min-h-0 flex-1"
-          : "flex h-full min-h-0 flex-col"
+        (isHorizontal
+          ? "flex h-full min-h-0 w-full flex-1"
+          : "flex h-full min-h-0 w-full flex-col") +
+        (className ? ` ${className}` : "")
       }
     >
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{first}</div>
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {first}
+      </div>
 
       <button
         type="button"
@@ -115,7 +120,7 @@ export default function ResizableSplit({
       />
 
       <div
-        className="min-h-0 shrink-0 overflow-hidden"
+        className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden"
         style={
           isHorizontal
             ? { width: secondSize }

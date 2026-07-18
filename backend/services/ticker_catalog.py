@@ -43,13 +43,15 @@ def resolve_ticker_input(raw: str | None) -> str | None:
     if lower in _NAME_TO_SYMBOL:
         return _NAME_TO_SYMBOL[lower]
 
-    for name, symbol in _NAME_TO_SYMBOL.items():
-        if lower in name or name in lower:
-            return symbol
-
-    # Símbolo desconocido pero plausible (1–6 letras)
-    if 1 <= len(as_symbol) <= 6 and as_symbol.isalpha():
-        return as_symbol
+    # Símbolo explícito en MAYÚSCULAS (NVDA, AMD). Sin fuzzy substring de nombres
+    # (evita "mas" → Mastercard, "esta" → ESTA).
+    if text.isupper() and as_symbol.isalpha():
+        if len(as_symbol) == 2:
+            if as_symbol in CURATED_TICKER_LABELS or as_symbol in CURATED_EXTRA_SYMBOLS:
+                return as_symbol
+            return None
+        if 3 <= len(as_symbol) <= 6:
+            return as_symbol
 
     return None
 

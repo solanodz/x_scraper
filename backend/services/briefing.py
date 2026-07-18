@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 
 from backend.app.services.chat_repo import get_previous_briefing
+from backend.app.services.dossier_repo import (
+    get_latest as get_latest_dossier,
+    save_version as save_dossier_version,
+    tables_ready as dossier_tables_ready,
+)
 from backend.app.services.ticker_watch_repo import list_watch, tables_ready
 from backend.services.ask import AskStreamChunk
+from backend.services.dossier import (
+    dossier_content_payload,
+    generate_dossier,
+    should_refresh_dossier,
+)
 from backend.services.llm import hits_to_citations, stream_briefing_answer
 from backend.services.market_data import Quote, fetch_quotes
 from backend.services.recent_signals import get_recent_signals
@@ -20,6 +30,8 @@ _EMPTY_WATCH_MESSAGE = (
 )
 
 _PRIOR_BRIEFING_MAX_CHARS = 6000
+_DOSSIER_INTEGRATED_KEY = "lectura_integrada"
+_DOSSIER_EXCERPT_CHARS = 800
 
 
 @dataclass
@@ -126,6 +138,90 @@ def _build_context(slices: list[_BriefingSlice], *, hours: int) -> str:
     return "\n\n".join(sections)
 
 
+def _citations_to_json(citations: list) -> list[dict]:
+    payload: list[dict] = []
+    for item in citations:
+        if is_dataclass(item):
+            payload.append(asdict(item))
+        elif isinstance(item, dict):
+            payload.append(item)
+    return payload
+
+
+def _integrated_excerpt(content: dict) -> str:
+    blocks = content.get("blocks")
+    if not isinstance(blocks, dict):
+        blocks = {}
+    text = blocks.get(_DOSSIER_INTEGRATED_KEY, "")
+    if not isinstance(text, str):
+        text = str(text) if text else ""
+    text = text.strip()
+    if len(text) <= _DOSSIER_EXCERPT_CHARS:
+        return text
+    return text[:_DOSSIER_EXCERPT_CHARS] + "…"
+
+
+def _format_dossier_context_section(
+    version: dict,
+    *,
+    thesis: str | None,
+) -> str:
+    symbol = version["symbol"]
+    lines = [f"# Dossier {symbol}", f"dossier_id: {version['id']}"]
+    if thesis:
+        lines.append(f"Thesis: {thesis}")
+    excerpt = _integrated_excerpt(version.get("content") or {})
+    if excerpt:
+        lines.append(excerpt)
+    lines.append(f"Link: dossier:{symbol}")
+    return "\n".join(lines)
+
+
+def _append_dossier_context(
+    context: str,
+    slices: list[_BriefingSlice],
+    *,
+    user_id: str,
+) -> str:
+    sections: list[str] = []
+    for item in slices:
+        version = get_latest_dossier(user_id=user_id, symbol=item.symbol)
+        if version is None:
+            continue
+        sections.append(
+            _format_dossier_context_section(version, thesis=item.thesis)
+        )
+    if not sections:
+        return context
+    return f"{context}\n\n" + "\n\n".join(sections)
+
+
+def _refresh_dossiers_for_slices(
+    user_id: str,
+    slices: list[_BriefingSlice],
+) -> Iterator[ResearchStepEvent]:
+    for item in slices:
+        if not should_refresh_dossier(
+            prioridad_alta=item.prioridad_alta,
+            has_recent_signals=bool(item.hits),
+        ):
+            continue
+        label = f"Actualizando Dossier {item.symbol}…"
+        yield ResearchStepEvent(tool="dossier", label=label, status="running")
+        generated_content, generated_citations = generate_dossier(
+            user_id=user_id,
+            symbol=item.symbol,
+            thesis=item.thesis,
+        )
+        save_dossier_version(
+            user_id=user_id,
+            symbol=item.symbol,
+            content=dossier_content_payload(generated_content),
+            citations=_citations_to_json(generated_citations),
+        )
+        yield ResearchStepEvent(tool="dossier", label=label, status="done")
+
+
 def _wrap_with_previous_briefing(context: str, previous: str) -> str:
     prior = previous.strip()[:_PRIOR_BRIEFING_MAX_CHARS]
     return (
@@ -181,7 +277,14 @@ def iter_briefing_stream(
 
     slices.sort(key=_slice_sort_key)
     _mark_prioridad_alta(slices)
+
+    if dossier_tables_ready():
+        for step in _refresh_dossiers_for_slices(user_id, slices):
+            yield step
+
     context = _build_context(slices, hours=hours)
+    if dossier_tables_ready():
+        context = _append_dossier_context(context, slices, user_id=user_id)
     previous = get_previous_briefing(
         user_id=user_id,
         exclude_session_id=exclude_session_id,

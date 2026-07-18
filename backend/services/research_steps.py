@@ -13,6 +13,8 @@ TOOL_STEP_LABELS: dict[str, str] = {
     "get_quotes": "Obteniendo cotizaciones",
     "get_watchlist_quotes": "Consultando panel de mercado",
     "get_price_history": "Cargando historial de precios",
+    "research_plan": "Resolviendo contexto del hilo…",
+    "parallel_research": "Investigación paralela",
 }
 
 

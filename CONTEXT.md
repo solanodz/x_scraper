@@ -41,7 +41,7 @@ Un símbolo de activo financiero (ej. $AAPL, $SPY) usado para filtrar y consulta
 _Avoid_: Symbol, stock, cashtag
 
 **Market Data**:
-Datos de mercado (precio, variación %) vía Finnhub con fallback Alpha Vantage y yfinance. Alimenta la Quote Strip y el enriquecimiento de Signal Detail. Gráficos vía TradingView (embed). Delay ~15 min.
+Datos de mercado (precio, variación %, historial OHLC, logo del Ticker) vía Finnhub con fallback Alpha Vantage y yfinance. Logos: Finnhub `profile2` (equities) y CDN coin-logos (BTC/ETH/SOL); cache en proceso. Alimenta la Quote Strip, Signal Detail, Ticker Watch y el **Ticker Chart**. Delay ~15 min en quotes.
 _Avoid_: Quotes, live prices
 
 **Quote**:
@@ -49,7 +49,7 @@ Cotización de un Ticker: precio actual, cambio absoluto y porcentual. Se obtien
 _Avoid_: Price, tick, quote data
 
 **Quote Strip**:
-Barra bajo el header de la Terminal que muestra Quotes de la Watchlist fija en carrusel continuo. Clic en un Ticker abre su gráfico (TradingView). Datos con delay ~15 min.
+Barra bajo el header de la Terminal que muestra Quotes de la Watchlist en carrusel continuo. Clic en un Ticker abre el **Ticker Chart** (mismo control Operator-first que en `/dossier`). Datos con delay ~15 min.
 _Avoid_: Ticker tape, price bar, market strip
 
 **Watchlist**:
@@ -67,7 +67,7 @@ Reglas de relevancia en `.env` (`SIGNAL_FILTER`, `SIGNAL_KEYWORDS`, `SIGNAL_BLOC
 _Avoid_: Content moderation, spam filter
 
 **Signal Detail**:
-Panel inferior izquierdo. Muestra el contenido completo del Signal seleccionado: tweet, artículo enlazado, engagement y metadata.
+Panel inferior izquierdo de la Terminal. Muestra el contenido completo del Signal seleccionado en el Feed.
 _Avoid_: Preview, sidebar, drawer
 
 **Research Chat**:
@@ -145,8 +145,16 @@ Consulta en lenguaje natural del Operator al Research Chat. El Research Agent pu
 _Avoid_: Prompt, question, command
 
 **Research Agent**:
-El agente que responde una Query orquestando herramientas sobre el Corpus y el Market Data antes de sintetizar la respuesta. Planifica qué herramientas usar, puede encadenar varias rondas (research multi-paso) y produce una respuesta grounded con Citations obligatorias derivadas de los Signals que las herramientas devolvieron. Recuerda el hilo de la Chat Session para responder follow-ups. Ver ADR-0006.
+El agente que responde una Query orquestando herramientas sobre el Corpus y el Market Data antes de sintetizar la respuesta. Elige el camino de research según la Query: **Parallel Research** cuando hay Tickers claros o un **Research Plan** de follow-up; **ReAct** secuencial para el resto. Produce una respuesta grounded con Citations obligatorias derivadas de los Signals que las herramientas devolvieron. Recuerda el hilo de la Chat Session para responder follow-ups. Ver ADR-0006 y ADR-0008.
 _Avoid_: Bot, assistant, copilot, chain
+
+**Research Plan**:
+Paso de planificación estructurada (salida JSON) que resuelve la intención de una Query cuando no hay Tickers explícitos en el texto pero sí contexto conversacional — típicamente follow-ups (*"¿y AMD?"*). Define qué Tickers investigar y qué dimensiones cubrir antes de ejecutar **Parallel Research**. No reemplaza la síntesis final ni genera la respuesta al Operator.
+_Avoid_: Planner agent, query parser, intent classifier
+
+**Parallel Research**:
+Ejecución concurrente y determinística del bundle de research por Ticker: cotizaciones (`get_quotes` batcheado), Signals recientes (`get_recent_signals` por Ticker) y búsqueda semántica (`search_corpus` scoped por Ticker). Garantiza cobertura en comparaciones multi-Ticker y en cruces precio + narrativa. Máximo cuatro Tickers por Query. Un solo sintetizador cierra la respuesta; no son agentes LLM en competencia.
+_Avoid_: Parallel agents, sub-agents, worker pool, map-reduce
 
 **Citation**:
 Referencia a un Signal fuente que respalda una afirmación de la respuesta del Research Chat. Obligatoria en toda respuesta; clickeable, abre el Signal Detail.
@@ -194,5 +202,25 @@ Hipótesis de inversión del Operator sobre un Ticker en su Ticker Watch: por qu
 _Avoid_: Note, watch note, investment thesis document, conviction score
 
 **Briefing**:
-Memo de decisión on-demand, grounded y con Citations, sobre los Tickers del Ticker Watch. Prioriza lo material (lo más relevante hoy, hasta dos Tickers en prioridad alta con hecho → implicación → qué mirar → riesgo), resume el resto con novedad en formato compacto, lista los Tickers sin novedad en bloque, y cierra con temas cruzados y preguntas abiertas. Si existe un Briefing anterior del Operator, abre con un delta (nuevo / sin cambio material / cambió el tono) respecto a ese Briefing. Es analítico: no da recomendaciones de compra/venta ni predice precios; toda afirmación se respalda con un Signal. Se genera bajo demanda en una Chat Session dedicada (permite follow-up).
+Memo ejecutivo on-demand, grounded y con Citations, sobre los Tickers del Ticker Watch. Resume lo material del día (prioridad alta, delta vs Briefing anterior, temas cruzados, preguntas abiertas) y apunta al **Dossier** de cada Ticker para profundidad. Refresca Dossiers seleccionados antes de sintetizar (ADR-0009). Prioriza velocidad de lectura: el Operator entiende qué cambió y qué merece atención sin leer un informe completo. No reemplaza al Dossier. Analítico: sin recomendaciones de compra/venta ni predicción de precios; afirmaciones sobre el Corpus respaldadas por Signal. On-demand en Chat Session dedicada (permite follow-up). Ver ADR-0007 y ADR-0009.
 _Avoid_: Digest, report, newsletter, resumen
+
+**Dossier**:
+Análisis integral persistente por Ticker del Ticker Watch. Estructura en seis bloques: (1) Panorama de mercado, (2) Narrativa del Corpus — ventana larga en dos subcapas: últimos 7 días (urgente) y 7–30 días (contexto), hilos materiales no headlines sueltos, (3) Sentimiento del Corpus — agregado híbrido: estadísticas determinísticas (conteos, tono, fuentes) más síntesis LLM anclada a esos números, (4) Contexto macro/sector, (5) Fundamentals (placeholder honesto hasta que haya fuente), (6) Lectura integrada con alineación a la **Thesis** y lagunas de datos declaradas. Pantalla dedicada `/dossier` (navbar); selector por Ticker del Watch; links desde el Briefing y el popover Watch. Ver ADR-0009. Cruza capas de evidencia con Citations donde aplique al Corpus. Se actualiza on-demand y se **refresca al generar un Briefing**: siempre los Tickers en **prioridad alta**; el resto solo si tuvieron Signals en la ventana del Briefing; los demás reutilizan la última versión. El Briefing consume Dossiers como contexto antes del memo ejecutivo. Conserva historial de versiones (últimas 10 o 30 días por Ticker, lo que ocurra primero). Analítico: sin recomendaciones de compra/venta. El **Chart Plan** es artefacto aparte, on-demand.
+_Avoid_: Profile, ticker page, equity research PDF, one-pager
+
+**Ticker Chart**:
+Gráfico interactivo de precio del Ticker en `/dossier` (velas OHLC + indicadores). Lo controla el **Operator** (intervalo de vela, ventana de historial e indicadores); no requiere Chart Plan ni Chart Agent. Puede auto-actualizarse con Market Data. El Operator elige con presets combinados (intervalo + ventana) o modo advanced con ambos controles. Indicadores MVP: SMA (lengths), Donchian (period), Fibonacci (on/off) y volumen (toggle); calculados de forma determinística sobre las velas.
+_Avoid_: TradingView widget, price pane, chart widget, timeframe (usar intervalo + ventana)
+
+**Chart Plan**:
+Artefacto on-demand en `/dossier` producido por el **Chart Agent**: lecturas interpretativas de indicadores, assessment objetivo y gráficos del Corpus. No captura el control del **Ticker Chart**; puede ofrecer una sugerencia soft (“Aplicar vista del Chart Plan”) que el Operator acepta o ignora. Si la vista del Ticker Chart diverge de la del Plan, las lecturas se marcan desactualizadas. Persistente y versionado por Ticker, independiente del Dossier. Pine Script exportable queda fuera del MVP actual.
+_Avoid_: Technical analysis report, trading setup, buy signal, Pine chart
+
+**Chart Agent**:
+Agente autónomo on-demand que genera un **Chart Plan**. Interpreta Market Data, Corpus y Dossier sin inventar números; produce `indicator_readings` y assessment (`conflicts`, `data_gaps`, `bias_check`). No bloquea ni reemplaza el control Operator-first del **Ticker Chart**.
+_Avoid_: Trading bot, chart generator, TA guru
+
+**Análisis integral**:
+Síntesis multi-capa que alimenta un Dossier o una respuesta del Research Chat: no es una noticia aislada ni una sola tool, sino la combinación explícita de narrativa (Corpus), mercado, fundamentos y sentimiento con incertidumbre declarada donde falten datos.
+_Avoid_: Deep dive, comprehensive report, full analysis

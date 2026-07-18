@@ -101,12 +101,37 @@ class Quote(BaseModel):
     timestamp: datetime | None = None
     delayed: bool = True
     available: bool = True
+    logo: str | None = None
+
+
+class TickerLogo(BaseModel):
+    symbol: str
+    logo: str | None = None
 
 
 class TickerSuggestion(BaseModel):
     symbol: str
     description: str = ""
     source: str = "finnhub"
+
+
+class PriceCandle(BaseModel):
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int = 0
+    time: int | None = None
+
+
+class PriceCandlesResponse(BaseModel):
+    symbol: str
+    period: str
+    interval: str = "1d"
+    candles: list[PriceCandle] = Field(default_factory=list)
+    data_points: int = 0
+    error: str | None = None
 
 
 class TickerWatchEntry(BaseModel):
@@ -123,3 +148,119 @@ class TickerWatchAddRequest(BaseModel):
 
 class TickerWatchUpdateRequest(BaseModel):
     note: str | None = Field(default=None, max_length=280)
+
+
+class DossierBlockContent(BaseModel):
+    blocks: dict[str, str]
+    sentiment_stats: dict[str, Any] | None = None
+
+
+class DossierVersion(BaseModel):
+    id: str
+    symbol: str
+    content: DossierBlockContent
+    citations: list[ChatCitation] = Field(default_factory=list)
+    created_at: datetime
+
+
+class DossierRefreshResponse(BaseModel):
+    version: DossierVersion
+
+
+class ChartPlanAssessment(BaseModel):
+    summary: str = ""
+    conflicts: list[str] = Field(default_factory=list)
+    data_gaps: list[str] = Field(default_factory=list)
+    bias_check: str = ""
+    bullish_count: int | None = None
+    bearish_count: int | None = None
+
+
+class ChartPlanView(BaseModel):
+    type: str
+    enabled: bool = True
+    interval: str | None = None
+    rationale: str | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChartPlanPineScript(BaseModel):
+    title: str = ""
+    purpose: str = ""
+    limitations: str = ""
+    code: str = ""
+
+
+class ChartPlanChartData(BaseModel):
+    sentiment_bars: list[dict[str, Any]] = Field(default_factory=list)
+    signals_timeline: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ChartPlanIndicatorReading(BaseModel):
+    name: str = ""
+    stance: str = "neutral"
+    reading: str = ""
+    tv_study: dict[str, Any] | None = None
+
+
+class ChartPlanTradingViewStudy(BaseModel):
+    id: str
+    inputs: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChartPlanSmaSlot(BaseModel):
+    enabled: bool = True
+    length: int = 20
+
+
+class ChartPlanDonchianSlot(BaseModel):
+    enabled: bool = True
+    period: int = 20
+
+
+class ChartPlanSuggestedView(BaseModel):
+    """Vista soft sugerida para el Ticker Chart (Operator-first, ADR-0011)."""
+
+    interval: str = "1d"
+    period: str = "1y"
+    sma_a: ChartPlanSmaSlot | dict[str, Any] = Field(
+        default_factory=lambda: ChartPlanSmaSlot(enabled=True, length=20)
+    )
+    sma_b: ChartPlanSmaSlot | dict[str, Any] = Field(
+        default_factory=lambda: ChartPlanSmaSlot(enabled=True, length=50)
+    )
+    donchian: ChartPlanDonchianSlot | dict[str, Any] = Field(
+        default_factory=lambda: ChartPlanDonchianSlot(enabled=True, period=20)
+    )
+    fib: bool = True
+    volume: bool = True
+
+
+class ChartPlanContent(BaseModel):
+    timeframes: list[Any] = Field(default_factory=list)
+    views: list[ChartPlanView | dict[str, Any]] = Field(default_factory=list)
+    suggested_view: ChartPlanSuggestedView | dict[str, Any] | None = None
+    pine_scripts: list[ChartPlanPineScript | dict[str, Any]] = Field(
+        default_factory=list
+    )
+    indicator_readings: list[ChartPlanIndicatorReading | dict[str, Any]] = Field(
+        default_factory=list
+    )
+    tradingview_studies: list[ChartPlanTradingViewStudy | dict[str, Any]] = Field(
+        default_factory=list
+    )
+    assessment: ChartPlanAssessment | dict[str, Any]
+    chart_data: ChartPlanChartData | dict[str, Any] | None = None
+    summary: str | None = None
+
+
+class ChartPlanVersion(BaseModel):
+    id: str
+    symbol: str
+    content: ChartPlanContent | dict[str, Any]
+    dossier_version_id: str | None = None
+    created_at: datetime
+
+
+class ChartPlanAnalyzeResponse(BaseModel):
+    version: ChartPlanVersion

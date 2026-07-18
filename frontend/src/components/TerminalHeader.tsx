@@ -1,17 +1,27 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { clearAccessTokenCache, isSupabaseConfigured, refreshIngest } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import TickerWatchPopover from "@/components/TickerWatchPopover";
 
+const NAV_ITEMS = [
+  { href: "/", label: "Terminal", match: (path: string) => path === "/" },
+  {
+    href: "/dossier",
+    label: "Dossier",
+    match: (path: string) => path.startsWith("/dossier"),
+  },
+] as const;
+
 interface TerminalHeaderProps {
   onRefreshComplete?: () => void;
 }
 
-export default function TerminalHeader({
-  onRefreshComplete,
-}: TerminalHeaderProps) {
+export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProps) {
+  const pathname = usePathname();
   const [refreshing, setRefreshing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -41,11 +51,31 @@ export default function TerminalHeader({
 
   return (
     <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
-      <div className="flex items-center gap-3">
-        <span className="text-amber-500 font-mono text-sm">▮</span>
-        <h1 className="font-sans text-sm font-semibold tracking-wide text-zinc-100">
-          X Scraper Terminal
-        </h1>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-sm text-amber-500">▮</span>
+          <h1 className="font-sans text-sm font-semibold tracking-wide text-zinc-100">
+            X Scraper Terminal
+          </h1>
+        </div>
+        <nav className="flex items-center gap-1" aria-label="Principal">
+          {NAV_ITEMS.map(({ href, label, match }) => {
+            const active = match(pathname);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`rounded px-2.5 py-1 font-sans text-xs transition-colors ${
+                  active
+                    ? "bg-amber-950/40 font-semibold text-amber-400"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
       <div className="flex items-center gap-3">
         {status && (

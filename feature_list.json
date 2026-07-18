@@ -487,6 +487,109 @@
         "backend/app/routes/chat.py: stream_factory pasa sid como exclude_session_id",
         "./init.sh OK"
       ]
+    },
+    {
+      "id": "F24",
+      "priority": 24,
+      "title": "Parallel Research para cobertura garantizada",
+      "user_visible_behavior": "El Research Chat cubre comparaciones multi-Ticker y follow-ups conversacionales con Parallel Research determinístico (cotizaciones + señales + corpus por Ticker en paralelo). Queries temáticas sin Ticker siguen en ReAct.",
+      "status": "passing",
+      "dependencies": ["F18"],
+      "notes": "Ver ADR-0008. Híbrido: extract_tickers → Parallel Research; historial sin tickers → Research Plan → Parallel Research; resto ReAct. Flag RESEARCH_PARALLEL_ENABLED (default false). Máx 4 Tickers. verify_f24.py.",
+      "verification": [
+        "extract_tickers_from_query('compará NVDA vs AMD') => NVDA, AMD",
+        "extract Intel => INTC; truncación a 4 Tickers",
+        "route_research_path con tickers => parallel; RESEARCH_PARALLEL_ENABLED=false => react",
+        "build_parallel_tasks + execute_parallel_bundle (mock) => get_quotes batcheado + signals + search por Ticker",
+        "Follow-up '¿y AMD?' con historial => Research Plan con AMD (live si OPENAI_API_KEY)",
+        "python -m backend.scripts.verify_f24 => OK",
+        "Regresión: python -m backend.scripts.verify_f18 => OK"
+      ],
+      "evidence": [
+        "2026-07-09: python -m backend.scripts.verify_f24 => OK (extract NVDA/AMD, Intel→INTC, max 4, routing parallel/react, bundle 5 tasks mock, Research Plan follow-up)",
+        "2026-07-09: python -m backend.scripts.verify_f18 => OK (regresión ReAct)",
+        "backend/services/ticker_extract.py, research_plan.py, parallel_research.py, research_gather.py; research_agent.py router híbrido",
+        "frontend ResearchStepLoader: pulse en todos los pasos running en paralelo",
+        "./init.sh OK; npm run build OK"
+      ]
+    },
+    {
+      "id": "F30",
+      "priority": 30,
+      "title": "Dossier: análisis integral por Ticker",
+      "user_visible_behavior": "Cada Ticker del Watch tiene un Dossier persistente (6 bloques: mercado, narrativa 7d+7-30d, sentimiento híbrido, macro, fundamentals placeholder, lectura+Thesis). Signal Detail muestra modo Dossier; el Briefing refresca dossiers seleccionados y enlaza al detalle; historial de versiones (10 o 30 días).",
+      "status": "passing",
+      "dependencies": ["F20", "F21", "F23"],
+      "notes": "Ver ADR-0009. Modelo C: Briefing ejecutivo + Dossier profundo. Generación determinística multi-capa (no ReAct). Refresh al Briefing: prioridad alta siempre; resto si novedad en ventana. Store: ticker_dossier_versions. Sentimiento: stats en código + LLM anclado. F31 fundamentals; F32 provenance no-Signal.",
+      "verification": [
+        "POST refresh dossier GGAL persiste versión con 6 bloques",
+        "GET dossier devuelve última versión; historial ≤10 versiones",
+        "Briefing refresca prioridad alta + tickers con novedad; memo incluye links a Dossier",
+        "Signal Detail: modo Signal vs modo Dossier desde Watch y desde Briefing",
+        "Bloque Fundamentals declara laguna de datos en F30",
+        "Sentimiento muestra stats determinísticas + párrafo LLM",
+        "python -m backend.scripts.verify_f30 => OK",
+        "Regresión: verify_f20, verify_f21, verify_f23 => OK"
+      ],
+      "evidence": [
+        "2026-07-10: python -m backend.scripts.verify_f30 => OK (migrations, refresh API, versions, briefing dossier refresh policy)",
+        "2026-07-10: verify_f20, verify_f21, verify_f23 regression OK (local Postgres)",
+        "2026-07-10: ./init.sh OK; npm run build OK",
+        "infra/store/init/009 + supabase/009 ticker_dossier_versions; dossier_repo.py, dossier.py, routes/dossier.py",
+        "briefing.py refresh + dossier context; SignalDetail modo Dossier; dossier: links en Briefing"
+      ]
+    },
+    {
+      "id": "F33",
+      "priority": 33,
+      "title": "Chart Plan: Chart Agent on-demand",
+      "user_visible_behavior": "En /dossier, split horizontal: Dossier texto (izq) + panel Chart Plan (der). Botón Analizar gráficos ejecuta Chart Agent (SSE pasos); muestra TradingView embed (intervalo del agente), gráficos sentimiento y timeline de señales, 0–3 Pine exportables, lectura objetiva (conflicts, data_gaps, bias_check). Requiere Dossier existente. Historial versionado independiente. Flag CHART_AGENT_ENABLED (default false).",
+      "status": "passing",
+      "dependencies": ["F30", "F18"],
+      "notes": "Ver ADR-0010. Chart Plan on-demand separado del Refresh Dossier. Chart Agent ReAct acotado (LangGraph). Stats determinísticas + schema objetividad. Store: ticker_chart_plan_versions. Vistas MVP: tradingview, sentiment_bars, signals_timeline. Pine 0–3 opcional.",
+      "verification": [
+        "POST analyze sin Dossier => 404 o mensaje claro",
+        "POST analyze con Dossier mock => persiste Chart Plan JSON con assessment",
+        "GET chart-plan latest + versions ≤10",
+        "CHART_AGENT_ENABLED=false => 503 o disabled",
+        "SSE emite ResearchStepEvent durante analyze",
+        "UI split /dossier: panel derecho renderiza TV + charts + Pine copy",
+        "python -m backend.scripts.verify_f33 => OK",
+        "Regresión: verify_f30 => OK"
+      ],
+      "evidence": [
+        "2026-07-10: python -m backend.scripts.verify_f33 => OK (migrations, 503 disabled, 404 sin dossier, SSE analyze+persist, versions)",
+        "2026-07-10: verify_f30 regression OK",
+        "2026-07-10: ./init.sh OK; npm run build OK",
+        "infra/store/init/010 + supabase/010 ticker_chart_plan_versions",
+        "chart_plan.py, chart_agent.py, chart_plan_synthesis.py, routes/chart_plan.py",
+        "frontend /dossier split + ChartPlanPanel (TV, recharts, Pine, SSE)"
+      ]
+    },
+    {
+      "id": "F34",
+      "priority": 34,
+      "title": "Ticker Chart Operator-first + Lightweight Charts",
+      "user_visible_behavior": "En /dossier y modal Quote Strip: Ticker Chart interactivo (Lightweight Charts) con presets intervalo+ventana, advanced, indicadores parametrizables (2 SMA, Donchian, Fib, volumen), prefs en localStorage, auto-refresh adaptativo. Chart Agent ofrece sugerencia soft Aplicar vista; lecturas desactualizadas si diverge. Pine fuera del MVP. API candles con interval+period.",
+      "status": "passing",
+      "dependencies": ["F33", "F7"],
+      "notes": "Ver ADR-0011. Operator-first. Backend GET /quotes/candles?interval=&period= canónico; fallback /api/candles. Crypto Yahoo map BTC-USD etc.",
+      "verification": [
+        "GET /quotes/candles?symbol=NVDA&period=3mo&interval=1d => velas",
+        "GET candles BTC interval=1d => precios ~decenas de miles (no ~30)",
+        "Presets 1D/5D/1M/3M/1Y/5Y cambian datos del chart",
+        "Toggle SMA/Donchian/Fib/volumen + lengths persisten en localStorage",
+        "Quote Strip modal usa mismo Ticker Chart",
+        "Tras analyze: CTA Aplicar vista; badge desactualizado si Operator cambia vista",
+        "Pine UI oculta / no requerida en Chart Plan MVP",
+        "npm run build OK"
+      ],
+      "evidence": [
+        "2026-07-18: AUTH_ENABLED=false python -m backend.scripts.verify_f34 => PASS (NVDA 62 velas last 202.81; BTC 92 velas last 64140)",
+        "2026-07-18: /api/candles BTC 3mo 1d => 92 points ~64k",
+        "2026-07-18: npm run build OK; lightweight-charts installed",
+        "ADR-0011; TickerChart + Toolbar; ChartPlanPanel soft apply + stale badge; QuoteStrip modal unificado; pine_scripts=[] in payload"
+      ]
     }
   ]
 }

@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import TickerChartModal from "@/components/TickerChartModal";
+import TickerLogo from "@/components/TickerLogo";
 import { fetchWatchlistQuotes } from "@/lib/api";
+import { MARKET_QUOTE_POLL_MS } from "@/lib/marketRefresh";
 import type { Quote } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 900_000; // 15 min — Finnhub + server cache
+const POLL_INTERVAL_MS = MARKET_QUOTE_POLL_MS;
 
 function formatPrice(price: number): string {
   return price.toLocaleString("en-US", {
@@ -122,9 +124,10 @@ function QuoteItem({
     <button
       type="button"
       onClick={() => onSelect(quote.symbol)}
-      className="group flex shrink-0 items-baseline gap-2 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-zinc-900"
+      className="group flex shrink-0 items-center gap-2 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-zinc-900"
       title={`Ver gráfico de ${quote.symbol}`}
     >
+      <TickerLogo symbol={quote.symbol} logoUrl={quote.logo} size="xs" />
       <span className="font-semibold text-zinc-300 group-hover:text-amber-400">
         {quote.symbol}
       </span>

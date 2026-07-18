@@ -1,20 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import TickerLogo from "@/components/TickerLogo";
 import {
   addTickerWatch,
+  fetchTickerLogos,
   fetchTickerSuggestions,
   fetchTickerWatch,
   removeTickerWatch,
   updateTickerWatchThesis,
 } from "@/lib/api";
+import { dossierPath } from "@/lib/dossierNav";
 import type { TickerSuggestion, TickerWatchEntry } from "@/lib/types";
 
 export default function TickerWatchPopover() {
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<TickerWatchEntry[]>([]);
+  const [logos, setLogos] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -28,6 +34,14 @@ export default function TickerWatchPopover() {
   const [thesisDraft, setThesisDraft] = useState("");
   const [savingThesis, setSavingThesis] = useState<string | null>(null);
 
+  const openDossier = useCallback(
+    (symbol: string) => {
+      router.push(dossierPath(symbol));
+      setOpen(false);
+    },
+    [router],
+  );
+
   const prefix = input.replace(/^\$/, "").trim().toUpperCase();
 
   const loadWatchlist = useCallback(async () => {
@@ -36,6 +50,12 @@ export default function TickerWatchPopover() {
     try {
       const data = await fetchTickerWatch();
       setEntries(data);
+      if (data.length > 0) {
+        const logoMap = await fetchTickerLogos(data.map((e) => e.symbol));
+        setLogos(logoMap);
+      } else {
+        setLogos({});
+      }
     } catch {
       setError("Failed to load watchlist");
     } finally {
@@ -261,9 +281,15 @@ export default function TickerWatchPopover() {
                   <div className="flex items-center justify-between gap-2 px-3 py-1.5">
                     <button
                       type="button"
-                      onClick={() => toggleThesisEditor(entry)}
-                      className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                      onClick={() => openDossier(entry.symbol)}
+                      className="flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors hover:text-amber-300"
+                      title={`Abrir Dossier de ${entry.symbol}`}
                     >
+                      <TickerLogo
+                        symbol={entry.symbol}
+                        logoUrl={logos[entry.symbol]}
+                        size="xs"
+                      />
                       <span className="font-mono text-[10px] font-semibold text-amber-400">
                         ${entry.symbol}
                       </span>
@@ -275,6 +301,13 @@ export default function TickerWatchPopover() {
                       )}
                     </button>
                     <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openDossier(entry.symbol)}
+                        className="rounded border border-zinc-700 px-1 py-0.5 font-mono text-[9px] text-zinc-400 transition-colors hover:border-amber-600 hover:text-amber-400"
+                      >
+                        Dossier
+                      </button>
                       <button
                         type="button"
                         onClick={() => toggleThesisEditor(entry)}

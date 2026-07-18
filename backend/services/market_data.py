@@ -14,6 +14,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from backend.services.market_symbols import yahoo_finance_symbol
+
 DEFAULT_WATCHLIST = (
     "BTC,ETH,SOL,"
     "SPY,QQQ,AMZN,AAPL,MSFT,MU,TSLA,NVDA,GOOGL,VIST,YPF,MELI,KO,META,BBD,GGAL,GLD"
@@ -433,53 +435,175 @@ def fetch_quotes(symbols: list[str]) -> list[Quote]:
     return quotes
 
 
-VALID_PRICE_PERIODS = frozenset({"1mo", "3mo", "6mo", "1y"})
+VALID_PRICE_PERIODS = frozenset(
+    {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y"}
+)
+VALID_PRICE_INTERVALS = frozenset(
+    {"1m", "5m", "15m", "30m", "1h", "1d", "1wk"}
+)
+_PERIOD_ORDER = ("1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y")
+_INTRADAY_INTERVALS = frozenset({"1m", "5m", "15m", "30m", "1h"})
+
+
+def _normalize_price_period(period: str | None) -> str:
+    effective = (period or "1y").strip()
+    if effective not in VALID_PRICE_PERIODS:
+        return "1y"
+    return effective
+
+
+def _normalize_price_interval(interval: str | None) -> str:
+    effective = (interval or "1d").strip()
+    if effective not in VALID_PRICE_INTERVALS:
+        return "1d"
+    return effective
+
+
+def _clamp_period_for_interval(period: str, interval: str) -> str:
+    """Acorta la ventana si supera límites Yahoo para el intervalo."""
+    if interval == "1m":
+        max_period = "5d"  # Yahoo: 1m max ~7d; sin 7d en VALID → 5d
+    elif interval in _INTRADAY_INTERVALS:
+        max_period = "1mo"  # Yahoo: intradía <1d max ~60d
+    else:
+        return period
+
+    try:
+        if _PERIOD_ORDER.index(period) > _PERIOD_ORDER.index(max_period):
+            return max_period
+    except ValueError:
+        return max_period
+    return period
+
+
+def _format_candle_date(index: Any, interval: str) -> str:
+    """ISO date para 1d/1wk; ISO datetime completo para intradía."""
+    if interval in ("1d", "1wk"):
+        if hasattr(index, "date"):
+            return index.date().isoformat()
+        return str(index)[:10]
+
+    if hasattr(index, "isoformat"):
+        return index.isoformat()
+    return str(index)
 
 
 def fetch_price_history(symbol: str, period: str = "1mo") -> dict[str, Any]:
     """Historial de precios vía yfinance (OHLC diario)."""
+    candles = _fetch_price_candles(symbol, period, interval="1d")
+    if candles.get("error"):
+        return candles
+
+    closes = [float(c["close"]) for c in candles["candles"]]
+    if not closes:
+        return {
+            "error": "sin datos históricos",
+            "symbol": candles.get("symbol"),
+            "period": candles.get("period"),
+        }
+
+    start_price = closes[0]
+    end_price = closes[-1]
+    change_percent = (
+        (end_price - start_price) / start_price * 100 if start_price else 0.0
+    )
+    highs = [float(c["high"]) for c in candles["candles"]]
+    lows = [float(c["low"]) for c in candles["candles"]]
+
+    return {
+        "symbol": candles["symbol"],
+        "period": candles["period"],
+        "start_price": round(start_price, 2),
+        "end_price": round(end_price, 2),
+        "change_percent": round(change_percent, 2),
+        "high": round(max(highs), 2),
+        "low": round(min(lows), 2),
+        "data_points": len(closes),
+    }
+
+
+def fetch_price_candles(
+    symbol: str,
+    period: str = "1y",
+    interval: str = "1d",
+) -> dict[str, Any]:
+    """Velas OHLC vía yfinance (intervalo + ventana)."""
+    payload = _fetch_price_candles(symbol, period, interval=interval)
+    if payload.get("error"):
+        return payload
+    return {
+        "symbol": payload["symbol"],
+        "period": payload["period"],
+        "interval": payload["interval"],
+        "candles": payload["candles"],
+        "data_points": len(payload["candles"]),
+    }
+
+
+def _fetch_price_candles(
+    symbol: str,
+    period: str,
+    interval: str = "1d",
+) -> dict[str, Any]:
+    """Carga OHLC desde yfinance con period + interval (clamp Yahoo)."""
     normalized = normalize_symbol(symbol)
     if not normalized:
-        return {"error": "symbol inválido", "symbol": symbol, "period": period}
+        return {
+            "error": "symbol inválido",
+            "symbol": symbol,
+            "period": period,
+            "interval": interval,
+        }
 
-    effective_period = (period or "1mo").strip()
-    if effective_period not in VALID_PRICE_PERIODS:
-        effective_period = "1mo"
+    effective_interval = _normalize_price_interval(interval)
+    effective_period = _clamp_period_for_interval(
+        _normalize_price_period(period),
+        effective_interval,
+    )
 
     try:
         import yfinance as yf
 
-        ticker = yf.Ticker(normalized)
-        history = ticker.history(period=effective_period, auto_adjust=True)
+        yf_symbol = yahoo_finance_symbol(normalized)
+        ticker = yf.Ticker(yf_symbol)
+        history = ticker.history(
+            period=effective_period,
+            interval=effective_interval,
+            auto_adjust=True,
+        )
         if history is None or history.empty:
             return {
                 "error": "sin datos históricos",
                 "symbol": normalized,
                 "period": effective_period,
+                "interval": effective_interval,
             }
 
-        close = history["Close"]
-        start_price = float(close.iloc[0])
-        end_price = float(close.iloc[-1])
-        change_percent = (
-            (end_price - start_price) / start_price * 100 if start_price else 0.0
-        )
+        candles: list[dict[str, Any]] = []
+        for index, row in history.iterrows():
+            candles.append(
+                {
+                    "date": _format_candle_date(index, effective_interval),
+                    "open": round(float(row["Open"]), 4),
+                    "high": round(float(row["High"]), 4),
+                    "low": round(float(row["Low"]), 4),
+                    "close": round(float(row["Close"]), 4),
+                    "volume": int(row.get("Volume", 0) or 0),
+                }
+            )
 
         return {
             "symbol": normalized,
             "period": effective_period,
-            "start_price": round(start_price, 2),
-            "end_price": round(end_price, 2),
-            "change_percent": round(change_percent, 2),
-            "high": round(float(history["High"].max()), 2),
-            "low": round(float(history["Low"].min()), 2),
-            "data_points": len(history),
+            "interval": effective_interval,
+            "candles": candles,
         }
     except Exception as exc:
         return {
             "error": str(exc),
             "symbol": normalized,
             "period": effective_period,
+            "interval": effective_interval,
         }
 
 
