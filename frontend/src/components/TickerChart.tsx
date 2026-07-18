@@ -25,15 +25,18 @@ import type { PriceCandle } from "@/lib/types";
 
 export type TickerChartIndicators = Pick<
   ChartViewConfig,
-  "smaA" | "smaB" | "donchian" | "fib" | "volume"
+  "smaA" | "smaB" | "donchian" | "fib" | "volume" | "oscillator" | "oracle"
 >;
 
 export interface TickerChartProps {
   symbol: string;
   candles: PriceCandle[];
   indicators: TickerChartIndicators;
+  /** Fixed height. Omit to fill the parent container. */
   height?: number;
   className?: string;
+  /** Expose LWC API for time-scale sync with the oscillator pane. */
+  onApiReady?: (api: IChartApi | null) => void;
 }
 
 const BG = "#09090b"; // zinc-950
@@ -45,18 +48,30 @@ export function TickerChart({
   symbol,
   candles,
   indicators,
-  height = 360,
+  height,
   className = "",
+  onApiReady,
 }: TickerChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onApiReadyRef = useRef(onApiReady);
+  onApiReadyRef.current = onApiReady;
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || candles.length === 0) return;
+    if (!el || candles.length === 0) {
+      onApiReadyRef.current?.(null);
+      return;
+    }
+
+    const initialHeight = Math.max(
+      120,
+      height ?? (Math.floor(el.clientHeight) || 360),
+    );
+    const initialWidth = Math.max(1, Math.floor(el.clientWidth) || 320);
 
     const chart: IChartApi = createChart(el, {
-      width: el.clientWidth,
-      height,
+      width: initialWidth,
+      height: initialHeight,
       layout: {
         background: { type: ColorType.Solid, color: BG },
         textColor: TEXT,
@@ -109,7 +124,7 @@ export function TickerChart({
           color: INDICATOR_COLORS.smaA,
           lineWidth: 2,
           priceLineVisible: false,
-          lastValueVisible: true,
+          lastValueVisible: false,
           title: `SMA ${indicators.smaA.length}`,
         },
         0,
@@ -125,7 +140,7 @@ export function TickerChart({
           color: INDICATOR_COLORS.smaB,
           lineWidth: 2,
           priceLineVisible: false,
-          lastValueVisible: true,
+          lastValueVisible: false,
           title: `SMA ${indicators.smaB.length}`,
         },
         0,
@@ -176,13 +191,14 @@ export function TickerChart({
             color: INDICATOR_COLORS.fib,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: `Fib ${level.ratio}`,
+            axisLabelVisible: false,
+            title: `${level.ratio}`,
           }),
         );
       }
     }
 
+    // Volume is the only secondary series that lives inside the price chart.
     if (indicators.volume) {
       chart.addPane(true);
       const volumeSeries = chart.addSeries(
@@ -191,29 +207,38 @@ export function TickerChart({
           priceFormat: { type: "volume" },
           priceLineVisible: false,
           lastValueVisible: false,
+          title: "Vol",
         },
         1,
       );
       volumeSeries.setData(buildVolumeHistogramData(candles));
       const panes = chart.panes();
-      if (panes[0]) panes[0].setStretchFactor(3);
+      if (panes[0]) panes[0].setStretchFactor(4);
       if (panes[1]) panes[1].setStretchFactor(1);
     }
 
     chart.timeScale().fitContent();
+    onApiReadyRef.current?.(chart);
 
     const ro =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver((entries) => {
-            const width = entries[0]?.contentRect.width;
-            if (width && width > 0) {
-              chart.applyOptions({ width, height });
+            const rect = entries[0]?.contentRect;
+            if (!rect) return;
+            const width = Math.max(1, Math.floor(rect.width));
+            const nextHeight = Math.max(
+              120,
+              Math.floor(height ?? rect.height),
+            );
+            if (width > 0 && nextHeight > 0) {
+              chart.applyOptions({ width, height: nextHeight });
             }
           })
         : null;
     ro?.observe(el);
 
     return () => {
+      onApiReadyRef.current?.(null);
       ro?.disconnect();
       for (const line of priceLines) {
         try {
@@ -237,7 +262,7 @@ export function TickerChart({
     return (
       <div
         className={`flex items-center justify-center rounded border border-zinc-800 bg-zinc-950 font-mono text-xs text-zinc-500 ${className}`}
-        style={{ height }}
+        style={height != null ? { height } : undefined}
       >
         {`Sin velas para $${symbol}`}
       </div>
@@ -248,7 +273,7 @@ export function TickerChart({
     <div
       ref={containerRef}
       className={`w-full overflow-hidden rounded border border-zinc-800 bg-zinc-950 ${className}`}
-      style={{ height }}
+      style={height != null ? { height } : { height: "100%", minHeight: 240 }}
       data-symbol={symbol}
     />
   );

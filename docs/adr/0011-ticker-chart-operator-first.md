@@ -28,7 +28,7 @@ El Operator necesita explorar precio e indicadores en `/dossier` (y desde la Quo
 - **Lenguaje**: **Ticker Chart** (Operator-first) vs **Chart Plan** (artefacto del Chart Agent). Evitar “timeframe” suelto → **intervalo** + **ventana**. Ver `CONTEXT.md`.
 - **Superficies**: mismo Ticker Chart en `/dossier` y en el modal de la **Quote Strip**.
 - **Presets**: chips combinados `1D·5m`, `5D·15m`, `1M·1h`, `3M·1d`, `1Y·1d` (default), `5Y·1wk` + modo **advanced** (intervalo y ventana explícitos, con límites Yahoo).
-- **Indicadores MVP**: hasta 2 SMA (slots, default 20/50, length 5–200, on/off), Donchian (period), Fibonacci (on/off), volumen (toggle, default on). Cálculo determinístico sobre OHLC.
+- **Indicadores MVP**: overlays en precio (2 SMA, Donchian, Fib), Volume (sub-pane del precio), RSI + **Oracle Oscillator** en pane separado debajo (no mezclar con precio). Oracle = híbrido ponderado %R/Laguerre/Stoch/RSI/DeMarker (recreación open de la arquitectura publicada; no el binario MQL5). **Todos OFF por defecto**; desplegable Ind. Expand a dialog grande.
 - **Prefs**: `localStorage` global (browser), no Store.
 - **Chart Agent**: tras analyze, **sugerencia soft** “Aplicar vista del Chart Plan”; no auto-aplica. Si la vista del Ticker Chart diverge, las `indicator_readings` se marcan **desactualizadas**.
 - **Auto-refresh**: quote ~1 min; refetch de velas según intervalo; merge de precio solo en la **vela abierta** del intervalo actual.

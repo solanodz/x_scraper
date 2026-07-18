@@ -1,6 +1,6 @@
 /** Prefs globales del Ticker Chart (localStorage, browser). Ver ADR-0011. */
 
-export const TICKER_CHART_PREFS_KEY = "xscraper.tickerChart.v2";
+export const TICKER_CHART_PREFS_KEY = "xscraper.tickerChart.v5";
 
 export type ChartPresetId = "1D" | "5D" | "1M" | "3M" | "1Y" | "5Y";
 
@@ -14,6 +14,24 @@ export type DonchianConfig = {
   period: number;
 };
 
+/** RSI en el pane de oscilador (separado del precio). */
+export type OscillatorConfig = {
+  enabled: boolean;
+  period: number;
+};
+
+/**
+ * Oracle Oscillator en el pane inferior (separado del precio).
+ * Híbrido: %R + Laguerre RSI + Stoch + RSI + DeMarker.
+ */
+export type OracleOscillatorConfig = {
+  enabled: boolean;
+  /** Lookback de componentes (default 14). */
+  period: number;
+  /** SMA de la signal line (default 5). */
+  signalPeriod: number;
+};
+
 /** Vista del Ticker Chart (también payload soft-apply del Chart Plan). */
 export type ChartViewConfig = {
   interval: string;
@@ -23,6 +41,8 @@ export type ChartViewConfig = {
   donchian: DonchianConfig;
   fib: boolean;
   volume: boolean;
+  oscillator: OscillatorConfig;
+  oracle: OracleOscillatorConfig;
 };
 
 export type TickerChartPrefs = ChartViewConfig & {
@@ -52,16 +72,44 @@ export const SMA_LENGTH_MIN = 5;
 export const SMA_LENGTH_MAX = 200;
 export const DONCHIAN_PERIOD_MIN = 5;
 export const DONCHIAN_PERIOD_MAX = 200;
+export const OSCILLATOR_PERIOD_MIN = 5;
+export const OSCILLATOR_PERIOD_MAX = 100;
+export const ORACLE_SIGNAL_PERIOD_MIN = 2;
+export const ORACLE_SIGNAL_PERIOD_MAX = 50;
 
+/** Defaults limpios: velas + pane inferior reservado; indicadores OFF. */
 export const DEFAULT_CHART_VIEW: ChartViewConfig = {
   interval: "1d",
   period: "1y",
-  smaA: { enabled: true, length: 20 },
-  smaB: { enabled: true, length: 50 },
-  donchian: { enabled: true, period: 20 },
-  fib: true,
-  volume: true,
+  smaA: { enabled: false, length: 20 },
+  smaB: { enabled: false, length: 50 },
+  donchian: { enabled: false, period: 20 },
+  fib: false,
+  volume: false,
+  oscillator: { enabled: false, period: 14 },
+  oracle: { enabled: false, period: 14, signalPeriod: 5 },
 };
+
+export function clampOscillatorPeriod(period: number): number {
+  return clampLength(period, OSCILLATOR_PERIOD_MIN, OSCILLATOR_PERIOD_MAX);
+}
+
+export function clampOracleSignalPeriod(period: number): number {
+  return clampLength(period, ORACLE_SIGNAL_PERIOD_MIN, ORACLE_SIGNAL_PERIOD_MAX);
+}
+
+/** Resumen corto para el chip del desplegable Indicators. */
+export function indicatorsSummary(prefs: ChartViewConfig): string {
+  const parts: string[] = [];
+  if (prefs.smaA.enabled) parts.push(`SMA${prefs.smaA.length}`);
+  if (prefs.smaB.enabled) parts.push(`SMA${prefs.smaB.length}`);
+  if (prefs.donchian.enabled) parts.push(`DC${prefs.donchian.period}`);
+  if (prefs.fib) parts.push("Fib");
+  if (prefs.volume) parts.push("Vol");
+  if (prefs.oscillator.enabled) parts.push(`RSI${prefs.oscillator.period}`);
+  if (prefs.oracle.enabled) parts.push(`Oracle${prefs.oracle.period}`);
+  return parts.length > 0 ? parts.join(" · ") : "None";
+}
 
 export const DEFAULT_TICKER_CHART_PREFS: TickerChartPrefs = {
   ...DEFAULT_CHART_VIEW,
@@ -99,6 +147,8 @@ export function viewConfigFromPrefs(prefs: TickerChartPrefs): ChartViewConfig {
     donchian: { ...prefs.donchian },
     fib: prefs.fib,
     volume: prefs.volume,
+    oscillator: { ...prefs.oscillator },
+    oracle: { ...prefs.oracle },
   };
 }
 
@@ -109,6 +159,13 @@ export function normalizeTickerChartPrefs(
   const smaALength = clampSmaLength(raw?.smaA?.length ?? base.smaA.length);
   const smaBLength = clampSmaLength(raw?.smaB?.length ?? base.smaB.length);
   const donchianPeriod = clampDonchianPeriod(raw?.donchian?.period ?? base.donchian.period);
+  const oscillatorPeriod = clampOscillatorPeriod(
+    raw?.oscillator?.period ?? base.oscillator.period,
+  );
+  const oraclePeriod = clampOscillatorPeriod(raw?.oracle?.period ?? base.oracle.period);
+  const oracleSignalPeriod = clampOracleSignalPeriod(
+    raw?.oracle?.signalPeriod ?? base.oracle.signalPeriod,
+  );
 
   const interval = typeof raw?.interval === "string" && raw.interval ? raw.interval : base.interval;
   const period = typeof raw?.period === "string" && raw.period ? raw.period : base.period;
@@ -138,6 +195,15 @@ export function normalizeTickerChartPrefs(
     },
     fib: raw?.fib ?? base.fib,
     volume: raw?.volume ?? base.volume,
+    oscillator: {
+      enabled: raw?.oscillator?.enabled ?? base.oscillator.enabled,
+      period: oscillatorPeriod,
+    },
+    oracle: {
+      enabled: raw?.oracle?.enabled ?? base.oracle.enabled,
+      period: oraclePeriod,
+      signalPeriod: oracleSignalPeriod,
+    },
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TickerChart } from "@/components/TickerChart";
+import { TickerChartStack } from "@/components/TickerChartStack";
 import { TickerChartToolbar } from "@/components/TickerChartToolbar";
 import TickerLogo from "@/components/TickerLogo";
 import { useLiveTickerMarket } from "@/hooks/useLiveTickerMarket";
@@ -14,19 +14,27 @@ import {
   saveTickerChartPrefs,
   type TickerChartPrefs,
 } from "@/lib/tickerChartPrefs";
+import type { PriceCandle } from "@/lib/types";
+import type { TickerChartIndicators } from "@/components/TickerChart";
 
 interface TickerChartModalProps {
   symbol: string;
   onClose: () => void;
+  /** Prefs controladas (p. ej. sync con Chart Plan). */
+  prefs?: TickerChartPrefs;
+  onPrefsChange?: (prefs: TickerChartPrefs) => void;
 }
 
 export default function TickerChartModal({
   symbol,
   onClose,
+  prefs: controlledPrefs,
+  onPrefsChange,
 }: TickerChartModalProps) {
-  const [chartPrefs, setChartPrefs] = useState<TickerChartPrefs>(() =>
+  const [internalPrefs, setInternalPrefs] = useState<TickerChartPrefs>(() =>
     loadTickerChartPrefs(),
   );
+  const chartPrefs = controlledPrefs ?? internalPrefs;
 
   const { quote, candles, candlesLoading, candlesError } = useLiveTickerMarket(
     symbol,
@@ -45,18 +53,27 @@ export default function TickerChartModal({
     };
   }, [onClose]);
 
+  function handlePrefsChange(next: TickerChartPrefs) {
+    if (onPrefsChange) {
+      onPrefsChange(next);
+    } else {
+      setInternalPrefs(next);
+      saveTickerChartPrefs(next);
+    }
+  }
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-6"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="flex h-[min(88vh,820px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950 shadow-2xl"
+        className="flex h-[min(92vh,960px)] w-full max-w-7xl flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`${symbol} chart`}
+        aria-label={`${symbol} chart expandido`}
       >
         <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-2">
           <div className="flex items-center gap-2">
@@ -91,33 +108,52 @@ export default function TickerChartModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+        <div className="flex min-h-0 flex-1 flex-col">
           <TickerChartToolbar
             value={chartPrefs}
-            onChange={(next) => {
-              setChartPrefs(next);
-              saveTickerChartPrefs(next);
-            }}
-            persist
+            onChange={handlePrefsChange}
+            persist={!onPrefsChange}
           />
-          {candlesLoading && candles.length === 0 ? (
-            <p className="py-20 text-center font-mono text-xs text-zinc-500">
-              Cargando velas…
-            </p>
-          ) : candlesError ? (
-            <p className="py-12 text-center font-mono text-xs text-red-400">
-              {candlesError}
-            </p>
-          ) : (
-            <TickerChart
-              symbol={symbol}
-              candles={candles}
-              indicators={chartPrefs}
-              height={520}
-            />
-          )}
+          <div className="min-h-0 flex-1 p-3">
+            {candlesLoading && candles.length === 0 ? (
+              <p className="flex h-full items-center justify-center font-mono text-xs text-zinc-500">
+                Cargando velas…
+              </p>
+            ) : candlesError ? (
+              <p className="flex h-full items-center justify-center font-mono text-xs text-red-400">
+                {candlesError}
+              </p>
+            ) : (
+              <ExpandedChart
+                symbol={symbol}
+                candles={candles}
+                indicators={chartPrefs}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function ExpandedChart({
+  symbol,
+  candles,
+  indicators,
+}: {
+  symbol: string;
+  candles: PriceCandle[];
+  indicators: TickerChartIndicators;
+}) {
+  return (
+    <TickerChartStack
+      symbol={symbol}
+      candles={candles}
+      indicators={indicators}
+      fillPrice
+      oscillatorHeight={140}
+      className="h-full min-h-[420px]"
+    />
   );
 }

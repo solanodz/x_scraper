@@ -13,7 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
-import { TickerChart } from "@/components/TickerChart";
+import TickerChartModal from "@/components/TickerChartModal";
+import { TickerChartStack } from "@/components/TickerChartStack";
 import { TickerChartToolbar } from "@/components/TickerChartToolbar";
 import TickerLogo from "@/components/TickerLogo";
 import { useLiveTickerMarket } from "@/hooks/useLiveTickerMarket";
@@ -119,6 +120,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
     loadTickerChartPrefs(),
   );
   const [softApplyAvailable, setSoftApplyAvailable] = useState(false);
+  const [chartExpanded, setChartExpanded] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const {
@@ -355,6 +357,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             value={chartPrefs}
             onChange={handlePrefsChange}
             persist
+            onExpand={() => setChartExpanded(true)}
           />
           {candlesLoading && candles.length === 0 ? (
             <p className="py-16 text-center font-mono text-xs text-zinc-500">
@@ -365,11 +368,20 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
               {candlesError}
             </p>
           ) : (
-            <TickerChart
+            <TickerChartStack
               symbol={symbol}
               candles={candles}
               indicators={chartPrefs}
-              height={380}
+              priceHeight={300}
+              oscillatorHeight={112}
+            />
+          )}
+          {chartExpanded && (
+            <TickerChartModal
+              symbol={symbol}
+              prefs={chartPrefs}
+              onPrefsChange={handlePrefsChange}
+              onClose={() => setChartExpanded(false)}
             />
           )}
           {content && indicatorReadings.length > 0 && (

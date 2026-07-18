@@ -210,7 +210,7 @@ Análisis integral persistente por Ticker del Ticker Watch. Estructura en seis b
 _Avoid_: Profile, ticker page, equity research PDF, one-pager
 
 **Ticker Chart**:
-Gráfico interactivo de precio del Ticker en `/dossier` (velas OHLC + indicadores). Lo controla el **Operator** (intervalo de vela, ventana de historial e indicadores); no requiere Chart Plan ni Chart Agent. Puede auto-actualizarse con Market Data. El Operator elige con presets combinados (intervalo + ventana) o modo advanced con ambos controles. Indicadores MVP: SMA (lengths), Donchian (period), Fibonacci (on/off) y volumen (toggle); calculados de forma determinística sobre las velas.
+Gráfico interactivo de precio del Ticker en `/dossier` (velas OHLC + indicadores). Lo controla el **Operator** (intervalo de vela, ventana de historial e indicadores); no requiere Chart Plan ni Chart Agent. Puede auto-actualizarse con Market Data. El Operator elige con presets combinados (intervalo + ventana) o modo advanced con ambos controles. Indicadores MVP (todos OFF por defecto; se eligen y parametrizan desde un desplegable): overlays en precio (SMA, Donchian, Fib), Volume (pane dentro del precio), y debajo del precio (panes separados, zoom sync): **Oracle Oscillator** (baseline fill verde/amarillo/rojo, niveles 75/25) y **RSI con divergencias** (señales Bull/Bear precio↔RSI). Se puede ampliar a un dialog grande.
 _Avoid_: TradingView widget, price pane, chart widget, timeframe (usar intervalo + ventana)
 
 **Chart Plan**:
