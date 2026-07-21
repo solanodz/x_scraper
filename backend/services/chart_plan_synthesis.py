@@ -130,15 +130,98 @@ def _merge_suggested_view(llm_view: Any) -> dict[str, Any]:
     }
 
 
+_INTERPRETER_ROLE_TO_DIM = {
+    "vision": "visual",
+    "narrative": "narrative",
+    "sentiment": "sentiment_vs_price",
+    "multi_tf": "multi_tf",
+}
+_ASSESSMENT_DIM_KEYS = (
+    "visual",
+    "narrative",
+    "sentiment_vs_price",
+    "multi_tf",
+)
+
+
+def _normalize_assessment_dimension(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    summary = str(raw.get("summary") or "").strip()
+    findings_raw = raw.get("findings")
+    findings = (
+        [str(item).strip() for item in findings_raw if str(item).strip()]
+        if isinstance(findings_raw, list)
+        else []
+    )
+    stance = raw.get("stance")
+    if stance not in {"alcista", "bajista", "neutral"}:
+        stance = None
+    if not summary and not findings and stance is None:
+        return None
+    return {"summary": summary, "stance": stance, "findings": findings}
+
+
+def _dimensions_from_interpreter_notes(
+    notes: Any,
+) -> dict[str, dict[str, Any]]:
+    if not isinstance(notes, list):
+        return {}
+    dims: dict[str, dict[str, Any]] = {}
+    for note in notes:
+        if not isinstance(note, dict):
+            continue
+        key = _INTERPRETER_ROLE_TO_DIM.get(str(note.get("role") or ""))
+        if not key:
+            continue
+        dim = _normalize_assessment_dimension(note)
+        if dim:
+            dims[key] = dim
+    return dims
+
+
 def _merge_assessment(
     llm_assessment: dict[str, Any] | None,
     deterministic_stats: dict[str, Any],
 ) -> dict[str, Any]:
     base = llm_assessment if isinstance(llm_assessment, dict) else {}
-    return {
+    conflicts = (
+        [str(item).strip() for item in base["conflicts"] if str(item).strip()]
+        if isinstance(base.get("conflicts"), list)
+        else []
+    )
+    data_gaps = (
+        [str(item).strip() for item in base["data_gaps"] if str(item).strip()]
+        if isinstance(base.get("data_gaps"), list)
+        else []
+    )
+    for gap in deterministic_stats.get("parallel_data_gaps") or []:
+        text = str(gap).strip()
+        if text and text not in data_gaps:
+            data_gaps.append(text)
+
+    dims = _dimensions_from_interpreter_notes(
+        deterministic_stats.get("interpreter_notes")
+    )
+    for key in _ASSESSMENT_DIM_KEYS:
+        llm_dim = _normalize_assessment_dimension(base.get(key))
+        if llm_dim:
+            dims[key] = llm_dim
+
+    notes = deterministic_stats.get("interpreter_notes") or []
+    if isinstance(notes, list):
+        for note in notes:
+            if not isinstance(note, dict):
+                continue
+            for item in note.get("conflicts") or []:
+                text = str(item).strip()
+                if text and text not in conflicts:
+                    conflicts.append(text)
+
+    payload: dict[str, Any] = {
         "summary": str(base.get("summary") or "Lectura objetiva del Chart Plan."),
-        "conflicts": base.get("conflicts") if isinstance(base.get("conflicts"), list) else [],
-        "data_gaps": base.get("data_gaps") if isinstance(base.get("data_gaps"), list) else [],
+        "conflicts": conflicts,
+        "data_gaps": data_gaps,
         "bias_check": str(
             base.get("bias_check")
             or "Sin recomendaciones de compra/venta; datos anclados al Corpus y mercado."
@@ -154,6 +237,10 @@ def _merge_assessment(
             else deterministic_stats.get("bearish_count") or 0
         ),
     }
+    for key in _ASSESSMENT_DIM_KEYS:
+        if key in dims:
+            payload[key] = dims[key]
+    return payload
 
 
 def _inject_chart_data(deterministic_stats: dict[str, Any]) -> dict[str, Any]:
@@ -232,6 +319,9 @@ def synthesize_chart_plan_json(
     deterministic_stats: dict[str, Any],
     gather_notes: str,
     symbol: str,
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Sintetiza Chart Plan JSON; chart_data viene de stats determinísticas."""
     raw = synthesize_chart_plan_answer(
@@ -239,6 +329,9 @@ def synthesize_chart_plan_json(
         gather_notes=gather_notes,
         deterministic_stats=deterministic_stats,
         symbol=symbol,
+        chart_image_base64=chart_image_base64,
+        chart_image_media_type=chart_image_media_type,
+        chart_view=chart_view,
     )
     parsed = _parse_chart_plan_json(raw)
 

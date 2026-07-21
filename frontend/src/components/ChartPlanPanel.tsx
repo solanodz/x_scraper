@@ -24,6 +24,7 @@ import {
   fetchChartPlanVersions,
   streamChartPlanAnalyze,
 } from "@/lib/api";
+import { captureChartStackPng } from "@/lib/captureChartStack";
 import {
   formatQuoteChangePercent,
   formatQuotePrice,
@@ -34,6 +35,7 @@ import {
   matchPresetId,
   normalizeTickerChartPrefs,
   saveTickerChartPrefs,
+  viewConfigFromPrefs,
   type TickerChartPrefs,
 } from "@/lib/tickerChartPrefs";
 import type {
@@ -64,10 +66,26 @@ function viewEnabled(views: ChartPlanView[], type: string): ChartPlanView | null
   return match;
 }
 
+function normalizeDimension(raw: ChartPlanContent["assessment"]["visual"]) {
+  if (!raw || typeof raw !== "object") return null;
+  const findings = Array.isArray(raw.findings)
+    ? raw.findings.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  const summary = typeof raw.summary === "string" ? raw.summary : "";
+  const stance =
+    typeof raw.stance === "string" && raw.stance.trim() ? raw.stance.trim() : null;
+  if (!summary && findings.length === 0 && !stance) return null;
+  return { summary, stance, findings };
+}
+
 function normalizeAssessment(content: ChartPlanContent) {
   const raw = content.assessment;
   return {
     summary: raw?.summary ?? content.summary ?? "",
+    visual: normalizeDimension(raw?.visual),
+    narrative: normalizeDimension(raw?.narrative),
+    sentiment_vs_price: normalizeDimension(raw?.sentiment_vs_price),
+    multi_tf: normalizeDimension(raw?.multi_tf),
     conflicts: raw?.conflicts ?? [],
     data_gaps: raw?.data_gaps ?? [],
     bias_check: raw?.bias_check ?? "",
@@ -183,6 +201,12 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
     setNeedsDossier(false);
 
     try {
+      const stackEl = document.querySelector<HTMLElement>(
+        "[data-ticker-chart-stack='1']",
+      );
+      const capture = await captureChartStackPng(stackEl);
+      const chartView = viewConfigFromPrefs(chartPrefs);
+
       await streamChartPlanAnalyze(
         symbol,
         {
@@ -208,6 +232,11 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
           },
         },
         controller.signal,
+        {
+          chart_image_base64: capture?.base64 ?? null,
+          chart_image_media_type: capture?.mediaType ?? "image/png",
+          chart_view: chartView,
+        },
       );
       const history = await fetchChartPlanVersions(symbol);
       setVersions(history);
@@ -459,16 +488,85 @@ function EmptyState({
   );
 }
 
+function AssessmentDimensionBlock({
+  title,
+  dimension,
+}: {
+  title: string;
+  dimension: {
+    summary: string;
+    stance: string | null;
+    findings: string[];
+  } | null;
+}) {
+  if (!dimension) return null;
+  const stanceClass =
+    dimension.stance === "alcista"
+      ? "text-emerald-400"
+      : dimension.stance === "bajista"
+        ? "text-red-400"
+        : "text-zinc-500";
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+        {title}
+        {dimension.stance ? (
+          <span className={`ml-2 normal-case ${stanceClass}`}>
+            {dimension.stance}
+          </span>
+        ) : null}
+      </p>
+      {dimension.summary ? (
+        <p className="mt-1 text-zinc-400">{dimension.summary}</p>
+      ) : null}
+      {dimension.findings.length > 0 ? (
+        <ul className="mt-1 list-inside list-disc space-y-0.5 text-zinc-400">
+          {dimension.findings.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function AssessmentSection({
   assessment,
 }: {
   assessment: {
     summary: string;
+    visual: {
+      summary: string;
+      stance: string | null;
+      findings: string[];
+    } | null;
+    narrative: {
+      summary: string;
+      stance: string | null;
+      findings: string[];
+    } | null;
+    sentiment_vs_price: {
+      summary: string;
+      stance: string | null;
+      findings: string[];
+    } | null;
+    multi_tf: {
+      summary: string;
+      stance: string | null;
+      findings: string[];
+    } | null;
     conflicts: string[];
     data_gaps: string[];
     bias_check: string;
   };
 }) {
+  const hasDimensions = Boolean(
+    assessment.visual ||
+      assessment.narrative ||
+      assessment.sentiment_vs_price ||
+      assessment.multi_tf,
+  );
+
   return (
     <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/30 p-3">
       <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -478,6 +576,26 @@ function AssessmentSection({
         {assessment.summary && (
           <p className="text-zinc-400">{assessment.summary}</p>
         )}
+        {hasDimensions ? (
+          <div className="space-y-2 border-t border-zinc-800/60 pt-2">
+            <AssessmentDimensionBlock
+              title="Visual"
+              dimension={assessment.visual}
+            />
+            <AssessmentDimensionBlock
+              title="Narrativa Corpus"
+              dimension={assessment.narrative}
+            />
+            <AssessmentDimensionBlock
+              title="Sentimiento vs precio"
+              dimension={assessment.sentiment_vs_price}
+            />
+            <AssessmentDimensionBlock
+              title="TA multi-ventana"
+              dimension={assessment.multi_tf}
+            />
+          </div>
+        ) : null}
         <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">
             Conflictos

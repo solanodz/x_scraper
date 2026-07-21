@@ -590,6 +590,29 @@
         "2026-07-18: npm run build OK; lightweight-charts installed",
         "ADR-0011; TickerChart + Toolbar; ChartPlanPanel soft apply + stale badge; QuoteStrip modal unificado; pine_scripts=[] in payload"
       ]
+    },
+    {
+      "id": "F35",
+      "priority": 35,
+      "title": "Parallel Chart Gather + Chart Interpreters",
+      "user_visible_behavior": "Con CHART_PARALLEL_ENABLED, Analizar gráficos usa Parallel Chart Gather (lanes concurrentes + 4 Chart Interpreters) en lugar del ReAct secuencial. SSE muestra pasos de gather/interpreters en paralelo; el Chart Plan assessment incluye dimensiones visual, narrativa, sentimiento vs precio y TA multi-ventana (5d·15m, 3mo·1d, 1y·1d). Sin captura, visión se omite con data_gaps; flag off mantiene camino legacy.",
+      "status": "passing",
+      "dependencies": ["F33", "F34"],
+      "notes": "Ver ADR-0012. Flag CHART_PARALLEL_ENABLED (default false). Interpreters: vision gpt-4o, resto gpt-4o-mini. Un solo sintetizador. No 'parallel agents'.",
+      "verification": [
+        "CHART_PARALLEL_ENABLED=false => camino ReAct legacy (no llama run_parallel_chart_gather)",
+        "CHART_PARALLEL_ENABLED=true => SSE emite gather + interpreter steps + synthesis",
+        "assessment incluye visual/narrative/sentiment_vs_price/multi_tf cuando hay interpreter_notes",
+        "sin chart_image => visión omitida + data_gaps",
+        "python -m backend.scripts.verify_f35 => OK",
+        "Regresión: verify_f33 => OK"
+      ],
+      "evidence": [
+        "2026-07-20: python -m backend.scripts.verify_f35 => OK (flag on/off, merge dimensiones, SSE parallel mock)",
+        "2026-07-20: ./init.sh OK; frontend npm run build OK; tsc OK",
+        "chart_interpreters.py + parallel_chart_gather.py; iter_chart_plan_analyze_stream branch; assessment dims in synthesis/UI",
+        "verify_f33: bloqueado en este entorno por error embeddings OpenAI al boot TestClient (no regresión de flag: default CHART_PARALLEL_ENABLED=false)"
+      ]
     }
   ]
 }

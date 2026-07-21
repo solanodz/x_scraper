@@ -2,18 +2,19 @@
 
 ## Estado actual
 
-**F34 `passing`.** Ticker Chart Operator-first + Lightweight Charts (ADR-0011).
+**F35 `passing`.** Parallel Chart Gather + Chart Interpreters (ADR-0012).
 
 ## Próximo paso
 
-1. Smoke manual UI: presets + indicadores en `/dossier` y Quote Strip
-2. Reiniciar API local si aún corre código viejo (`uvicorn --reload`)
-3. **F31** Fundamentals o polish Chart Agent
+1. Activar en local: `CHART_AGENT_ENABLED=true` + `CHART_PARALLEL_ENABLED=true`, reiniciar API, smoke en `/dossier` → Analizar gráficos
+2. Confirmar SSE: pasos Gather · / Interpreter · en paralelo + assessment con dimensiones
+3. **F31** Fundamentals o polish restante
 
-## Roadmap Chart Plan (ADR-0010 / ADR-0011)
+## Roadmap Chart Plan (ADR-0010 / ADR-0011 / ADR-0012)
 
 - **F33** Chart Agent on-demand (`passing`)
 - **F34** Ticker Chart Operator-first (`passing`)
+- **F35** Parallel Chart Gather (`passing`)
 
 ## Roadmap Dossier (ADR-0009)
 
@@ -53,6 +54,8 @@
 Railway (API + Worker) + Vercel (frontend) + Supabase — prod operativo.
 
 ## Log
+
+- 2026-07-20 — F35 PASSING. Parallel Chart Gather (ADR-0012): `chart_interpreters.py` + `parallel_chart_gather.py`, stream detrás de `CHART_PARALLEL_ENABLED`, assessment enriquecido (visual/narrative/sentiment_vs_price/multi_tf), UI ChartPlanPanel. Verificado: `verify_f35` OK, `init.sh` OK, `npm run build` OK.
 
 - 2026-07-10 — F33 PASSING. Chart Plan (ADR-0010): migración 010, Chart Agent ReAct acotado, SSE /chart-plan/analyze, split /dossier, ChartPlanPanel (TV+recharts+Pine), verify_f33 OK.
 

@@ -167,8 +167,18 @@ class DossierRefreshResponse(BaseModel):
     version: DossierVersion
 
 
+class ChartPlanAssessmentDimension(BaseModel):
+    summary: str = ""
+    stance: str | None = None
+    findings: list[str] = Field(default_factory=list)
+
+
 class ChartPlanAssessment(BaseModel):
     summary: str = ""
+    visual: ChartPlanAssessmentDimension | dict[str, Any] | None = None
+    narrative: ChartPlanAssessmentDimension | dict[str, Any] | None = None
+    sentiment_vs_price: ChartPlanAssessmentDimension | dict[str, Any] | None = None
+    multi_tf: ChartPlanAssessmentDimension | dict[str, Any] | None = None
     conflicts: list[str] = Field(default_factory=list)
     data_gaps: list[str] = Field(default_factory=list)
     bias_check: str = ""
@@ -252,6 +262,7 @@ class ChartPlanContent(BaseModel):
     assessment: ChartPlanAssessment | dict[str, Any]
     chart_data: ChartPlanChartData | dict[str, Any] | None = None
     summary: str | None = None
+    vision_used: bool | None = None
 
 
 class ChartPlanVersion(BaseModel):
@@ -264,3 +275,12 @@ class ChartPlanVersion(BaseModel):
 
 class ChartPlanAnalyzeResponse(BaseModel):
     version: ChartPlanVersion
+
+
+class ChartPlanAnalyzeRequest(BaseModel):
+    """Body opcional del analyze: captura real del Ticker Chart para visión."""
+
+    chart_image_base64: str | None = None
+    chart_image_media_type: str = "image/png"
+    # Vista Operator al momento de capturar (prefs del Ticker Chart).
+    chart_view: dict[str, Any] | None = None

@@ -19,8 +19,9 @@ Fase 2 del Dossier añade análisis visual y scripts Pine Script exportables. El
 - **Activación**: botón *Analizar gráficos* en `/dossier`; **no** corre al Refresh del Dossier textual.
 - **Prerequisito**: existe al menos un Dossier para el Ticker (contexto mínimo: narrativa + `sentiment_stats`).
 - **UI**: split horizontal en `/dossier` — Dossier texto (izquierda), **Chart Plan** (derecha): TradingView embed, gráficos propios, Pine, lectura objetiva.
-- **Chart Agent**: ReAct acotado (LangGraph, ADR-0006); máximo de rounds configurable; tools sobre Market Data (`get_quotes`, `get_price_history`), Corpus (`get_recent_signals`, `search_corpus`, `corpus_stats`) y lectura del último Dossier.
+- **Chart Agent**: ReAct acotado (LangGraph, ADR-0006) en el camino legacy; máximo de rounds configurable; tools sobre Market Data (`get_quotes`, `get_price_history`), Corpus (`get_recent_signals`, `search_corpus`, `corpus_stats`) y lectura del último Dossier. El camino preferido de latencia/profundidad es **Parallel Chart Gather** (ADR-0012).
 - **Stats determinísticas** siempre inyectadas antes de la síntesis (sentimiento, retornos de precio, conteos); el LLM interpreta, no inventa números.
+- **Visión del Ticker Chart real (post–ADR-0011)**: el frontend captura el stack de charts del Operator (PNG) y lo envía en `POST /chart-plan/{symbol}/analyze`; la síntesis usa modelo multimodal (`CHART_VISION_MODEL`, default `gpt-4o`) + stats. Sin captura → fallback texto+stats.
 - **Salida JSON** persistida: timeframes, vistas (`tradingview`, `sentiment_bars`, `signals_timeline`), `pine_scripts` (0–3, opcional), `assessment` obligatorio (`conflicts`, `data_gaps`, `bias_check`).
 - **Objetividad**: sin recomendaciones de compra/venta ni predicción de precio; debe declarar lecturas contradictorias y lagunas; Pine con `purpose` + `limitations`.
 - **Pine Script**: artefacto exportable (copiar a TradingView); el embed **no** ejecuta Pine custom.

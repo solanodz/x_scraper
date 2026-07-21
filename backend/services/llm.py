@@ -373,19 +373,24 @@ CHART_PLAN_SYSTEM_PROMPT = """Sos el planificador visual del Chart Plan de X Scr
 Objetivo: proponer timeframes, vistas de gráficos, indicadores técnicos y una **suggested_view** soft para el Ticker Chart (intervalo/ventana/indicadores), con lectura objetiva e interpretativa.
 
 Tenés acceso a:
-- **Dossier persistido** y stats determinísticas (sentimiento, retornos de precio, timeline de Signals, **technical_indicators**: SMA 20/50, Donchian 20, Fibonacci)
-- **Notas del Chart Agent** (recolección adicional de mercado y Corpus)
+- **Captura real del Ticker Chart** del Operator (imagen), cuando esté adjunta: precio + osciladores visibles (Oracle/RSI) tal como están en pantalla
+- **Dossier persistido** y stats determinísticas (sentimiento, retornos de precio, timeline de Signals, **technical_indicators**: SMA 20/50, Donchian 20, Fibonacci; opcional **multi_tf** e **interpreter_notes**)
+- **Notas del Chart Agent** o del **Parallel Chart Gather** (incluye Chart Interpreters por dimensión)
+- **chart_view** (prefs Operator al capturar), cuando venga en el contexto
 
 Reglas:
 - **No** des recomendaciones de compra/venta ni predicciones de precio.
-- No inventes números: usá `technical_indicators` y stats inyectadas; si faltan datos, declaralo en `data_gaps`.
-- **`indicator_readings` (obligatorio, 2–5 items)**: para cada indicador relevante (SMA, Donchian, Fibonacci, etc.) explicá qué nos indica en lenguaje claro. Ejemplo: "La SMA 20 en X con precio por encima sugiere momentum reciente constructivo en marco diario."
+- Si hay **imagen**: describí e interpretá lo que ves (estructura de precio, overlays, Oracle/RSI, divergencias Bull/Bear si aparecen). Eso es la verdad visual.
+- Si hay **Chart Interpreters** en las notas (sin imagen): usá esas lecturas como fuente primaria por dimensión; no inventes visión.
+- No inventes números: anclá precios/niveles a `technical_indicators` / `multi_tf` y stats inyectadas; si la imagen y los números divergen, declaralo en `conflicts` / `data_gaps`.
+- **`indicator_readings` (obligatorio, 2–5 items)**: para cada indicador relevante (SMA, Donchian, Fibonacci, RSI, Oracle, etc.) explicá qué nos indica en lenguaje claro. Ejemplo: "La SMA 20 en X con precio por encima sugiere momentum reciente constructivo en marco diario."
   - `stance`: `alcista`, `bajista` o `neutral`
   - `tv_study`: estudio built-in de TradingView equivalente cuando exista (`MASimple@tv-basicstudies`, `BB@tv-basicstudies`, etc.) con `inputs` (ej. `length: 20`). Fibonacci no tiene estudio automático: `tv_study` puede ser null.
 - **`tradingview_studies`**: lista de estudios built-in (máx. 6). Deben corresponder a los indicadores que interpretás.
 - **`suggested_view` (obligatorio)**: vista sugerida soft para el Ticker Chart Operator-first (intervalo Yahoo, ventana, SMA A/B, Donchian, Fib, volumen). El Operator decide aplicarla; no auto-aplica.
 - **Pine Script fuera del MVP**: omití `pine_scripts` o devolvé `[]`. No generés scripts Pine.
 - Declará `conflicts`, `data_gaps` y `bias_check`.
+- En `assessment`, incluí secciones por dimensión cuando haya evidencia: `visual`, `narrative`, `sentiment_vs_price`, `multi_tf` (cada una: summary, stance, findings).
 - Vistas MVP: `tradingview`, `sentiment_bars`, `signals_timeline`.
 
 Respondé **únicamente** con JSON válido (sin markdown) con este esquema:
@@ -421,6 +426,10 @@ Respondé **únicamente** con JSON válido (sin markdown) con este esquema:
   "pine_scripts": [],
   "assessment": {
     "summary": "...",
+    "visual": {"summary": "...", "stance": "neutral", "findings": ["..."]},
+    "narrative": {"summary": "...", "stance": "alcista", "findings": ["..."]},
+    "sentiment_vs_price": {"summary": "...", "stance": "bajista", "findings": ["..."]},
+    "multi_tf": {"summary": "...", "stance": "neutral", "findings": ["..."]},
     "conflicts": ["..."],
     "data_gaps": ["..."],
     "bias_check": "...",
@@ -501,28 +510,92 @@ def _mock_chart_plan_json(symbol: str, deterministic_stats: dict) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+_MAX_CHART_IMAGE_CHARS = 5_000_000  # ~base64 length guard
+
+
+def _normalize_chart_image(
+    chart_image_base64: str | None,
+    chart_image_media_type: str | None,
+) -> tuple[str | None, str]:
+    if not chart_image_base64 or not str(chart_image_base64).strip():
+        return None, "image/png"
+    raw = str(chart_image_base64).strip()
+    if raw.startswith("data:") and "," in raw:
+        header, raw = raw.split(",", 1)
+        if ";base64" in header and header.startswith("data:"):
+            media = header[5:].split(";")[0] or "image/png"
+        else:
+            media = "image/png"
+    else:
+        media = (chart_image_media_type or "image/png").strip() or "image/png"
+    if len(raw) > _MAX_CHART_IMAGE_CHARS:
+        return None, media
+    if media not in {"image/png", "image/jpeg", "image/webp", "image/gif"}:
+        media = "image/png"
+    return raw, media
+
+
 def _build_chart_plan_messages(
     context: str,
     *,
     gather_notes: str,
     deterministic_stats: dict,
     symbol: str,
-) -> list[dict[str, str]]:
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict | None = None,
+) -> list[dict]:
     import json
 
     stats_json = json.dumps(deterministic_stats, ensure_ascii=False, indent=2)
+    view_json = (
+        json.dumps(chart_view, ensure_ascii=False, indent=2)
+        if isinstance(chart_view, dict) and chart_view
+        else "(no enviada)"
+    )
+    image_b64, media = _normalize_chart_image(
+        chart_image_base64, chart_image_media_type
+    )
+    has_image = bool(image_b64)
+
+    text_body = (
+        f"Ticker: {symbol}\n\n"
+        f"Contexto Dossier + determinístico:\n\n{context}\n\n---\n\n"
+        f"Stats determinísticas (referencia, no inventar):\n{stats_json}\n\n---\n\n"
+        f"Vista Operator al capturar (chart_view):\n{view_json}\n\n---\n\n"
+        f"Notas del Chart Agent / Parallel Chart Gather:\n\n"
+        f"{gather_notes or '(sin recolección adicional)'}\n\n---\n\n"
+    )
+    if has_image:
+        text_body += (
+            "Hay una **imagen adjunta**: captura real del Ticker Chart del Operator "
+            "(velas + overlays + osciladores visibles). Priorizá la lectura visual; "
+            "anclá números a las stats. Generá el Chart Plan JSON del system prompt.\n"
+        )
+    else:
+        text_body += (
+            "No hay captura de chart en este request. Generá el Chart Plan JSON "
+            "usando solo texto/stats (sin visión).\n"
+        )
+
+    user_content: str | list[dict]
+    if has_image and image_b64:
+        user_content = [
+            {"type": "text", "text": text_body},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media};base64,{image_b64}",
+                    "detail": "high",
+                },
+            },
+        ]
+    else:
+        user_content = text_body
+
     return [
         {"role": "system", "content": CHART_PLAN_SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Ticker: {symbol}\n\n"
-                f"Contexto Dossier + determinístico:\n\n{context}\n\n---\n\n"
-                f"Stats determinísticas (referencia, no inventar):\n{stats_json}\n\n---\n\n"
-                f"Notas del Chart Agent:\n\n{gather_notes or '(sin recolección adicional)'}\n\n---\n\n"
-                "Generá el Chart Plan JSON siguiendo el esquema del system prompt."
-            ),
-        },
+        {"role": "user", "content": user_content},
     ]
 
 
@@ -532,14 +605,31 @@ def synthesize_chart_plan_answer(
     gather_notes: str,
     deterministic_stats: dict,
     symbol: str,
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict | None = None,
 ) -> str:
-    """Genera Chart Plan JSON grounded en Dossier y recolección del agente."""
+    """Genera Chart Plan JSON grounded en Dossier, stats y (opcional) visión del chart."""
     load_dotenv()
     if not os.getenv("OPENAI_API_KEY", "").strip():
         return _mock_chart_plan_json(symbol, deterministic_stats)
 
+    image_b64, media = _normalize_chart_image(
+        chart_image_base64, chart_image_media_type
+    )
     client = _get_client()
-    model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    if image_b64:
+        model = (
+            os.getenv("CHART_VISION_MODEL", "").strip()
+            or os.getenv("SYNTHESIS_MODEL", "gpt-4o").strip()
+            or "gpt-4o"
+        )
+        # Vision needs a multimodal-capable model; default to gpt-4o if mini was set.
+        if model.endswith("-mini") and not os.getenv("CHART_VISION_MODEL", "").strip():
+            model = "gpt-4o"
+    else:
+        model = os.getenv("SYNTHESIS_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+
     response = client.chat.completions.create(
         model=model,
         messages=_build_chart_plan_messages(
@@ -547,6 +637,9 @@ def synthesize_chart_plan_answer(
             gather_notes=gather_notes,
             deterministic_stats=deterministic_stats,
             symbol=symbol,
+            chart_image_base64=image_b64,
+            chart_image_media_type=media,
+            chart_view=chart_view,
         ),
         temperature=0.2,
         response_format={"type": "json_object"},
