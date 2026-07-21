@@ -180,8 +180,17 @@ def _cleanup(user_id: str) -> None:
     remove_watch(user_id=user_id, symbol=TEST_SYMBOL)
 
 
-def _fake_synthesize_chart_plan_json(*, context, deterministic_stats, gather_notes, symbol):
-    del context, gather_notes
+def _fake_synthesize_chart_plan_json(
+    *,
+    context,
+    deterministic_stats,
+    gather_notes,
+    symbol,
+    chart_image_base64=None,
+    chart_image_media_type="image/png",
+    chart_view=None,
+):
+    del context, gather_notes, chart_image_base64, chart_image_media_type, chart_view
     return {
         "timeframes": [{"interval": "D", "rationale": "mock"}],
         "views": [

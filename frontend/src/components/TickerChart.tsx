@@ -191,8 +191,8 @@ export function TickerChart({
             color: INDICATOR_COLORS.fib,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
-            axisLabelVisible: false,
-            title: `${level.ratio}`,
+            axisLabelVisible: true,
+            title: `Fib ${level.ratio}`,
           }),
         );
       }
