@@ -209,8 +209,17 @@ async def post_chart_plan_analyze(
         except ChartPlanRepoError as exc:
             payload = json.dumps({"detail": str(exc)})
             yield f"event: error\ndata: {payload}\n\n"
-        except RuntimeError as exc:
-            payload = json.dumps({"detail": str(exc)})
+        except Exception as exc:  # noqa: BLE001 — SSE debe cerrar con error visible
+            detail = str(exc).strip() or type(exc).__name__
+            # OpenAI 429 suele venir con mensaje largo; recortar para UI.
+            if "insufficient_quota" in detail or "RateLimitError" in type(exc).__name__:
+                detail = (
+                    "OpenAI sin cuota (429). Recargá billing en platform.openai.com "
+                    "para poder analizar gráficos."
+                )
+            elif len(detail) > 400:
+                detail = detail[:397] + "…"
+            payload = json.dumps({"detail": detail}, ensure_ascii=False)
             yield f"event: error\ndata: {payload}\n\n"
 
     return StreamingResponse(

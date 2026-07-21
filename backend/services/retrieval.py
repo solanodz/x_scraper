@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from scraper.embeddings import embed_texts
+from scraper.embeddings import embed_texts_safe
 from scraper.filters import build_sql_filter
 from scraper.store import connect
 
@@ -231,8 +231,20 @@ def retrieve(
     source_type: str | None = None,
     min_relevance: float | None = None,
 ) -> list[SignalHit]:
-    """Recupera Signals por similitud semántica; fallback a keywords si no hay hits."""
-    query_vector = _format_embedding(embed_texts([query])[0])
+    """Recupera Signals por similitud semántica; fallback a keywords si no hay hits o falla embed."""
+    embeddings = embed_texts_safe([query])
+    if not embeddings:
+        # Sin Vector Index (cuota OpenAI, key, red): no tumbar el API process.
+        return search_by_keywords(
+            query,
+            limit=limit,
+            ticker=ticker,
+            since_hours=since_hours,
+            source_type=source_type,
+            min_relevance=min_relevance,
+        )
+
+    query_vector = _format_embedding(embeddings[0])
 
     conditions = ["embedding IS NOT NULL"]
     params: dict[str, Any] = {
