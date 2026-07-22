@@ -60,3 +60,49 @@ body {
   animation-play-state: paused;
 }
 
+@keyframes landing-cinta {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-cinta-track {
+  animation: landing-cinta 18s linear 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-cinta-track {
+    animation: none;
+  }
+}
+
+@keyframes landing-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Grano tipo película: turbulence suave + blur para textura orgánica continua */
+.landing-grain {
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: soft-light;
+  filter: url(#hero-grain);
+}
+
+/* Fallback para navegadores que no resuelvan el filter por id: CSS background */
+@supports not (filter: url(#hero-grain)) {
+  .landing-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeGaussianBlur stdDeviation='0.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+}
+
