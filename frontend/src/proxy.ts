@@ -21,8 +21,9 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLogin = pathname.startsWith("/login");
   const isApi = pathname.startsWith("/api/");
+  const isLanding = pathname === "/";
 
-  if (!user && !isLogin && !isApi) {
+  if (!user && !isLogin && !isApi && !isLanding) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return withSessionCookies(NextResponse.redirect(url), supabaseResponse);
@@ -30,7 +31,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && isLogin) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/terminal";
     return withSessionCookies(NextResponse.redirect(url), supabaseResponse);
   }
 
