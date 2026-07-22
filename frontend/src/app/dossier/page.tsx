@@ -32,7 +32,7 @@ function DossierPageContent() {
   }, [symbol, router]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
       <TerminalHeader />
       <QuoteStrip />
       <div className="flex min-h-0 flex-1">

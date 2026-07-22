@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "X Scraper Terminal",
-  description: "Financial intelligence terminal powered by X Corpus + Research Chat",
+  description:
+    "Terminal de inteligencia financiera: Corpus de X, Research Chat, Dossier y Chart Plan.",
 };
 
 export default function RootLayout({
@@ -24,12 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="h-full overflow-hidden bg-zinc-950 text-zinc-100">
-        {children}
-      </body>
+      <body className="min-h-full bg-zinc-950 text-zinc-100">{children}</body>
     </html>
   );
 }

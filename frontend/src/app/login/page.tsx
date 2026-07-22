@@ -30,11 +30,11 @@ export default function LoginPage() {
       return;
     }
 
-    window.location.href = "/";
+    window.location.href = "/terminal";
   }
 
   return (
-    <div className="grid h-full min-h-screen lg:grid-cols-2">
+    <div className="grid h-[100dvh] min-h-screen overflow-hidden lg:grid-cols-2">
       {/* Formulario */}
       <div className="flex flex-col justify-center bg-zinc-950 px-6 py-12 sm:px-12 lg:px-16">
         <div className="mx-auto w-full max-w-sm">

@@ -8,7 +8,11 @@ import { createClient } from "@/lib/supabase/client";
 import TickerWatchPopover from "@/components/TickerWatchPopover";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Terminal", match: (path: string) => path === "/" },
+  {
+    href: "/terminal",
+    label: "Terminal",
+    match: (path: string) => path === "/terminal" || path.startsWith("/terminal/"),
+  },
   {
     href: "/dossier",
     label: "Dossier",
