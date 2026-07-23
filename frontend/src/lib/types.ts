@@ -147,8 +147,18 @@ export interface DossierVersion {
   created_at: string;
 }
 
+export interface ChartPlanAssessmentDimension {
+  summary?: string;
+  stance?: "alcista" | "bajista" | "neutral" | string | null;
+  findings?: string[];
+}
+
 export interface ChartPlanAssessment {
   summary?: string;
+  visual?: ChartPlanAssessmentDimension | null;
+  narrative?: ChartPlanAssessmentDimension | null;
+  sentiment_vs_price?: ChartPlanAssessmentDimension | null;
+  multi_tf?: ChartPlanAssessmentDimension | null;
   conflicts: string[];
   data_gaps: string[];
   bias_check: string;

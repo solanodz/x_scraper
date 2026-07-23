@@ -222,12 +222,20 @@ Gráfico interactivo de precio del Ticker en `/dossier` (velas OHLC + indicadore
 _Avoid_: TradingView widget, price pane, chart widget, timeframe (usar intervalo + ventana)
 
 **Chart Plan**:
-Artefacto on-demand en `/dossier` producido por el **Chart Agent**: lecturas interpretativas de indicadores, assessment objetivo y gráficos del Corpus. No captura el control del **Ticker Chart**; puede ofrecer una sugerencia soft (“Aplicar vista del Chart Plan”) que el Operator acepta o ignora. Si la vista del Ticker Chart diverge de la del Plan, las lecturas se marcan desactualizadas. Persistente y versionado por Ticker, independiente del Dossier. Pine Script exportable queda fuera del MVP actual.
+Artefacto on-demand en `/dossier` producido por el **Chart Agent**: lecturas interpretativas de indicadores, assessment objetivo (incluye dimensiones visual, narrativa Corpus, sentimiento vs precio, TA multi-ventana) y gráficos del Corpus. No captura el control del **Ticker Chart**; puede ofrecer una sugerencia soft (“Aplicar vista del Chart Plan”) que el Operator acepta o ignora. Si la vista del Ticker Chart diverge de la del Plan, las lecturas se marcan desactualizadas. Persistente y versionado por Ticker, independiente del Dossier. Pine Script exportable queda fuera del MVP actual.
 _Avoid_: Technical analysis report, trading setup, buy signal, Pine chart
 
 **Chart Agent**:
-Agente autónomo on-demand que genera un **Chart Plan**. Interpreta Market Data, Corpus y Dossier sin inventar números; produce `indicator_readings` y assessment (`conflicts`, `data_gaps`, `bias_check`). No bloquea ni reemplaza el control Operator-first del **Ticker Chart**.
-_Avoid_: Trading bot, chart generator, TA guru
+Orquestador on-demand que genera un **Chart Plan**. Con **Parallel Chart Gather** activo: gather concurrente + **Chart Interpreters** en paralelo + una sola síntesis (sin ReAct secuencial). Captura el **Ticker Chart** real del Operator para el interpreter de visión; ancla números en stats determinísticas. Produce `indicator_readings` y assessment enriquecido (`conflicts`, `data_gaps`, `bias_check` + lecturas por dimensión). No bloquea ni reemplaza el control Operator-first del **Ticker Chart**. Ver ADR-0012.
+_Avoid_: Trading bot, chart generator, TA guru, parallel agents
+
+**Parallel Chart Gather**:
+Ejecución concurrente del análisis del Chart Plan: lanes determinísticas (Market/TA, Corpus, sentimiento stats, Dossier, captura del Ticker Chart) más **Chart Interpreters** LLM en paralelo, cerradas por un único sintetizador. Sustituye el ReAct secuencial del Chart Agent cuando el flag de parallel está activo. Distinto de **Parallel Research** (Research Chat). Ver ADR-0012.
+_Avoid_: Parallel agents, sub-agents, chart workers, map-reduce
+
+**Chart Interpreter**:
+Lectura LLM acotada a una dimensión del Chart Plan dentro del **Parallel Chart Gather**. Cuatro roles: (1) visión del Ticker Chart, (2) narrativa del Corpus, (3) sentimiento vs precio, (4) TA multi-ventana (`5d·15m`, `3mo·1d`, `1y·1d`). No genera el Chart Plan solo; alimenta al sintetizador. Ver ADR-0012.
+_Avoid_: Sub-agent, specialist agent, vision bot, news bot
 
 **Análisis integral**:
 Síntesis multi-capa que alimenta un Dossier o una respuesta del Research Chat: no es una noticia aislada ni una sola tool, sino la combinación explícita de narrativa (Corpus), mercado, fundamentos y sentimiento con incertidumbre declarada donde falten datos.

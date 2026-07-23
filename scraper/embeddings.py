@@ -47,16 +47,17 @@ def build_embedding_document(record: dict[str, Any]) -> str:
     return "\n\n".join(parts)
 
 
+class EmbeddingError(RuntimeError):
+    """Fallo de embeddings (key ausente, cuota, red). No usa sys.exit."""
+
+
 def _get_openai_client() -> OpenAI:
     load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        print(
-            "Error: OPENAI_API_KEY no configurada en .env (requerida para Vector Index).\n"
-            "Usá --skip-embeddings para desarrollo sin API key.",
-            file=sys.stderr,
+        raise EmbeddingError(
+            "OPENAI_API_KEY no configurada en .env (requerida para Vector Index)."
         )
-        sys.exit(1)
     return OpenAI(api_key=api_key)
 
 
@@ -79,21 +80,26 @@ def embed_texts_safe(texts: list[str]) -> list[list[float]] | None:
         )
         ordered = sorted(response.data, key=lambda item: item.index)
         return [item.embedding for item in ordered]
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — degradación controlada
+        print(
+            f"Warning: embeddings OpenAI fallaron ({type(exc).__name__}); "
+            "continuando sin Vector Index.",
+            file=sys.stderr,
+        )
         return None
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Genera embeddings en batch vía OpenAI API."""
+    """Genera embeddings en batch vía OpenAI API. Raises EmbeddingError (no sys.exit)."""
     if not texts:
         return []
 
     result = embed_texts_safe(texts)
     if result is None:
-        _get_openai_client()  # missing key: mensaje + sys.exit(1)
-        print(
-            "Error: falló la API de embeddings de OpenAI.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        load_dotenv()
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            raise EmbeddingError(
+                "OPENAI_API_KEY no configurada en .env (requerida para Vector Index)."
+            )
+        raise EmbeddingError("Falló la API de embeddings de OpenAI.")
     return result

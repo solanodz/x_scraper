@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from backend.app.auth import get_current_user, operator_id_from_user
-from backend.app.schemas import ChartPlanVersion
+from backend.app.schemas import ChartPlanAnalyzeRequest, ChartPlanVersion
 from backend.app.services.chart_plan_repo import (
     ChartPlanRepoError,
     get_latest,
@@ -133,13 +133,22 @@ async def _sse_chart_plan_analyze(
     *,
     operator_id: str,
     symbol: str,
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
     loop = asyncio.get_event_loop()
 
     def _next_chunk(iterator):
         return next(iterator, None)
 
-    stream = iter_chart_plan_analyze_stream(operator_id, symbol)
+    stream = iter_chart_plan_analyze_stream(
+        operator_id,
+        symbol,
+        chart_image_base64=chart_image_base64,
+        chart_image_media_type=chart_image_media_type,
+        chart_view=chart_view,
+    )
     pending_content: dict[str, Any] | None = None
     pending_dossier_id: str | None = None
     while True:
@@ -171,6 +180,7 @@ async def _sse_chart_plan_analyze(
 @router.post("/{symbol}/analyze")
 async def post_chart_plan_analyze(
     symbol: str,
+    body: ChartPlanAnalyzeRequest | None = None,
     user: dict | None = Depends(get_current_user),
 ) -> StreamingResponse:
     _require_chart_plan_tables()
@@ -185,11 +195,19 @@ async def post_chart_plan_analyze(
             detail="dossier not found — generate dossier first",
         )
 
+    request = body or ChartPlanAnalyzeRequest()
+    chart_image = request.chart_image_base64
+    media_type = request.chart_image_media_type or "image/png"
+    chart_view = request.chart_view
+
     async def _stream() -> AsyncIterator[str]:
         try:
             async for event in _sse_chart_plan_analyze(
                 operator_id=operator_id,
                 symbol=canonical,
+                chart_image_base64=chart_image,
+                chart_image_media_type=media_type,
+                chart_view=chart_view,
             ):
                 yield event
         except ChartPlanNoDossierError as exc:
@@ -201,8 +219,17 @@ async def post_chart_plan_analyze(
         except ChartPlanRepoError as exc:
             payload = json.dumps({"detail": str(exc)})
             yield f"event: error\ndata: {payload}\n\n"
-        except RuntimeError as exc:
-            payload = json.dumps({"detail": str(exc)})
+        except Exception as exc:  # noqa: BLE001 — SSE debe cerrar con error visible
+            detail = str(exc).strip() or type(exc).__name__
+            # OpenAI 429 suele venir con mensaje largo; recortar para UI.
+            if "insufficient_quota" in detail or "RateLimitError" in type(exc).__name__:
+                detail = (
+                    "OpenAI sin cuota (429). Recargá billing en platform.openai.com "
+                    "para poder analizar gráficos."
+                )
+            elif len(detail) > 400:
+                detail = detail[:397] + "…"
+            payload = json.dumps({"detail": detail}, ensure_ascii=False)
             yield f"event: error\ndata: {payload}\n\n"
 
     return StreamingResponse(

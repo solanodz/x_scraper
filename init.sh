@@ -104,6 +104,15 @@ fi
 if [ -f "backend/scripts/verify_f33.py" ]; then
   python -m py_compile backend/scripts/verify_f33.py
 fi
+if [ -f "backend/services/chart_interpreters.py" ]; then
+  python -m py_compile backend/services/chart_interpreters.py
+fi
+if [ -f "backend/services/parallel_chart_gather.py" ]; then
+  python -m py_compile backend/services/parallel_chart_gather.py
+fi
+if [ -f "backend/scripts/verify_f35.py" ]; then
+  python -m py_compile backend/scripts/verify_f35.py
+fi
 
 # --- Docker services (Store: Postgres + pgvector) ---
 if [ -f "docker-compose.yml" ] || [ -f "compose.yaml" ]; then

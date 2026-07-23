@@ -273,20 +273,31 @@ def chart_plan_content_payload(content: dict[str, Any]) -> dict[str, Any]:
         payload["symbol"] = content["symbol"]
     if content.get("mock"):
         payload["mock"] = True
+    if content.get("vision_used"):
+        payload["vision_used"] = True
     return payload
 
 
 def _synthesize_plan(
     gather: ChartPlanGather,
     gather_notes: str,
+    *,
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     plan = synthesize_chart_plan_json(
         context=gather.dossier_context_text,
         deterministic_stats=gather.deterministic_stats,
         gather_notes=gather_notes,
         symbol=gather.symbol,
+        chart_image_base64=chart_image_base64,
+        chart_image_media_type=chart_image_media_type,
+        chart_view=chart_view,
     )
     plan["symbol"] = gather.symbol
+    if chart_image_base64:
+        plan["vision_used"] = True
     if not _openai_configured():
         plan["mock"] = True
     return plan
@@ -320,15 +331,130 @@ def generate_chart_plan(
     return content, gather.dossier_version_id
 
 
+def _iter_parallel_chart_plan_stream(
+    user_id: str,
+    symbol: str,
+    *,
+    chart_image_base64: str | None,
+    chart_image_media_type: str,
+    chart_view: dict[str, Any] | None,
+) -> Iterator:
+    """Parallel Chart Gather + síntesis (sin ReAct; ADR-0012)."""
+    import queue
+    import threading
+
+    from backend.services.parallel_chart_gather import (
+        format_interpreter_notes_for_synthesis,
+        run_parallel_chart_gather,
+    )
+
+    normalized = _normalize_symbol(symbol)
+    has_vision = bool(chart_image_base64 and str(chart_image_base64).strip())
+    step_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
+    holder: dict[str, Any] = {}
+
+    def on_step(event: ResearchStepEvent) -> None:
+        step_queue.put(("step", event))
+
+    def worker() -> None:
+        try:
+            holder["result"] = run_parallel_chart_gather(
+                user_id=user_id,
+                symbol=normalized,
+                chart_image_base64=chart_image_base64,
+                chart_image_media_type=chart_image_media_type,
+                chart_view=chart_view,
+                on_step=on_step,
+            )
+        except Exception as exc:  # noqa: BLE001 — re-raise en el consumer
+            holder["error"] = exc
+        finally:
+            step_queue.put(("done", None))
+
+    threading.Thread(target=worker, daemon=True).start()
+    while True:
+        kind, payload = step_queue.get()
+        if kind == "step":
+            yield payload
+        elif kind == "done":
+            break
+
+    if "error" in holder:
+        raise holder["error"]
+
+    parallel_result = holder["result"]
+    gather = parallel_result.gather
+    gather_notes = format_interpreter_notes_for_synthesis(
+        parallel_result.interpreter_notes
+    )
+    if parallel_result.corpus_notes:
+        gather_notes = (
+            f"{gather_notes}\n\n# Corpus (raw)\n\n{parallel_result.corpus_notes}"
+        )
+
+    yield ResearchStepEvent(
+        tool="synthesis",
+        label="Sintetizando Chart Plan (Parallel Chart Gather)…",
+        status="running",
+    )
+
+    # Visión ya corrió en Chart Interpreter; no reenviar imagen al sintetizador.
+    content = _synthesize_plan(
+        gather,
+        gather_notes,
+        chart_image_base64=None,
+        chart_image_media_type=chart_image_media_type,
+        chart_view=chart_view,
+    )
+    if has_vision:
+        content["vision_used"] = True
+    if parallel_result.data_gaps:
+        assessment = content.get("assessment")
+        if isinstance(assessment, dict):
+            gaps = assessment.get("data_gaps")
+            if not isinstance(gaps, list):
+                gaps = []
+            for gap in parallel_result.data_gaps:
+                if gap not in gaps:
+                    gaps.append(gap)
+            assessment["data_gaps"] = gaps
+
+    yield ResearchStepEvent(
+        tool="synthesis",
+        label="Sintetizando Chart Plan (Parallel Chart Gather)…",
+        status="done",
+    )
+    yield content
+    yield gather.dossier_version_id
+
+
 def iter_chart_plan_analyze_stream(
     user_id: str,
     symbol: str,
+    *,
+    chart_image_base64: str | None = None,
+    chart_image_media_type: str = "image/png",
+    chart_view: dict[str, Any] | None = None,
 ) -> Iterator:
     """Pipeline SSE: pasos de recolección + síntesis; el caller persiste."""
     if not chart_agent_enabled():
         raise ChartPlanDisabledError("Chart Agent deshabilitado (CHART_AGENT_ENABLED=false)")
 
+    from backend.services.parallel_chart_gather import chart_parallel_enabled
+
+    if chart_parallel_enabled():
+        yield from _iter_parallel_chart_plan_stream(
+            user_id,
+            symbol,
+            chart_image_base64=chart_image_base64,
+            chart_image_media_type=chart_image_media_type,
+            chart_view=chart_view,
+        )
+        return
+
     normalized = _normalize_symbol(symbol)
+    has_vision = bool(chart_image_base64 and str(chart_image_base64).strip())
+
     yield ResearchStepEvent(
         tool="chart_plan",
         label=f"Verificando Dossier de {normalized}…",
@@ -367,15 +493,29 @@ def iter_chart_plan_analyze_stream(
 
     yield ResearchStepEvent(
         tool="synthesis",
-        label="Sintetizando Chart Plan…",
+        label=(
+            "Interpretando captura del Ticker Chart…"
+            if has_vision
+            else "Sintetizando Chart Plan…"
+        ),
         status="running",
     )
 
-    content = _synthesize_plan(gather, gather_notes)
+    content = _synthesize_plan(
+        gather,
+        gather_notes,
+        chart_image_base64=chart_image_base64,
+        chart_image_media_type=chart_image_media_type,
+        chart_view=chart_view,
+    )
 
     yield ResearchStepEvent(
         tool="synthesis",
-        label="Sintetizando Chart Plan…",
+        label=(
+            "Interpretando captura del Ticker Chart…"
+            if has_vision
+            else "Sintetizando Chart Plan…"
+        ),
         status="done",
     )
 

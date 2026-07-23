@@ -55,6 +55,7 @@ export function TickerChartStack({
     <div
       className={`flex min-h-0 flex-col gap-1.5 ${className}`}
       data-component="ticker-chart-stack"
+      data-ticker-chart-stack="1"
     >
       <div className={fillPrice ? "min-h-0 flex-1" : undefined}>
         <TickerChart

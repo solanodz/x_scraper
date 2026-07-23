@@ -653,13 +653,25 @@ export class ChartPlanAnalyzeError extends Error {
   }
 }
 
+export type ChartPlanAnalyzeBody = {
+  chart_image_base64?: string | null;
+  chart_image_media_type?: string;
+  chart_view?: Record<string, unknown> | null;
+};
+
 export async function streamChartPlanAnalyze(
   symbol: string,
   callbacks: StreamChartPlanCallbacks,
   signal?: AbortSignal,
+  body?: ChartPlanAnalyzeBody,
 ): Promise<void> {
   const normalized = normalizeDossierSymbol(symbol);
   const headers = await authHeaders();
+  const payload: ChartPlanAnalyzeBody = {
+    chart_image_base64: body?.chart_image_base64 ?? null,
+    chart_image_media_type: body?.chart_image_media_type ?? "image/png",
+    chart_view: body?.chart_view ?? null,
+  };
 
   try {
     await fetchEventSource(
@@ -670,6 +682,7 @@ export async function streamChartPlanAnalyze(
           "Content-Type": "application/json",
           ...headers,
         },
+        body: JSON.stringify(payload),
         signal,
         async onopen(res) {
           if (res.status === 503) {
