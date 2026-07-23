@@ -286,3 +286,79 @@ class ChartPlanAnalyzeRequest(BaseModel):
     chart_image_media_type: str = "image/png"
     # Vista Operator al momento de capturar (prefs del Ticker Chart).
     chart_view: dict[str, Any] | None = None
+
+
+# --- Paper Bot (F47) ---
+
+
+class BotConfig(BaseModel):
+    operator_id: str
+    armed: bool = False
+    symbols: list[str] = Field(default_factory=lambda: ["BTC", "ETH"])
+    max_positions: int = Field(default=2, ge=1, le=10)
+    donchian_period: int = Field(default=20, ge=2)
+    donchian_interval: str = "30m"
+    size_usd: float = Field(default=1000, gt=0)
+    leverage: float = Field(default=1, gt=0)
+    tp_pct: float = Field(default=2, gt=0)
+    sl_pct: float = Field(default=1, gt=0)
+    venue: str = "paper"
+    cooldown_seconds: int = Field(default=3600, ge=0)
+    updated_at: datetime | None = None
+
+
+class BotConfigPatch(BaseModel):
+    armed: bool | None = None
+    symbols: list[str] | None = None
+    max_positions: int | None = Field(default=None, ge=1, le=10)
+    donchian_period: int | None = Field(default=None, ge=2)
+    donchian_interval: str | None = None
+    size_usd: float | None = Field(default=None, gt=0)
+    leverage: float | None = Field(default=None, gt=0)
+    tp_pct: float | None = Field(default=None, gt=0)
+    sl_pct: float | None = Field(default=None, gt=0)
+    venue: str | None = None
+    cooldown_seconds: int | None = Field(default=None, ge=0)
+
+
+class BotPosition(BaseModel):
+    id: str
+    operator_id: str
+    symbol: str
+    side: str
+    size_usd: float
+    qty: float
+    leverage: float
+    entry_price: float
+    tp_price: float
+    sl_price: float
+    status: str
+    opened_at: datetime
+    closed_at: datetime | None = None
+    close_reason: str | None = None
+    realized_pnl: float | None = None
+    venue: str
+    external_id: str | None = None
+    mark_price: float | None = None
+
+
+class BotFill(BaseModel):
+    id: str
+    position_id: str
+    operator_id: str
+    symbol: str
+    side: str
+    price: float
+    qty: float
+    venue: str
+    created_at: datetime
+    raw: dict[str, Any] = Field(default_factory=dict)
+
+
+class BotEvent(BaseModel):
+    id: str
+    operator_id: str
+    kind: str
+    symbol: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime

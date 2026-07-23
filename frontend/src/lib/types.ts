@@ -254,3 +254,63 @@ export interface PriceCandlesResponse {
   data_points: number;
   error?: string | null;
 }
+
+/** Paper Bot operator config (GET/PATCH /bot/config). */
+export interface BotConfig {
+  operator_id: string;
+  armed: boolean;
+  symbols: string[];
+  max_positions: number;
+  donchian_period: number;
+  donchian_interval: string;
+  size_usd: number;
+  leverage: number;
+  tp_pct: number;
+  sl_pct: number;
+  venue: string;
+  cooldown_seconds: number;
+  updated_at?: string | null;
+}
+
+export type BotPositionSide = "long" | "short";
+
+/** Paper/live position from Execution Venue. */
+export interface BotPosition {
+  id: string;
+  symbol: string;
+  side: BotPositionSide;
+  size_usd: number;
+  qty?: number | null;
+  leverage: number;
+  entry_price: number;
+  tp_price: number;
+  sl_price: number;
+  status: string;
+  opened_at: string;
+  closed_at?: string | null;
+  close_reason?: string | null;
+  realized_pnl?: number | null;
+  mark_price?: number | null;
+  venue: string;
+}
+
+/** Fill record from Venue open/close. */
+export interface BotFill {
+  id: string;
+  position_id: string;
+  symbol: string;
+  side: string;
+  price: number;
+  qty: number;
+  venue: string;
+  created_at: string;
+}
+
+/** Audit trail row from bot_events. */
+export interface BotEvent {
+  id: string;
+  kind: string;
+  symbol?: string | null;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+}

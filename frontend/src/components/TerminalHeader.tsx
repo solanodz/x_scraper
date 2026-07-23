@@ -23,6 +23,11 @@ const NAV_ITEMS = [
     label: "Dossier",
     match: (path: string) => path.startsWith("/dossier"),
   },
+  {
+    href: "/bot",
+    label: "Bot",
+    match: (path: string) => path === "/bot" || path.startsWith("/bot/"),
+  },
 ] as const;
 
 interface TerminalHeaderProps {

@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FeedFilterQuery } from "./feedFilters";
 import type {
+  BotConfig,
+  BotEvent,
+  BotFill,
+  BotPosition,
   ChartPlanVersion,
   ChatArtifact,
   ChatCitation,
@@ -658,6 +662,80 @@ export type ChartPlanAnalyzeBody = {
   chart_image_media_type?: string;
   chart_view?: Record<string, unknown> | null;
 };
+
+export async function getBotConfig(): Promise<BotConfig> {
+  const res = await fetch(`${API_URL}/bot/config`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch bot config: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function patchBotConfig(
+  partial: Partial<BotConfig>,
+): Promise<BotConfig> {
+  const res = await fetch(`${API_URL}/bot/config`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify(partial),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update bot config: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function listBotPositions(
+  status?: "open" | "closed",
+): Promise<BotPosition[]> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  const query = params.toString();
+  const res = await fetch(
+    `${API_URL}/bot/positions${query ? `?${query}` : ""}`,
+    { headers: await authHeaders() },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch bot positions: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function closeBotPosition(id: string): Promise<BotPosition> {
+  const res = await fetch(`${API_URL}/bot/positions/${encodeURIComponent(id)}/close`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to close bot position: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function listBotFills(): Promise<BotFill[]> {
+  const res = await fetch(`${API_URL}/bot/fills`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch bot fills: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function listBotEvents(): Promise<BotEvent[]> {
+  const res = await fetch(`${API_URL}/bot/events`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch bot events: ${res.status}`);
+  }
+  return res.json();
+}
 
 export async function streamChartPlanAnalyze(
   symbol: string,

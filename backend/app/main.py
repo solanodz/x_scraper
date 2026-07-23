@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.app.auth import PUBLIC_PATHS, auth_enabled, verify_token
+from backend.app.routes.bot import router as bot_router
 from backend.app.routes.chart_plan import router as chart_plan_router
 from backend.app.routes.chat import router as chat_router
 from backend.app.routes.dossier import router as dossier_router
@@ -77,6 +78,7 @@ app.include_router(chart_plan_router)
 app.include_router(ingest_router)
 app.include_router(quotes_router)
 app.include_router(watch_router)
+app.include_router(bot_router)
 
 
 @app.get("/health")

@@ -1,6 +1,6 @@
-# Railway — API + Worker
+# Railway — API + Worker + Trader
 
-Deploy both backend services from the monorepo root using the root `Dockerfile`. Railway builds one image; each service overrides only the start command and environment.
+Deploy backend services from the monorepo root using the root `Dockerfile`. Railway builds one image; each service overrides only the start command and environment.
 
 ## Prerequisites
 
@@ -12,14 +12,15 @@ Deploy both backend services from the monorepo root using the root `Dockerfile`.
 
 1. **New Project** → Deploy from GitHub → select this repo.
 2. Railway detects the root `Dockerfile` automatically.
-3. Create **two services** from the same repo (duplicate the service or add a second one):
+3. Create **three services** from the same repo (duplicate the service or add more):
 
 | Service | Start command |
 |---------|---------------|
 | `xscraper-api` | *(vacío — usa `CMD` del Dockerfile)* o ver abajo |
 | `xscraper-worker` | `python -m scraper.worker --interval 1800` |
+| `xscraper-trader` | `python -m backend.scripts.run_paper_bot` |
 
-Both services use the same Dockerfile build; only the start command differs.
+All services use the same Dockerfile build; only the start command differs.
 
 > **API y `$PORT`:** con Dockerfile, Railway no expande `$PORT` en exec form. El `CMD` del Dockerfile ya usa `sh -c` con `${PORT}`. Dejá el **Custom Start Command vacío** en el API, o usá:
 >
@@ -104,6 +105,40 @@ Railway → Worker service → **Volumes** → add volume, mount path `/data`.
 | `SIGNAL_REQUIRE_LINK` | no | Same as API |
 
 `X_COOKIES` and `ACCOUNTS_DB` must **never** appear on the API service or in git.
+
+## Service 3: `xscraper-trader`
+
+**Start command:**
+
+```bash
+python -m backend.scripts.run_paper_bot
+```
+
+Always-on **Paper Bot** loop (Donchian + TP/SL via PaperVenue). Same image as API/Worker; no HTTP port required.
+
+**Environment variables:**
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `DATABASE_URL` | yes | Same Store as API (prefer direct/session pooler for long-lived loop) |
+| `BOT_ENABLED` | yes | `true` to run ticks; `false` sleeps |
+| `BOT_OPERATOR_ID` | yes* | Supabase Auth user UUID (same Operator as `/bot`). *Or set `LOCAL_OPERATOR_ID`; if omitted and exactly one `bot_config` row exists, that id is used |
+| `BOT_TICK_SECONDS` | no | Default `30` |
+| `BOT_VENUE` | no | Default `paper`; `hyperliquid` fails closed in MVP |
+| `FINNHUB_API_KEY` | recommended | OHLC / marks via Market Data |
+| `ALPHA_VANTAGE_API_KEY` | no | Fallback quotes |
+| `AUTH_ENABLED` | no | Not required (no HTTP) |
+
+**Go-live checklist**
+
+1. Create Railway service from same repo/image as API.
+2. Start command: `python -m backend.scripts.run_paper_bot`
+3. Copy `DATABASE_URL` + market data keys from API.
+4. Set `BOT_ENABLED=true`, `BOT_VENUE=paper`, `BOT_OPERATOR_ID=<your Supabase user uuid>`.
+5. In the app `/bot`: Arm the bot, confirm symbols BTC/ETH and risk params.
+6. Watch Railway logs: `tick armed=True opened=…` (opens only on Donchian breakouts).
+
+Do **not** put `X_COOKIES` on the trader. Hyperliquid private keys are out of scope for MVP.
 
 ## Verification
 

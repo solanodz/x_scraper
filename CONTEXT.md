@@ -240,3 +240,35 @@ _Avoid_: Sub-agent, specialist agent, vision bot, news bot
 **Análisis integral**:
 Síntesis multi-capa que alimenta un Dossier o una respuesta del Research Chat: no es una noticia aislada ni una sola tool, sino la combinación explícita de narrativa (Corpus), mercado, fundamentos y sentimiento con incertidumbre declarada donde falten datos.
 _Avoid_: Deep dive, comprehensive report, full analysis
+
+**Paper Bot**:
+Proceso always-on (Railway `xscraper-trader`) que opera un universo permitido (MVP: BTC y ETH) bajo una **Strategy** + **Risk Policy** vía un **Execution Venue**. Abre/cierra long y short, gestiona TP/SL en background y expone config/estado al Operator en `/bot`. Modo paper ahora; puerto listo para Hyperliquid (stub fail-closed). No es consejo de inversión; paper fills ≠ fills reales de exchange.
+_Avoid_: algo trading tip, autotrader tip, signal tip bot, on-chain bot
+
+**Strategy**:
+Reglas determinísticas de entrada/salida del Paper Bot. MVP: **Donchian Breakout** (period/interval configurables; defaults 20 / `30m`). No LLM ni Chart Agent.
+_Avoid_: trading tip engine, AI entry model, signal tip generator
+
+**Risk Policy**:
+Límites y defaults de tamaño (notional USD), leverage, take-profit y stop-loss del Paper Bot. MVP: estáticos en **Bot Config** (Operator). Más adelante puede incorporar sentimiento del Corpus u otras variables sin cambiar el puerto del Execution Venue. Caps: `max_positions` ∈ [1, 10]; una sola Position open por símbolo.
+_Avoid_: money management tip, Kelly tip, portfolio allocator
+
+**Trade Signal**:
+Evento interno de entrada del Paper Bot `{symbol, side, reason, bar_ts, meta}`. **No** es un **Signal** del Corpus.
+_Avoid_: algo trading tip, signal tip, buy signal (como sinónimo de Trade Signal)
+
+**Position**:
+Posición open o closed (paper o live futuro) con entry, size, leverage, TP, SL y PnL realizado al cierre.
+_Avoid_: trade lot, open order book row
+
+**Fill**:
+Registro de ejecución producido por un Execution Venue (apertura o cierre).
+_Avoid_: on-chain fill, exchange receipt (como sinónimo genérico en paper)
+
+**Execution Venue**:
+Puerto de open/close/marks del Paper Bot. Implementaciones: `PaperVenue` (fills al mark de Market Data) y `HyperliquidVenue` (stub; falla cerrado sin credenciales). Env `BOT_VENUE=paper` por defecto.
+_Avoid_: broker adapter tip, exchange driver tip
+
+**Bot Config**:
+Configuración del Paper Bot por Operator: armed/paused, symbols, max_positions, params Donchian, defaults de Risk Policy y venue activo.
+_Avoid_: bot settings tip, trading prefs tip

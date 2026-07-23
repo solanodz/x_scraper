@@ -2,29 +2,22 @@
 
 ## Estado actual
 
-**Listo para prod.** Research Chat v2 (F39–F45), Morning Briefing Email (F46), lectura Terminal (F36–F37), Chart Plan F35, landing + `/terminal` + `/research`.
+**F47 `passing`.** Paper Bot listo para Railway (`xscraper-trader`), UI sin demo, paper live autónomo.
 
 ## Próximo paso
 
-1. Cron Morning Briefing ~08:00 ART en Railway (sin `--dry-run`)
-2. Confirmar env prod: `RESEND_*`, `BRIEFING_EMAIL_*`, `FRONTEND_BASE_URL=https://myterm.solanodz.com`, `CHART_PARALLEL_ENABLED` si se quiere on
-3. F38 Article Body enrichment (aparte)
+1. Push `main` + deploy Vercel
+2. Railway: crear `xscraper-trader`
+   - Start: `python -m backend.scripts.run_paper_bot`
+   - Env: `BOT_ENABLED=true`, `BOT_VENUE=paper`, `BOT_OPERATOR_ID=<supabase user uuid>`, `DATABASE_URL`, `FINNHUB_API_KEY`
+3. En `/bot` → **Armed**
+4. Logs: ticks cada 30s; opens solo con breakout Donchian 30m
 
 ## Notas
 
-- 2026-07-23 — Push a prod: merge main (F35) + landing/Research/Briefing Email.
-- 2026-07-23 — Fix HTML Briefing Email: parser línea-a-línea, FX tabla, CTAs a `myterm.solanodz.com`.
-- 2026-07-23 — F46 passing (`verify_f46_briefing_email OK`); migración `013_briefing_email_log`.
-- 2026-07-20 — F35 passing (Parallel Chart Gather, ADR-0012).
+- 2026-07-23 — Removido demo UI. Trader resuelve operator vía `BOT_OPERATOR_ID` / `LOCAL_OPERATOR_ID` / única fila `bot_config`.
+- 2026-07-23 — F47 PASSING (verify_f47 + /bot UI).
 
-## Roadmap Briefing Email
+## Roadmap Paper Bot
 
-- **F46** Morning Briefing Email (`passing`)
-
-## Roadmap lectura Terminal
-
-- **F36** / **F37** `passing` · **F38** `pending`
-
-## Roadmap Chart Plan (ADR-0010 / ADR-0011 / ADR-0012)
-
-- **F33** / **F34** / **F35** `passing`
+- **F47** Paper Bot (`passing`)

@@ -911,6 +911,29 @@
         "2026-07-23: briefing_email orchestrator + CLI send_morning_briefing + log 013",
         "2026-07-23: .venv/bin/python -m backend.scripts.verify_f46_briefing_email => OK"
       ]
+    },
+    {
+      "id": "F47",
+      "priority": 47,
+      "title": "Paper Bot BTC/ETH (Donchian + TP/SL, Hyperliquid-ready)",
+      "user_visible_behavior": "El Operator arma un Paper Bot always-on para BTC y ETH: entradas Donchian long/short, hasta 10 posiciones (máx. 1 por símbolo), size/leverage/TP/SL configurables, cierre automático por TP/SL en background. UI /bot muestra config, posiciones y fills. Venue paper ahora; contrato listo para Hyperliquid (stub).",
+      "status": "passing",
+      "dependencies": [
+        "F7",
+        "F34"
+      ],
+      "notes": "Spec docs/superpowers/specs/2026-07-23-paper-bot-hyperliquid-ready-design.md. ADR-0015. Servicio Railway xscraper-trader.",
+      "verification": [
+        "verify_f47_paper_bot: fixture breakout abre posición paper; TP/SL cierra; HL stub fail-closed",
+        "GET/PATCH /bot/config + GET /bot/positions OK",
+        "UI /bot: armed toggle + tabla posiciones; npm run build OK",
+        "Paused: no nuevas entradas; TP/SL sigue en abiertas"
+      ],
+      "evidence": [
+        "2026-07-23: ADR-0015, migrations 014 (applied Supabase), bot_repo, Donchian/Strategy/PaperVenue/HL stub, API /bot/*, run_paper_bot",
+        "2026-07-23: .venv/bin/python -m backend.scripts.verify_f47_paper_bot => OK",
+        "2026-07-23: frontend /bot + TerminalHeader Bot nav; tsc --noEmit OK"
+      ]
     }
   ]
 }
