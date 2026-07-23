@@ -47,6 +47,7 @@ python -m py_compile \
   backend/services/research_gather.py \
   backend/services/research_agent.py \
   backend/services/corpus_stats.py \
+  backend/services/fx.py \
   backend/services/market_data.py \
   backend/app/__init__.py \
   backend/app/auth.py \

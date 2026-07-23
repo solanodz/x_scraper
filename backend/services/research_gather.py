@@ -20,6 +20,8 @@ class ResearchContext:
     hits: list[SignalHit] = field(default_factory=list)
     market_sections: list[str] = field(default_factory=list)
     corpus_sections: list[str] = field(default_factory=list)
+    dossier_sections: list[str] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def record_tool_result(
@@ -74,7 +76,11 @@ def record_tool_result(
             if arguments.get(key) is not None:
                 parts.append(f"{key}={arguments.get(key)!r}")
         label = f"corpus_stats({', '.join(parts) or ''})"
-        context.corpus_sections.append(f"### {label}\n{result}")
+        context.corpus_sections.append(
+            f"### {label}\n"
+            "<!-- Usar estos números en tablas markdown GFM; no inventar filas -->\n"
+            f"{result}"
+        )
 
     elif tool_name == "get_price_history":
         parts = []
@@ -83,6 +89,26 @@ def record_tool_result(
         if arguments.get("period"):
             parts.append(f"period={arguments.get('period')!r}")
         label = f"get_price_history({', '.join(parts) or ''})"
+        context.market_sections.append(f"### {label}\n{result}")
+        from backend.services.tools import build_price_chart_artifact
+
+        artifact = build_price_chart_artifact(result)
+        if artifact:
+            context.artifacts.append(artifact)
+
+    elif tool_name == "get_dossier":
+        parts = []
+        if arguments.get("symbol"):
+            parts.append(f"symbol={arguments.get('symbol')!r}")
+        label = f"get_dossier({', '.join(parts) or ''})"
+        context.dossier_sections.append(f"### {label}\n{result}")
+
+    elif tool_name == "get_fx_quotes":
+        parts = []
+        for key in ("scope", "base", "quote", "pairs"):
+            if arguments.get(key) is not None:
+                parts.append(f"{key}={arguments.get(key)!r}")
+        label = f"get_fx_quotes({', '.join(parts) or ''})"
         context.market_sections.append(f"### {label}\n{result}")
 
     elif tool_name in {"get_quotes", "get_watchlist_quotes"}:

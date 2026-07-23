@@ -19,23 +19,45 @@ interface SignalDetailProps {
   idStr: string | null;
 }
 
+/** True when Article Body is real content, not a summary echo. */
+function hasFullArticleBody(
+  body?: string | null,
+  summary?: string | null,
+): boolean {
+  const trimmedBody = body?.trim() ?? "";
+  if (!trimmedBody) return false;
+
+  const trimmedSummary = summary?.trim() ?? "";
+  if (trimmedSummary && trimmedBody === trimmedSummary) return false;
+
+  // Meaningful length, or clearly longer than the summary when both exist.
+  if (trimmedBody.length >= 200) return true;
+  if (trimmedSummary && trimmedBody.length > trimmedSummary.length * 1.5) {
+    return true;
+  }
+  return false;
+}
+
 export default function SignalDetail({ idStr }: SignalDetailProps) {
   const [signal, setSignal] = useState<SignalDetailType | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [heroBroken, setHeroBroken] = useState(false);
 
   useEffect(() => {
     if (!idStr) {
       setSignal(null);
       setQuotes([]);
       setError(null);
+      setHeroBroken(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setHeroBroken(false);
 
     fetchSignal(idStr)
       .then((data) => {
@@ -88,16 +110,18 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
       : null;
 
   const isX = signal ? isXSignal(signal.source_type) : true;
-  const headline =
-    signal?.title?.trim() ||
-    (isX ? signal?.raw_content : "") ||
-    "";
-  const bodyText =
-    !isX && signal?.body?.trim()
-      ? signal.body.trim()
-      : !isX && signal?.summary?.trim()
-        ? signal.summary.trim()
-        : signal?.raw_content || "";
+  const hasFullBody =
+    !isX && signal
+      ? hasFullArticleBody(signal.body, signal.summary)
+      : false;
+  const newsReadingText = !isX
+    ? hasFullBody
+      ? (signal?.body?.trim() ?? "")
+      : signal?.summary?.trim() ||
+        signal?.body?.trim() ||
+        signal?.raw_content ||
+        ""
+    : "";
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
@@ -107,11 +131,13 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
         </h2>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4">
         {!idStr && (
-          <p className="font-mono text-xs text-zinc-500">
-            Select a signal from the feed.
-          </p>
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+            <p className="font-mono text-xs text-zinc-500">
+              Seleccioná un Signal del Feed.
+            </p>
+          </div>
         )}
         {loading && (
           <p className="font-mono text-xs text-zinc-500">Loading…</p>
@@ -131,9 +157,48 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
             </div>
 
             {!isX && signal.title?.trim() && (
-              <h3 className="font-sans text-sm font-semibold leading-snug text-zinc-100">
-                {signal.title.trim()}
-              </h3>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-sans text-sm font-semibold leading-snug text-zinc-100">
+                    {signal.title.trim()}
+                  </h3>
+                  {hasFullBody ? (
+                    <span className="shrink-0 rounded border border-emerald-800/40 bg-emerald-950/25 px-1.5 py-0.5 font-sans text-[10px] font-medium text-emerald-400/90">
+                      Artículo completo
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-400">
+                      Solo summary
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isX && !signal.title?.trim() && (
+              <div>
+                {hasFullBody ? (
+                  <span className="inline-block rounded border border-emerald-800/40 bg-emerald-950/25 px-1.5 py-0.5 font-sans text-[10px] font-medium text-emerald-400/90">
+                    Artículo completo
+                  </span>
+                ) : (
+                  <span className="inline-block rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-400">
+                    Solo summary
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!isX && signal.image_url && !heroBroken && (
+              // eslint-disable-next-line @next/next/no-img-element -- hotlinked publisher URLs; not in next/image remotePatterns
+              <img
+                src={signal.image_url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={() => setHeroBroken(true)}
+                className="max-h-56 w-full rounded-md object-cover"
+              />
             )}
 
             {signal.cluster_sources && signal.cluster_sources.length > 1 && (
@@ -158,9 +223,29 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
               </div>
             )}
 
-            <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-zinc-200">
-              {isX ? signal.raw_content : bodyText || headline}
-            </p>
+            {isX ? (
+              <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-zinc-200">
+                {signal.raw_content}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {newsReadingText && (
+                  <p className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-zinc-200">
+                    {newsReadingText}
+                  </p>
+                )}
+                {!hasFullBody && (
+                  <a
+                    href={externalLinkHref(signal)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center font-sans text-sm font-medium text-amber-500 hover:text-amber-400"
+                  >
+                    Leer en la fuente →
+                  </a>
+                )}
+              </div>
+            )}
 
             {signal.cashtags.length > 0 && (
               <div className="space-y-2">
@@ -216,14 +301,16 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
               </div>
             )}
 
-            <a
-              href={externalLinkHref(signal)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block font-mono text-[11px] text-amber-600 hover:text-amber-400"
-            >
-              {externalLinkLabel(signal.source_type)} →
-            </a>
+            {(isX || hasFullBody) && (
+              <a
+                href={externalLinkHref(signal)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block font-mono text-[11px] text-amber-600 hover:text-amber-400"
+              >
+                {externalLinkLabel(signal.source_type)} →
+              </a>
+            )}
           </div>
         )}
       </div>

@@ -20,6 +20,28 @@ import {
 } from "@/lib/briefingMarkdown";
 import type { ChatCitation } from "@/lib/types";
 
+/** ISO FX codes are not Tickers — never open Dossier/Chart Plan for them. */
+const FX_CURRENCY_CODES = new Set([
+  "USD",
+  "ARS",
+  "EUR",
+  "GBP",
+  "JPY",
+  "BRL",
+  "CNY",
+  "MXN",
+  "CLP",
+  "UYU",
+  "CAD",
+  "AUD",
+  "CHF",
+  "NZD",
+]);
+
+function isFxCurrencyCode(symbol: string): boolean {
+  return FX_CURRENCY_CODES.has(symbol.trim().toUpperCase());
+}
+
 interface ChatMarkdownProps {
   content: string;
   streaming?: boolean;
@@ -109,6 +131,9 @@ function createBaseComponents(
     a: ({ href, children }) => {
       if (href?.startsWith("dossier:") && onDossierClick) {
         const symbol = href.slice("dossier:".length).trim().toUpperCase();
+        if (symbol && isFxCurrencyCode(symbol)) {
+          return <span className="font-mono text-zinc-400">{children}</span>;
+        }
         if (symbol) {
           return (
             <button
@@ -133,7 +158,7 @@ function createBaseComponents(
           <button
             type="button"
             onClick={() => onCitationClick(idStr)}
-            title="Abrir Signal en el panel"
+            title="Abrir Signal en Terminal"
             className={`${linkClassName} cursor-pointer bg-transparent p-0 font-inherit`}
           >
             {children}
@@ -179,20 +204,27 @@ function createBaseComponents(
       </pre>
     ),
     table: ({ children }) => (
-      <div className="mb-2 overflow-x-auto last:mb-0">
-        <table className="w-full border-collapse font-mono text-[11px] text-zinc-200">
+      <div className="mb-3 overflow-x-auto rounded-md border border-zinc-800 last:mb-0">
+        <table className="w-full min-w-[16rem] border-collapse font-mono text-[11px] leading-snug text-zinc-200">
           {children}
         </table>
       </div>
     ),
     thead: ({ children }) => (
-      <thead className="border-b border-zinc-700 text-zinc-400">{children}</thead>
+      <thead className="bg-zinc-900/90 text-zinc-400">{children}</thead>
+    ),
+    tbody: ({ children }) => (
+      <tbody className="[&_tr:nth-child(even)]:bg-zinc-950/60">{children}</tbody>
     ),
     th: ({ children }) => (
-      <th className="px-2 py-1 text-left font-semibold">{children}</th>
+      <th className="whitespace-nowrap border-b border-zinc-700 px-2.5 py-1.5 text-left font-semibold">
+        {children}
+      </th>
     ),
     td: ({ children }) => (
-      <td className="border-t border-zinc-800 px-2 py-1">{children}</td>
+      <td className="border-t border-zinc-800/80 px-2.5 py-1.5 align-top text-zinc-300">
+        {children}
+      </td>
     ),
   };
 }
@@ -211,6 +243,9 @@ function createBriefingComponents(
     a: ({ href, children }) => {
       if (href?.startsWith("dossier:") && onDossierClick) {
         const symbol = href.slice("dossier:".length).trim().toUpperCase();
+        if (symbol && isFxCurrencyCode(symbol)) {
+          return <span className="font-mono text-zinc-400">{children}</span>;
+        }
         if (symbol) {
           return (
             <button
@@ -235,7 +270,7 @@ function createBriefingComponents(
           <button
             type="button"
             onClick={() => onCitationClick(idStr)}
-            title="Abrir Signal en el panel"
+            title="Abrir Signal en Terminal"
             className={`${briefingLinkClassName} cursor-pointer bg-transparent p-0 font-inherit`}
           >
             {children}

@@ -37,6 +37,7 @@ _COMMON_COLUMNS = """
     topic,
     relevance_score,
     cluster_id,
+    image_url,
     ingested_at
 """
 
@@ -65,6 +66,7 @@ _COMMON_VALUES = """
     %(topic)s,
     %(relevance_score)s,
     %(cluster_id)s,
+    %(image_url)s,
     now()
 """
 
@@ -85,6 +87,7 @@ ON CONFLICT (id_str) DO UPDATE SET
     relevance_score = EXCLUDED.relevance_score,
     canonical_url = EXCLUDED.canonical_url,
     cluster_id = COALESCE(EXCLUDED.cluster_id, signals.cluster_id),
+    image_url = COALESCE(EXCLUDED.image_url, signals.image_url),
     source_type = EXCLUDED.source_type,
     payload = EXCLUDED.payload,
     reply_count = CASE
@@ -126,6 +129,7 @@ ON CONFLICT (id_str) DO UPDATE SET
     relevance_score = EXCLUDED.relevance_score,
     canonical_url = EXCLUDED.canonical_url,
     cluster_id = COALESCE(EXCLUDED.cluster_id, signals.cluster_id),
+    image_url = COALESCE(EXCLUDED.image_url, signals.image_url),
     source_type = EXCLUDED.source_type,
     payload = EXCLUDED.payload,
     embedding = EXCLUDED.embedding,
@@ -231,6 +235,9 @@ def record_to_params(record: dict[str, Any]) -> dict[str, Any]:
         "topic": record.get("topic"),
         "relevance_score": relevance_score,
         "cluster_id": record.get("cluster_id"),
+        "image_url": (str(record["image_url"]).strip() or None)
+        if record.get("image_url")
+        else None,
     }
 
 
@@ -333,14 +340,26 @@ def update_signal_body(
     *,
     body: str,
     raw_content: str,
+    image_url: str | None = None,
 ) -> None:
     """Persiste Article Body extraído sin re-ingestar el Signal completo."""
-    sql = """
-        UPDATE signals
-        SET body = %s,
-            raw_content = %s
-        WHERE id_str = %s
-    """
+    if image_url:
+        sql = """
+            UPDATE signals
+            SET body = %s,
+                raw_content = %s,
+                image_url = COALESCE(image_url, %s)
+            WHERE id_str = %s
+        """
+        params: tuple[Any, ...] = (body, raw_content, image_url, id_str)
+    else:
+        sql = """
+            UPDATE signals
+            SET body = %s,
+                raw_content = %s
+            WHERE id_str = %s
+        """
+        params = (body, raw_content, id_str)
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (body, raw_content, id_str))
+            cur.execute(sql, params)

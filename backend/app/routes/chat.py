@@ -31,7 +31,7 @@ from backend.app.services.chat_repo import (
 from backend.services.ask import ask_stream
 from backend.services.briefing import iter_briefing_stream
 from backend.services.chat_history import prepare_chat_history
-from backend.services.research_steps import ResearchStepEvent
+from backend.services.research_steps import ChatArtifact, ResearchStepEvent
 from backend.services.types import Citation
 from fastapi.responses import StreamingResponse
 
@@ -72,12 +72,17 @@ def _message_to_schema(row: dict[str, Any]) -> ChatMessageRecord:
     citations: list[ChatCitation] | None = None
     if isinstance(citations_raw, list):
         citations = [ChatCitation(**item) for item in citations_raw if isinstance(item, dict)]
+    artifacts_raw = row.get("artifacts")
+    artifacts: list[dict[str, Any]] | None = None
+    if isinstance(artifacts_raw, list):
+        artifacts = [item for item in artifacts_raw if isinstance(item, dict)]
     return ChatMessageRecord(
         id=row["id"],
         session_id=row["session_id"],
         role=row["role"],
         content=row["content"],
         citations=citations,
+        artifacts=artifacts,
         created_at=row["created_at"],
     )
 
@@ -143,6 +148,10 @@ async def _consume_stream_chunks(
         if isinstance(chunk, ResearchStepEvent):
             payload = chunk.to_dict()
             yield f"event: step\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        elif isinstance(chunk, ChatArtifact):
+            payload = chunk.to_dict()
+            yield f"event: artifact\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            yield ("__artifact__", payload)
         elif isinstance(chunk, list):
             payload = _citation_payload(chunk)
             yield f"event: citations\ndata: {json.dumps(payload)}\n\n"
@@ -189,6 +198,7 @@ async def _sse_research_stream(
     stream = stream_factory(chat_history, sid)
     answer_parts: list[str] = []
     citations: list[Citation] = []
+    artifacts: list[dict[str, Any]] = []
 
     async for item in _consume_stream_chunks(stream, loop):
         if isinstance(item, tuple):
@@ -197,6 +207,9 @@ async def _sse_research_stream(
                 answer_parts.append(value)
             elif kind == "__citations__":
                 citations = value
+            elif kind == "__artifact__":
+                if isinstance(value, dict):
+                    artifacts.append(value)
             continue
         yield item
 
@@ -208,6 +221,7 @@ async def _sse_research_stream(
             role="assistant",
             content=answer,
             citations=_citation_payload(citations) if citations else None,
+            artifacts=artifacts or None,
         )
 
 
@@ -221,7 +235,11 @@ async def _sse_chat_stream(
         query,
         operator_id=operator_id,
         session_id=session_id,
-        stream_factory=lambda history, sid: ask_stream(query, history=history),
+        stream_factory=lambda history, sid: ask_stream(
+            query,
+            history=history,
+            operator_id=operator_id,
+        ),
     ):
         yield event
 

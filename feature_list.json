@@ -31,7 +31,9 @@
       "title": "Store: schema de Signals + persistencia",
       "user_visible_behavior": "El scraper actual persiste Signals en Postgres (tabla signals) deduplicados por id_str, en vez de solo escribir JSON.",
       "status": "passing",
-      "dependencies": ["F1"],
+      "dependencies": [
+        "F1"
+      ],
       "verification": [
         "Correr la ingesta contra unas pocas Sources",
         "SELECT count(*) FROM signals > 0",
@@ -50,7 +52,9 @@
       "title": "Worker: Ingestion (cron + Refresh) con Vector Index",
       "user_visible_behavior": "El Worker corre la Ingestion periódicamente y bajo demanda, escribiendo Signal + embedding (pgvector) en la misma transacción.",
       "status": "passing",
-      "dependencies": ["F2"],
+      "dependencies": [
+        "F2"
+      ],
       "verification": [
         "Ejecutar el Worker una vez",
         "SELECT count(*) FROM signals WHERE embedding IS NOT NULL > 0",
@@ -70,7 +74,9 @@
       "title": "Core Services: search / summarize / ask",
       "user_visible_behavior": "Capa de servicios independiente de HTTP que resuelve búsqueda semántica, resumen por ticker/fecha y ask RAG con Citations.",
       "status": "passing",
-      "dependencies": ["F3"],
+      "dependencies": [
+        "F3"
+      ],
       "verification": [
         "Test/script: search('inflation') devuelve Signals relevantes ordenados por similitud",
         "ask('resumen $TSLA 24h') devuelve texto con al menos una Citation a un Signal real",
@@ -89,7 +95,9 @@
       "title": "API: REST + Feed Stream (SSE) + Chat Stream",
       "user_visible_behavior": "FastAPI expone endpoints de Signals, un Feed Stream SSE que empuja Signals nuevos, y un Chat Stream que streamea la respuesta del Research Chat token a token.",
       "status": "passing",
-      "dependencies": ["F4"],
+      "dependencies": [
+        "F4"
+      ],
       "verification": [
         "GET /signals devuelve lista paginada",
         "curl al endpoint SSE recibe un evento al ingerir un Signal nuevo",
@@ -110,7 +118,9 @@
       "title": "Web: Terminal de 3 paneles",
       "user_visible_behavior": "Next.js renderiza la Terminal: Signal Feed (arriba), Signal Detail (abajo izq), Research Chat (abajo der). El feed se actualiza vía SSE y el chat streamea.",
       "status": "passing",
-      "dependencies": ["F5"],
+      "dependencies": [
+        "F5"
+      ],
       "verification": [
         "Abrir la Terminal en el navegador y ver Signals en el Feed",
         "Click en un Signal muestra su Detail",
@@ -129,7 +139,9 @@
       "title": "Market Data: Quote Strip + Signal Detail",
       "user_visible_behavior": "La Terminal muestra Quotes de la Watchlist fija en una Quote Strip bajo el header (badge 15m delayed), y enriquece los cashtags del Signal seleccionado con precio y variación % vía Alpha Vantage.",
       "status": "passing",
-      "dependencies": ["F6"],
+      "dependencies": [
+        "F6"
+      ],
       "verification": [
         "GET /quotes/watchlist devuelve Quotes para tickers de WATCHLIST",
         "GET /quotes?symbols=AAPL devuelve precio y cambio %",
@@ -150,7 +162,9 @@
       "title": "Research Chat: agente Corpus + Market Data",
       "user_visible_behavior": "El Research Chat responde preguntas variadas usando herramientas: busca Signals en el Corpus, consulta precios de Tickers y cruza ambas fuentes para análisis (ej. precio de NVDA + qué dicen en X).",
       "status": "passing",
-      "dependencies": ["F7"],
+      "dependencies": [
+        "F7"
+      ],
       "verification": [
         "Tools search_corpus y get_quotes ejecutan correctamente",
         "gather_agent_context reúne Market Data + Corpus para queries sobre tickers",
@@ -169,7 +183,9 @@
       "user_visible_behavior": "Terminal en URL pública con login Supabase; API y Worker en Railway; Store en Supabase.",
       "status": "passing",
       "notes": "Deploy prod completo: Railway API+Worker, Vercel frontend, Supabase Store. Auth + SSE + Chat + Quotes + ingesta verificados en producción.",
-      "dependencies": ["F8"],
+      "dependencies": [
+        "F8"
+      ],
       "verification": [
         "Login en Vercel → acceso a Terminal",
         "GET /signals sin token → 401 en producción",
@@ -192,7 +208,9 @@
       "title": "News Source: Alpha Vantage (Corpus multi-fuente)",
       "user_visible_behavior": "El Signal Feed muestra noticias financieras de Alpha Vantage (título, resumen, tickers, sentiment), no solo tweets de X. Los Signals son source-agnostic y un Source Adapter normaliza cada fuente.",
       "status": "passing",
-      "dependencies": ["F3"],
+      "dependencies": [
+        "F3"
+      ],
       "notes": "Primera feature del Corpus multi-fuente (ADR-0004). Source Adapters + schema multi-fuente. AV comparte cuota diaria con Quote Strip; RssNewsAdapter como fallback $0 cuando AV throttled.",
       "verification": [
         "Correr el adapter de Alpha Vantage (worker/script) contra NEWS_SENTIMENT",
@@ -213,7 +231,9 @@
       "title": "RSS + Article Body (profundidad)",
       "user_visible_behavior": "El Corpus incorpora noticias vía RSS de medios abiertos, y cada Signal de noticia guarda el Article Body extraído (best-effort trafilatura, fallback a summary). El Research Chat cita contenido con cuerpo real, no solo títulos.",
       "status": "passing",
-      "dependencies": ["F10"],
+      "dependencies": [
+        "F10"
+      ],
       "notes": "Sources RSS curadas hacia medios extraíbles (Yahoo Finance, CNBC, BBC). Article Enrichment con trafilatura; paywalls/bot-block (MarketWatch, Google News wrappers) => fallback summary. Embedding Document pasa a title+summary+body.",
       "verification": [
         "Correr el adapter RSS contra feeds configurados",
@@ -235,7 +255,9 @@
       "title": "Relevance Score (LLM) para bajar ruido",
       "user_visible_behavior": "El Signal Feed se rankea y filtra por un Relevance Score (0–1) asignado en la Ingestion, mostrando primero lo relevante y descartando ruido.",
       "status": "passing",
-      "dependencies": ["F10"],
+      "dependencies": [
+        "F10"
+      ],
       "notes": "Pase LLM barato en Ingestion: relevance_score + tópico + tickers faltantes. Reusa sentiment/tickers de la fuente cuando existen. Complementa al Signal Filter por reglas.",
       "verification": [
         "Cada Signal nuevo persiste con relevance_score entre 0 y 1",
@@ -256,7 +278,9 @@
       "title": "Story Cluster (dedup cross-source)",
       "user_visible_behavior": "La misma noticia llegada por varias fuentes (AV, RSS, X) se muestra una sola vez en el feed, indicando de qué fuentes vino.",
       "status": "passing",
-      "dependencies": ["F11"],
+      "dependencies": [
+        "F11"
+      ],
       "notes": "Dedup por URL canónica + near-duplicate por similitud de embedding. cluster_id agrupa Signals de la misma historia.",
       "verification": [
         "Dos Signals de la misma noticia (distinta fuente) comparten cluster_id",
@@ -277,7 +301,9 @@
       "title": "X como complemento",
       "user_visible_behavior": "X deja de ser la fuente primaria y queda como complemento de reacción/chatter, integrado como un Source Adapter más junto a las News Sources.",
       "status": "passing",
-      "dependencies": ["F10"],
+      "dependencies": [
+        "F10"
+      ],
       "notes": "Demote de twscrape a fuente secundaria. Ajuste de sources/queries de X hacia reacción a noticias. Mantiene graceful degradation si twscrape falla.",
       "verification": [
         "El Worker corre News Sources aunque twscrape falle (no aborta la Ingestion)",
@@ -297,7 +323,9 @@
       "title": "Chat Session (historial Research Chat)",
       "user_visible_behavior": "El Research Chat persiste mensajes y Citations por sesión. Al recargar la Terminal se restaura el historial; el Operator puede abrir sesiones anteriores o iniciar una nueva.",
       "status": "passing",
-      "dependencies": ["F6"],
+      "dependencies": [
+        "F6"
+      ],
       "notes": "Tablas chat_sessions + chat_messages (local Store + Supabase). user_id desde JWT sub o LOCAL_OPERATOR_ID sin auth. Citations en JSONB por mensaje assistant.",
       "verification": [
         "POST /chat con session_id persiste mensaje user y assistant en chat_messages",
@@ -318,7 +346,9 @@
       "title": "RSS noticias Argentina",
       "user_visible_behavior": "El Corpus incorpora noticias de medios argentinos (Ámbito, La Nación, Infobae, Google News AR) vía RSS, con Article Body en español cuando trafilatura lo permite.",
       "status": "passing",
-      "dependencies": ["F11"],
+      "dependencies": [
+        "F11"
+      ],
       "notes": "ARGENTINA_FEEDS en scraper/adapters/rss.py; flag RSS_AR_FEEDS_ENABLED. Google News AR = metadata (wrapper); medios directos extraen body.",
       "verification": [
         "Ingesta RSS trae Signals de Ámbito / La Nación / Infobae",
@@ -339,7 +369,10 @@
       "title": "Acceso confiable al Corpus (retrieval)",
       "user_visible_behavior": "El Research Chat encuentra de forma confiable las noticias recientes y relevantes que aparecen en el Signal Feed (ej. 'dame la última noticia de MSFT' devuelve la del feed, no una vieja o ninguna).",
       "status": "passing",
-      "dependencies": ["F8", "F12"],
+      "dependencies": [
+        "F8",
+        "F12"
+      ],
       "notes": "Prerrequisito duro de F18 (LangGraph). Tres partes: (1) cobertura de embeddings — subir/forzar backfill para reducir Signals sin vector; (2) tool get_recent_signals(ticker?, source_type?, hours?, limit?) ordenada por published_at (lee del Store como el feed); (3) fallback por keyword en título/summary recientes cuando la búsqueda vectorial no trae hits. Recency boost y re-embed on Refresh quedan fuera de alcance.",
       "verification": [
         "Query 'última noticia de MSFT' en el Research Chat cita el Signal más reciente de MSFT del feed",
@@ -361,7 +394,10 @@
       "title": "Research Agent con LangGraph",
       "user_visible_behavior": "El Research Chat orquesta research multi-paso con LangGraph: filtra por ticker/tipo/fecha/relevancia, hace análisis de mercado y tendencias (precio + narrativa), lectura profunda de artículos, y recuerda el hilo de la conversación. Streaming y Citations sin cambios visibles de contrato.",
       "status": "passing",
-      "dependencies": ["F15", "F17"],
+      "dependencies": [
+        "F15",
+        "F17"
+      ],
       "notes": "Ver ADR-0006. LangGraph + langchain-core + langchain-openai; retrieval propio. ReAct prebuilt primero (create_react_agent), grafo custom después. 7 tools: search_corpus (+source_type,+min_relevance), get_recent_signals, get_signal_detail, corpus_stats, get_quotes, get_watchlist_quotes, get_price_history (yfinance). Citations derivadas del estado. Memoria vía chat_messages (sin checkpointer). Modelo configurable (RESEARCH_MODEL/SYNTHESIS_MODEL, default gpt-4o-mini). LangSmith opt-in. Flag RESEARCH_ENGINE=langgraph|legacy (default legacy hasta verificar). Backend-only, contrato SSE intacto.",
       "verification": [
         "Con RESEARCH_ENGINE=langgraph, /chat mantiene el contrato SSE (session, tokens, citations)",
@@ -385,7 +421,9 @@
       "title": "Ticker Watch (lista personal del Operator)",
       "user_visible_behavior": "El Operator sigue Tickers a mano desde la Terminal: los agrega por símbolo o nombre de empresa (Intel → INTC), los ve listados y los quita. La lista persiste por Operator entre sesiones.",
       "status": "passing",
-      "dependencies": ["F9"],
+      "dependencies": [
+        "F9"
+      ],
       "notes": "Tabla dedicada ticker_watch (no JSONB en operator_settings). Supabase: user_id UUID + FK auth.users + RLS (migración 007_ticker_watch.sql). Store local: user_id TEXT sin FK (006_ticker_watch.sql), patrón chat. Símbolo canónico vía resolve_ticker_input; canonicalizar + aceptar (sin validar contra quote). Repo filtra por user_id explícito (como chat_repo) + operator_id_from_user. Columna note/thesis nullable desde ya para interpretación futura. UI: popover 'Watch' en TerminalHeader, add con autocomplete fetchTickerSuggestions, quitar con ×. Filtro 'Mis tickers' en el feed queda fuera de alcance (requiere multi-ticker backend).",
       "verification": [
         "POST /watch con 'Intel' persiste INTC canónico (una fila por operator+symbol)",
@@ -408,7 +446,10 @@
       "title": "Briefing on-demand del Ticker Watch",
       "user_visible_behavior": "El Operator pide un Briefing de sus Tickers seguidos y recibe, por cada Ticker con novedad, precio + Signals recientes + una interpretación 'qué implica / qué mirar', con Citations. Se muestra como mensaje del Research Chat y permite follow-up.",
       "status": "passing",
-      "dependencies": ["F18", "F19"],
+      "dependencies": [
+        "F18",
+        "F19"
+      ],
       "notes": "Ver ADR-0007. Servicio determinístico backend/services/briefing.py: por cada Ticker del Ticker Watch llama get_recent_signals (default 24h) + fetch_quotes, luego una síntesis grounded única (reusa stream_answer + Citations). Cobertura garantizada (itera en código, no vía agente). Interpretación analítica: sin recomendaciones compra/venta ni predicción de precios; toda afirmación respaldada por Signal. Orden por relevancia/movimiento; Tickers sin novedad en línea compacta 'Sin novedades'. Entrega streaming SSE reusando contrato Chat Stream + ResearchStepLoader (pasos 'Revisando NVDA…'). Render como mensaje del Research Chat (queda en Chat Session, habilita follow-up). On-demand (botón), sin cron. Ventana configurable (BRIEFING_WINDOW_HOURS default 24).",
       "verification": [
         "Con Tickers en el Ticker Watch, el Briefing cubre cada uno con novedad",
@@ -432,7 +473,9 @@
       "title": "Briefing memo de decisión",
       "user_visible_behavior": "El Briefing prioriza lo material: resumen ejecutivo, hasta 2 tickers en prioridad alta (hecho → implicación → qué mirar → riesgo), otras novedades compactas, lista de sin novedades, temas cruzados y preguntas abiertas. Sin calls compra/venta.",
       "status": "passing",
-      "dependencies": ["F20"],
+      "dependencies": [
+        "F20"
+      ],
       "notes": "Memo B (grill). Top 2 prioridad_alta en código (_slice_sort_key). Reescribir BRIEFING_SYSTEM_PROMPT + _build_context con tags prioridad_alta. verify_f21.py.",
       "verification": [
         "Contexto marca top 2 tickers con novedad como prioridad_alta: true",
@@ -452,7 +495,9 @@
       "title": "Thesis por ticker en Ticker Watch",
       "user_visible_behavior": "El Operator escribe una Thesis opcional por ticker en Watch (expand inline). El Briefing incluye alineación refuerza/neutral/tensiona en tickers con novedad.",
       "status": "passing",
-      "dependencies": ["F21"],
+      "dependencies": [
+        "F21"
+      ],
       "notes": "Columna note=Thesis. PATCH /watch/{symbol}. UI TickerWatchPopover expand inline. briefing.py incluye thesis en contexto. verify_f23.py.",
       "verification": [
         "PATCH /watch/NVDA persiste thesis",
@@ -472,7 +517,9 @@
       "title": "Briefing delta vs anterior",
       "user_visible_behavior": "Si existe un Briefing previo (sesión Briefing %), el nuevo abre con delta: nuevo / sin cambio material / cambió el tono.",
       "status": "passing",
-      "dependencies": ["F21"],
+      "dependencies": [
+        "F21"
+      ],
       "notes": "chat_repo.get_previous_briefing. Una pasada LLM con briefing anterior en contexto (cap 6k). Omitir bloque si no hay previo. verify_f22.py.",
       "verification": [
         "Con Briefing previo, contexto incluye texto anterior",
@@ -494,7 +541,9 @@
       "title": "Parallel Research para cobertura garantizada",
       "user_visible_behavior": "El Research Chat cubre comparaciones multi-Ticker y follow-ups conversacionales con Parallel Research determinístico (cotizaciones + señales + corpus por Ticker en paralelo). Queries temáticas sin Ticker siguen en ReAct.",
       "status": "passing",
-      "dependencies": ["F18"],
+      "dependencies": [
+        "F18"
+      ],
       "notes": "Ver ADR-0008. Híbrido: extract_tickers → Parallel Research; historial sin tickers → Research Plan → Parallel Research; resto ReAct. Flag RESEARCH_PARALLEL_ENABLED (default false). Máx 4 Tickers. verify_f24.py.",
       "verification": [
         "extract_tickers_from_query('compará NVDA vs AMD') => NVDA, AMD",
@@ -519,7 +568,11 @@
       "title": "Dossier: análisis integral por Ticker",
       "user_visible_behavior": "Cada Ticker del Watch tiene un Dossier persistente (6 bloques: mercado, narrativa 7d+7-30d, sentimiento híbrido, macro, fundamentals placeholder, lectura+Thesis). Signal Detail muestra modo Dossier; el Briefing refresca dossiers seleccionados y enlaza al detalle; historial de versiones (10 o 30 días).",
       "status": "passing",
-      "dependencies": ["F20", "F21", "F23"],
+      "dependencies": [
+        "F20",
+        "F21",
+        "F23"
+      ],
       "notes": "Ver ADR-0009. Modelo C: Briefing ejecutivo + Dossier profundo. Generación determinística multi-capa (no ReAct). Refresh al Briefing: prioridad alta siempre; resto si novedad en ventana. Store: ticker_dossier_versions. Sentimiento: stats en código + LLM anclado. F31 fundamentals; F32 provenance no-Signal.",
       "verification": [
         "POST refresh dossier GGAL persiste versión con 6 bloques",
@@ -545,7 +598,10 @@
       "title": "Chart Plan: Chart Agent on-demand",
       "user_visible_behavior": "En /dossier, split horizontal: Dossier texto (izq) + panel Chart Plan (der). Botón Analizar gráficos ejecuta Chart Agent (SSE pasos); muestra TradingView embed (intervalo del agente), gráficos sentimiento y timeline de señales, 0–3 Pine exportables, lectura objetiva (conflicts, data_gaps, bias_check). Requiere Dossier existente. Historial versionado independiente. Flag CHART_AGENT_ENABLED (default false).",
       "status": "passing",
-      "dependencies": ["F30", "F18"],
+      "dependencies": [
+        "F30",
+        "F18"
+      ],
       "notes": "Ver ADR-0010. Chart Plan on-demand separado del Refresh Dossier. Chart Agent ReAct acotado (LangGraph). Stats determinísticas + schema objetividad. Store: ticker_chart_plan_versions. Vistas MVP: tradingview, sentiment_bars, signals_timeline. Pine 0–3 opcional.",
       "verification": [
         "POST analyze sin Dossier => 404 o mensaje claro",
@@ -572,7 +628,10 @@
       "title": "Ticker Chart Operator-first + Lightweight Charts",
       "user_visible_behavior": "En /dossier y modal Quote Strip: Ticker Chart interactivo (Lightweight Charts) con presets intervalo+ventana, advanced, indicadores parametrizables (2 SMA, Donchian, Fib, volumen), prefs en localStorage, auto-refresh adaptativo. Chart Agent ofrece sugerencia soft Aplicar vista; lecturas desactualizadas si diverge. Pine fuera del MVP. API candles con interval+period.",
       "status": "passing",
-      "dependencies": ["F33", "F7"],
+      "dependencies": [
+        "F33",
+        "F7"
+      ],
       "notes": "Ver ADR-0011. Operator-first. Backend GET /quotes/candles?interval=&period= canónico; fallback /api/candles. Crypto Yahoo map BTC-USD etc.",
       "verification": [
         "GET /quotes/candles?symbol=NVDA&period=3mo&interval=1d => velas",
@@ -589,6 +648,249 @@
         "2026-07-18: /api/candles BTC 3mo 1d => 92 points ~64k",
         "2026-07-18: npm run build OK; lightweight-charts installed",
         "ADR-0011; TickerChart + Toolbar; ChartPlanPanel soft apply + stale badge; QuoteStrip modal unificado; pine_scripts=[] in payload"
+      ]
+    },
+    {
+      "id": "F36",
+      "priority": 36,
+      "title": "Signal Detail: lectura honesta (body vs summary)",
+      "user_visible_behavior": "En Terminal, Signal Detail distingue Artículo completo vs Solo summary con badge, tipografía de lectura (sans) y CTA claro al original. No simula body cuando solo hay summary.",
+      "status": "passing",
+      "dependencies": [
+        "F11",
+        "F6"
+      ],
+      "notes": "UI-only. Complementa F11 Article Body best-effort. Terminal layout Feed|Detail (ADR-0013).",
+      "verification": [
+        "Signal con body: badge 'Artículo completo' + body completo en sans",
+        "Signal solo summary: badge 'Solo summary' + summary visible + link al original prominente",
+        "Signal X: sin badge de artículo; raw_content + card de artículo enlazado como hoy",
+        "npm run build OK"
+      ],
+      "evidence": [
+        "2026-07-22: SignalDetail hasFullArticleBody (body≠summary, len>=200 o >1.5×summary); badges Artículo completo / Solo summary; font-sans reading; CTA Leer en la fuente →",
+        "2026-07-22: npm run build OK (Next 16.2.10)"
+      ]
+    },
+    {
+      "id": "F37",
+      "priority": 37,
+      "title": "Signal image_url + hero en Detail",
+      "user_visible_behavior": "Los Signals de noticia pueden tener image_url. Signal Detail muestra hero image cuando existe. Ingest llena image_url desde Marketaux, RSS enclosure/media y og:image en enrichment cuando sea barato.",
+      "status": "passing",
+      "dependencies": [
+        "F36",
+        "F11"
+      ],
+      "notes": "Campo canónico image_url (no nestear en payload). Hotlink primero; sin blob store en MVP. Re-ingest para poblar image_url en filas viejas.",
+      "verification": [
+        "Migración image_url en signals",
+        "GET /signals/{id} expone image_url",
+        "Marketaux/RSS con imagen persisten image_url",
+        "Signal Detail renderiza <img> hero cuando image_url presente",
+        "npm run build OK"
+      ],
+      "evidence": [
+        "2026-07-22: migraciones 011 (supabase + store/init); store upsert COALESCE; Marketaux top-level; RSS enclosure/media; enrichment og:image sin fetch extra",
+        "2026-07-22: schemas + signals_repo + types + SignalDetail hero (onError hide); py_compile + tsc --noEmit OK",
+        "2026-07-22: ALTER TABLE signals ADD COLUMN image_url TEXT aplicado en Supabase; GET /signals deja de 500 (UndefinedColumn)"
+      ]
+    },
+    {
+      "id": "F38",
+      "priority": 38,
+      "title": "Article Body: más cobertura de enrichment",
+      "user_visible_behavior": "Más Signals de noticia llegan con Article Body real tras Ingestion/backfill (cap y cola más agresivos), sin pretender cubrir paywalls.",
+      "status": "pending",
+      "dependencies": [
+        "F36",
+        "F11"
+      ],
+      "notes": "Subir ARTICLE_BODY_MAX_PER_INGEST default, mejorar backfill, documentar límites. Paywall sigue = summary + link.",
+      "verification": [
+        "Ingest con enrichment: count body usable sube vs baseline",
+        "Backfill procesa signals needing body",
+        "Signals en SKIP_DOMAINS siguen sin body (honesto)"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F39",
+      "priority": 39,
+      "title": "Research Chat: respuesta tipo research memo",
+      "user_visible_behavior": "Las respuestas analíticas del Research Chat siguen una estructura fija cuando hay Tickers o ventana temporal: qué pasó, por qué importa, Corpus vs precio (si hay data), incertidumbre/data gaps, preguntas abiertas/follow-ups sugeridos; Citations por afirmación material.",
+      "status": "passing",
+      "dependencies": [
+        "F8",
+        "F15"
+      ],
+      "notes": "Pack Research Chat v2. Prompt synthesis; trivial price/FX queda corto. No buy/sell.",
+      "verification": [
+        "Query analítica con ticker: respuesta incluye secciones memo (qué pasó / drivers / gaps / follow-ups)",
+        "Citations presentes en afirmaciones sobre el Corpus",
+        "Query trivial (precio solo) no fuerza memo completo innecesariamente",
+        "verify chat / smoke POST /chat OK"
+      ],
+      "evidence": [
+        "2026-07-22: SYSTEM_PROMPT (llm.py) estructura memo + escape trivial",
+        "Integración: py_compile + tsc --noEmit OK"
+      ]
+    },
+    {
+      "id": "F40",
+      "priority": 40,
+      "title": "Research Agent: tool get_dossier",
+      "user_visible_behavior": "El Research Agent puede leer el Dossier persistente de un Ticker del Watch y usarlo como base (narrativa, sentimiento, gaps) antes de complementar con Corpus reciente / Market Data; la respuesta referencia o alinea con ese Dossier cuando existe.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F30"
+      ],
+      "notes": "operator_id threaded chat→ask_stream→execute_tool. Sin Dossier: mensaje honesto.",
+      "verification": [
+        "Tool get_dossier (o equivalente) en TOOL_DEFINITIONS + execute_tool",
+        "Query sobre Ticker con Dossier: agent llama la tool y la síntesis refleja bloques del Dossier",
+        "Ticker sin Dossier: respuesta honesta sin inventar bloques",
+        "Citations siguen viniendo de Signals del Corpus cuando afirma hechos de noticias"
+      ],
+      "evidence": [
+        "2026-07-22: .venv/bin/python -m backend.scripts.verify_f40_dossier => OK",
+        "operator_id contextvar + prompts RESEARCH/AGENT"
+      ]
+    },
+    {
+      "id": "F41",
+      "priority": 41,
+      "title": "Research Chat: Chart card de precio (artefacto)",
+      "user_visible_behavior": "Cuando la Query pide precio/evolución/comparación temporal, el Research Chat puede emitir un artefacto Chart card embebido (OHLC real vía Market Data) con ticker, ventana e intervalo; click abre el Ticker Chart en /dossier. El LLM no inventa series ni dibuja charts genéricos.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F7",
+        "F34"
+      ],
+      "notes": "SSE event:artifact + ensure_price_chart_artifacts post-gather. Candles date→t. No Chart Plan en chat.",
+      "verification": [
+        "Query 'precio NVDA 30d': respuesta incluye Chart card con datos reales",
+        "Query solo narrativa Corpus: sin Chart card obligatorio",
+        "Click en card navega a /dossier (o abre Ticker Chart) del Ticker",
+        "Series/números del card coinciden con get_price_history (no alucinados)",
+        "npm run build OK"
+      ],
+      "evidence": [
+        "2026-07-22 FE: PriceChartCard + parseChatArtifact; tsc/build OK",
+        "2026-07-22 BE: include_candles + ChatArtifact SSE; migración 012 aplicada",
+        "2026-07-22 fix: _normalize_chart_candles date→t; FE acepta t|date",
+        "2026-07-23: ensure_price_chart_artifacts — Chart card determinístico si Query pide precio/evolución+ticker (no solo si el LLM llama get_price_history); verify_f41_charts OK"
+      ]
+    },
+    {
+      "id": "F42",
+      "priority": 42,
+      "title": "Research Chat: tablas de corpus_stats",
+      "user_visible_behavior": "Cuando la Query pide tendencias, volumen o desglose del Corpus, la respuesta incluye tabla(s) determinísticas (p. ej. Signals/día, por fuente, por ticker) ancladas a corpus_stats, no solo prosa.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F8"
+      ],
+      "notes": "Prompt pide tablas GFM; ChatMarkdown tables polish.",
+      "verification": [
+        "Query de tendencias: agent usa corpus_stats y la UI muestra tabla legible",
+        "Cifras de la tabla coinciden con el resultado de la tool",
+        "Citations siguen presentes si hay claims narrativos"
+      ],
+      "evidence": [
+        "2026-07-22: SYSTEM_PROMPT corpus_stats→tablas GFM; ChatMarkdown table styles"
+      ]
+    },
+    {
+      "id": "F43",
+      "priority": 43,
+      "title": "Research Chat: modo comparación de Tickers",
+      "user_visible_behavior": "Queries del tipo 'AAPL vs MSFT última semana' producen una comparación estructurada (Corpus + quotes; opcionalmente Chart cards) en columnas o secciones paralelas, con Citations por lado.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F41"
+      ],
+      "notes": "Prompt ## Ticker: SYMBOL + Parallel Research; Chart cards vía F41.",
+      "verification": [
+        "Query A vs B con ventana: respuesta con secciones/columnas por Ticker",
+        "Quotes o price context para ambos cuando Market Data disponible",
+        "Citations no mezclan evidencia entre Tickers sin etiquetar",
+        "Opcional: hasta 2 Chart cards si la Query es temporal"
+      ],
+      "evidence": [
+        "2026-07-22: SYSTEM_PROMPT + agent prompts comparación ## Ticker: SYMBOL"
+      ]
+    },
+    {
+      "id": "F44",
+      "priority": 44,
+      "title": "Research Agent: grounding con Article Body",
+      "user_visible_behavior": "Antes de sintetizar claims profundos, el agent tiende a abrir get_signal_detail / Article Body de los hits clave; si solo hay summary, la respuesta lo declara en lugar de fingir profundidad.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F11"
+      ],
+      "notes": "content_depth full_body|summary_only + prompts.",
+      "verification": [
+        "Query que exige detalle: trace/steps incluyen get_signal_detail en hits relevantes",
+        "Hit summary-only: respuesta menciona límite (summary / paywall) cuando afirma sobre ese Signal",
+        "Citations siguen clickeables a /terminal?signal="
+      ],
+      "evidence": [
+        "2026-07-22: RESEARCH/AGENT prompts + content_depth en tools; SYSTEM_PROMPT declara summary-only"
+      ]
+    },
+    {
+      "id": "F45",
+      "priority": 45,
+      "title": "Research Agent: FX — dólar Argentina + otras monedas",
+      "user_visible_behavior": "El Research Agent puede obtener cotizaciones FX vía tool: dólar en Argentina (al menos oficial y blue; MEP/CCL si la fuente lo expone) y pares comunes (USD, EUR, BRL, etc. vs ARS u otras). La respuesta cita tipo de cambio, moneda y fuente/timestamp; no inventa números.",
+      "status": "passing",
+      "dependencies": [
+        "F39",
+        "F8"
+      ],
+      "notes": "dolarapi + Frankfurter (ADR-0014). Cache corto. CONTEXT: FX Quote.",
+      "verification": [
+        "Tool get_fx_quotes (o equivalente) en TOOL_DEFINITIONS + execute_tool",
+        "Query 'dólar blue' / 'oficial': respuesta con bid/ask o valor + fuente + hora",
+        "Query 'EURUSD' o 'euro en pesos': cotización real, no alucinada",
+        "Fuente caída: error honesto, sin inventar precio",
+        "verify script o smoke POST /chat OK"
+      ],
+      "evidence": [
+        "2026-07-22: .venv/bin/python -m backend.scripts.verify_f45_fx => OK",
+        "ADR-0014 + CONTEXT FX Quote"
+      ]
+    },
+    {
+      "id": "F46",
+      "priority": 46,
+      "title": "Morning Briefing Email (Resend + FX USD/ARS)",
+      "user_visible_behavior": "Cada mañana (cron) o vía CLI, el Operator recibe un email con el Briefing del Ticker Watch, un bloque de dólar USD/ARS (oficial/blue/MEP/CCL si hay), y links a Terminal y Research. Un solo destinatario configurado en .env. No reenvía el mismo día salvo --force.",
+      "status": "passing",
+      "dependencies": [
+        "F20",
+        "F22",
+        "F45"
+      ],
+      "notes": "Ver docs/superpowers/specs/2026-07-23-morning-briefing-email-design.md. Resend. FX solo scope=ars_usd. CLI send_morning_briefing + idempotencia diaria.",
+      "verification": [
+        "CLI --dry-run genera asunto + cuerpo con Briefing + FX USD/ARS + CTAs",
+        "Envío Resend (o mock) OK; segundo run mismo día no reenvía sin --force",
+        "Cuerpo FX no incluye otras monedas (EUR/BRL/etc.)",
+        "Briefing queda persistido como Chat Session para follow-up",
+        "verify script con mocks OK"
+      ],
+      "evidence": [
+        "2026-07-23: email_resend + briefing_email_render (FX USD/ARS only)",
+        "2026-07-23: briefing_email orchestrator + CLI send_morning_briefing + log 013",
+        "2026-07-23: .venv/bin/python -m backend.scripts.verify_f46_briefing_email => OK"
       ]
     }
   ]

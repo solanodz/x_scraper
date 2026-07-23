@@ -14,6 +14,11 @@ const NAV_ITEMS = [
     match: (path: string) => path === "/terminal" || path.startsWith("/terminal/"),
   },
   {
+    href: "/research",
+    label: "Research",
+    match: (path: string) => path === "/research" || path.startsWith("/research/"),
+  },
+  {
     href: "/dossier",
     label: "Dossier",
     match: (path: string) => path.startsWith("/dossier"),

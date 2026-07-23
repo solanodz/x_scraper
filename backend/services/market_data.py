@@ -488,13 +488,23 @@ def _format_candle_date(index: Any, interval: str) -> str:
     return str(index)
 
 
-def fetch_price_history(symbol: str, period: str = "1mo") -> dict[str, Any]:
-    """Historial de precios vía yfinance (OHLC diario)."""
+def fetch_price_history(
+    symbol: str,
+    period: str = "1mo",
+    *,
+    include_candles: bool = False,
+    max_candles: int = 90,
+) -> dict[str, Any]:
+    """Historial de precios vía yfinance (OHLC diario).
+
+    Con include_candles=True incluye velas (cap max_candles) para Chart cards.
+    """
     candles = _fetch_price_candles(symbol, period, interval="1d")
     if candles.get("error"):
         return candles
 
-    closes = [float(c["close"]) for c in candles["candles"]]
+    all_candles = list(candles["candles"])
+    closes = [float(c["close"]) for c in all_candles]
     if not closes:
         return {
             "error": "sin datos históricos",
@@ -507,12 +517,15 @@ def fetch_price_history(symbol: str, period: str = "1mo") -> dict[str, Any]:
     change_percent = (
         (end_price - start_price) / start_price * 100 if start_price else 0.0
     )
-    highs = [float(c["high"]) for c in candles["candles"]]
-    lows = [float(c["low"]) for c in candles["candles"]]
+    highs = [float(c["high"]) for c in all_candles]
+    lows = [float(c["low"]) for c in all_candles]
+    cap = max(1, min(int(max_candles), 90))
+    chart_candles = all_candles[-cap:] if include_candles else None
 
-    return {
+    payload: dict[str, Any] = {
         "symbol": candles["symbol"],
         "period": candles["period"],
+        "interval": candles.get("interval") or "1d",
         "start_price": round(start_price, 2),
         "end_price": round(end_price, 2),
         "change_percent": round(change_percent, 2),
@@ -520,6 +533,10 @@ def fetch_price_history(symbol: str, period: str = "1mo") -> dict[str, Any]:
         "low": round(min(lows), 2),
         "data_points": len(closes),
     }
+    if chart_candles is not None:
+        payload["candles"] = chart_candles
+        payload["closes"] = [float(c["close"]) for c in chart_candles]
+    return payload
 
 
 def fetch_price_candles(

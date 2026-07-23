@@ -196,6 +196,7 @@ class MarketauxNewsAdapter(SourceAdapter):
             avg_sentiment = _average_sentiment(entities)
             sentiment = _sentiment_label(avg_sentiment) if avg_sentiment is not None else None
             topic = _primary_topic(entities)
+            image_url = str(item.get("image_url") or "").strip() or None
 
             record: dict[str, Any] = {
                 "id_str": f"marketaux:{uuid}",
@@ -208,6 +209,7 @@ class MarketauxNewsAdapter(SourceAdapter):
                 "sentiment": sentiment,
                 "topic": topic,
                 "relevance_score": None,
+                "image_url": image_url,
                 "date": published.isoformat(),
                 "user": {"username": source_name},
                 "rawContent": f"{title}\n\n{summary}" if summary else title,
@@ -223,7 +225,7 @@ class MarketauxNewsAdapter(SourceAdapter):
                     "uuid": uuid,
                     "entities": entities,
                     "language": item.get("language"),
-                    "image_url": item.get("image_url"),
+                    "image_url": image_url,
                 },
             }
             records.append(record)

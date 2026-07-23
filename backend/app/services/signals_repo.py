@@ -28,7 +28,8 @@ _SIGNAL_SELECT_COLUMNS = """
     quote_count, bookmarked_count, payload,
     source_type, title, summary, body, canonical_url, relevance_score, topic,
     sentiment,
-    cluster_id
+    cluster_id,
+    image_url
 """
 
 _SIGNAL_DETAIL_EXTRA = ", hashtags, article"
@@ -69,6 +70,7 @@ def _row_to_summary(
         sentiment=row.get("sentiment"),
         cluster_id=row.get("cluster_id"),
         cluster_sources=cluster_sources or [],
+        image_url=row.get("image_url"),
     )
 
 

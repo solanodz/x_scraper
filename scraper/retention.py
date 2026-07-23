@@ -20,13 +20,13 @@ from scraper.store import connect
 
 
 def get_retention_days() -> int:
-    """Lee RETENTION_DAYS del entorno. Default 60; 0 = deshabilitado."""
+    """Lee RETENTION_DAYS del entorno. Default 30; 0 = deshabilitado."""
     load_dotenv()
-    raw = os.getenv("RETENTION_DAYS", "60").strip()
+    raw = os.getenv("RETENTION_DAYS", "30").strip()
     try:
         return max(0, int(raw))
     except ValueError:
-        return 60
+        return 30
 
 
 def prune_expired_signals(*, dry_run: bool = False) -> int:

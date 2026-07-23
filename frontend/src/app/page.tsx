@@ -15,11 +15,11 @@ const STEPS = [
   },
   {
     title: "Observá",
-    body: "El Feed corre en vivo y el Research Chat queda al lado. Agregá tickers al Watch.",
+    body: "El Feed corre en vivo; abrís un Signal y lo leés en el Detail. Agregá tickers al Watch.",
   },
   {
     title: "Investigá",
-    body: "Abrí un Dossier por ticker o pedí un Chart Plan sobre la vista que vos controlás.",
+    body: "Pasá a Research para preguntar al Corpus, o abrí un Dossier / Chart Plan por ticker.",
   },
 ] as const;
 

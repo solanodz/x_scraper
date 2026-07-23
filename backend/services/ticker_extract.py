@@ -32,6 +32,15 @@ _THEMATIC_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+# Dólar / FX: no es Parallel Research de Tickers de equity.
+_FX_QUERY_RE = re.compile(
+    r"\b(?:"
+    r"d[oó]lar(?:es)?|blue|oficial|mep|ccl|contado\s+con\s+liqui|"
+    r"tipo\s+de\s+cambio|forex|fx|divisa(?:s)?|"
+    r"euro(?:s)?|real(?:es)?\s+brasile|yen|libra"
+    r")\b",
+    re.IGNORECASE,
+)
 _SKIP_TOKENS = frozenset(
     {
         "a",
@@ -120,9 +129,14 @@ def query_looks_thematic(query: str) -> bool:
     return bool(_THEMATIC_RE.search(text))
 
 
+def query_looks_fx(query: str) -> bool:
+    """Query de FX / dólar Argentina (no Tickers de equity)."""
+    return bool(_FX_QUERY_RE.search((query or "").strip()))
+
+
 def should_use_parallel_research(query: str) -> bool:
     """Parallel Research solo si hay Tickers confiables y la Query no es temática."""
-    if query_looks_thematic(query):
+    if query_looks_thematic(query) or query_looks_fx(query):
         return False
     return bool(extract_tickers_from_query(query))
 
@@ -132,12 +146,19 @@ def extract_tickers_from_query(query: str) -> list[str]:
     text = (query or "").strip()
     if not text:
         return []
+    # "precio del dólar" / FX no debe extraer USD como Ticker de bolsa.
+    if query_looks_fx(text):
+        return []
 
     max_tickers = _max_parallel_tickers()
     candidates: list[tuple[int, str]] = []
     lower_text = text.lower()
 
+    from backend.services.fx import is_fx_currency_code
+
     for match in _CASHTAG_RE.finditer(text):
+        if is_fx_currency_code(match.group(1)):
+            continue
         symbol = resolve_ticker_input(match.group(1))
         if symbol:
             candidates.append((match.start(), symbol))

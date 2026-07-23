@@ -3,19 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChatMarkdown, { isBriefingAssistantMessage } from "@/components/ChatMarkdown";
-import ChatSessionSelect from "@/components/ChatSessionSelect";
+import ChatSessionSidebar from "@/components/ChatSessionSidebar";
+import PriceChartCard from "@/components/chat/PriceChartCard";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
 import {
   createChatSession,
   fetchChatMessages,
   fetchChatSessions,
   fetchTickerWatch,
+  parseChatArtifact,
   streamBriefing,
   streamChat,
   type StreamChatCallbacks,
 } from "@/lib/api";
 import { dossierPath } from "@/lib/dossierNav";
 import type {
+  ChatArtifact,
   ChatMessage,
   ChatMessageRecord,
   ChatSessionSummary,
@@ -43,11 +46,24 @@ interface ResearchChatProps {
   onCitationClick: (idStr: string) => void;
 }
 
+function artifactsFromRecord(
+  raw: ChatMessageRecord["artifacts"],
+): ChatArtifact[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const parsed: ChatArtifact[] = [];
+  for (const item of raw) {
+    const artifact = parseChatArtifact(item);
+    if (artifact) parsed.push(artifact);
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
 function recordsToMessages(records: ChatMessageRecord[]): ChatMessage[] {
   return records.map((row) => ({
     role: row.role,
     content: row.content,
     citations: row.citations ?? undefined,
+    artifacts: artifactsFromRecord(row.artifacts),
   }));
 }
 
@@ -253,6 +269,19 @@ export default function ResearchChat({
                 return updated;
               });
             },
+            onArtifact: (artifact) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIndex];
+                if (msg?.role !== "assistant") return prev;
+                const prior = msg.artifacts ?? [];
+                updated[assistantIndex] = {
+                  ...msg,
+                  artifacts: [...prior, artifact],
+                };
+                return updated;
+              });
+            },
           },
           controller.signal,
           sessionId,
@@ -356,6 +385,19 @@ export default function ResearchChat({
               return updated;
             });
           },
+          onArtifact: (artifact) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const msg = updated[assistantIndex];
+              if (msg?.role !== "assistant") return prev;
+              const prior = msg.artifacts ?? [];
+              updated[assistantIndex] = {
+                ...msg,
+                artifacts: [...prior, artifact],
+              };
+              return updated;
+            });
+          },
         },
         controller.signal,
         sessionId,
@@ -407,113 +449,128 @@ export default function ResearchChat({
 
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-zinc-900">
-      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-1.5">
-        <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
-          Research Chat
-        </h2>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleBriefing}
-            disabled={streaming || watchEmpty}
-            className="rounded border border-amber-800/60 bg-amber-950/30 px-2 py-0.5 font-mono text-[10px] text-amber-400 hover:border-amber-600 hover:text-amber-300 disabled:opacity-50"
-          >
-            Briefing
-          </button>
-          <button
-            type="button"
-            onClick={handleNewChat}
-            disabled={streaming}
-            className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
-          >
-            Nueva
-          </button>
-        </div>
-      </div>
+    <section className="flex h-full min-h-0 flex-row bg-zinc-900">
+      <ChatSessionSidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelect={handleSelectSession}
+        onNewChat={handleNewChat}
+        onBriefing={handleBriefing}
+        disabled={streaming}
+        loading={loading}
+        watchEmpty={watchEmpty}
+        streaming={streaming}
+      />
 
-      {sessions.length > 0 && (
-        <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-1.5">
-          <ChatSessionSelect
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSelect={handleSelectSession}
-            disabled={streaming}
-            loading={loading}
-          />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center border-b border-zinc-800 px-4 py-2">
+          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
+            Research Chat
+          </h2>
         </div>
-      )}
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        {loading && (
-          <p className="font-mono text-xs text-zinc-500">Cargando historial…</p>
-        )}
-        {historyError && (
-          <p className="font-mono text-xs text-amber-600">{historyError}</p>
-        )}
-        {!loading && messages.length === 0 && !historyError && (
-          <p className="font-mono text-xs text-zinc-500">
-            Preguntá por tickers, precios, noticias o análisis cruzado — ej.
-            &quot;¿cómo está NVDA y qué dicen en X?&quot;
-          </p>
-        )}
-        {messages.map((msg, i) => (
-          <div key={i}>
-            {msg.role === "user" ? (
-              <div className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2">
-                <p className="font-mono text-xs text-zinc-300">{msg.content}</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {msg.steps && msg.steps.length > 0 && (
-                  <ResearchStepLoader
-                    steps={msg.steps}
-                    active={streaming && i === messages.length - 1 && !msg.content}
-                  />
-                )}
-                {streaming && i === messages.length - 1 && !msg.content && !msg.steps?.length && (
-                  <ResearchStepLoader steps={[]} active />
-                )}
-                {(msg.content || !(streaming && i === messages.length - 1)) && (
-                  <ChatMarkdown
-                    content={msg.content}
-                    streaming={streaming && i === messages.length - 1}
-                    citations={msg.citations}
-                    onCitationClick={onCitationClick}
-                    onDossierClick={handleDossierClick}
-                    variant={
-                      isBriefingAssistantMessage(messages, i)
-                        ? "briefing"
-                        : "default"
-                    }
-                  />
-                )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+            {loading && (
+              <p className="text-center font-mono text-xs text-zinc-500">
+                Cargando historial…
+              </p>
+            )}
+            {historyError && (
+              <p className="text-center font-mono text-xs text-amber-600">
+                {historyError}
+              </p>
+            )}
+            {!loading && messages.length === 0 && !historyError && (
+              <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+                <p className="max-w-sm font-mono text-xs leading-relaxed text-zinc-500">
+                  Preguntá por tickers, precios, noticias o análisis cruzado — ej.
+                  &quot;¿cómo está NVDA y qué dicen en X?&quot;
+                </p>
               </div>
             )}
+            {messages.map((msg, i) =>
+              msg.role === "user" ? (
+                <div
+                  key={i}
+                  className="ml-auto max-w-[85%] rounded-2xl bg-zinc-800 px-4 py-2.5"
+                >
+                  <p className="font-mono text-xs leading-relaxed text-zinc-100">
+                    {msg.content}
+                  </p>
+                </div>
+              ) : (
+                <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
+                  {msg.steps && msg.steps.length > 0 && (
+                    <ResearchStepLoader
+                      steps={msg.steps}
+                      active={
+                        streaming && i === messages.length - 1 && !msg.content
+                      }
+                    />
+                  )}
+                  {streaming &&
+                    i === messages.length - 1 &&
+                    !msg.content &&
+                    !msg.steps?.length && (
+                      <ResearchStepLoader steps={[]} active />
+                    )}
+                  {(msg.content ||
+                    !(streaming && i === messages.length - 1)) && (
+                    <ChatMarkdown
+                      content={msg.content}
+                      streaming={streaming && i === messages.length - 1}
+                      citations={msg.citations}
+                      onCitationClick={onCitationClick}
+                      onDossierClick={handleDossierClick}
+                      variant={
+                        isBriefingAssistantMessage(messages, i)
+                          ? "briefing"
+                          : "default"
+                      }
+                    />
+                  )}
+                  {msg.artifacts && msg.artifacts.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-1">
+                      {msg.artifacts.map((artifact, ai) =>
+                        artifact.type === "price_chart" ? (
+                          <PriceChartCard
+                            key={`${artifact.symbol}-${artifact.period}-${ai}`}
+                            artifact={artifact}
+                          />
+                        ) : null,
+                      )}
+                    </div>
+                  )}
+                </div>
+              ),
+            )}
           </div>
-        ))}
-      </div>
+        </div>
 
-      <form
-        onSubmit={handleSend}
-        className="flex gap-2 border-t border-zinc-800 p-3"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Preguntá por tickers, precios, noticias…"
-          disabled={streaming}
-          className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-amber-600 focus:outline-none disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={streaming || !input.trim()}
-          className="rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 font-sans text-xs text-zinc-300 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
-        >
-          {streaming ? "…" : "Send"}
-        </button>
-      </form>
+        <div className="border-t border-zinc-800 px-4 py-3">
+          <form
+            onSubmit={handleSend}
+            className="mx-auto flex w-full max-w-3xl gap-2"
+          >
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Preguntá por tickers, precios, noticias…"
+              disabled={streaming}
+              className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={streaming || !input.trim()}
+              className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 font-sans text-xs text-zinc-300 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
+            >
+              {streaming ? "…" : "Send"}
+            </button>
+          </form>
+        </div>
+      </div>
     </section>
   );
 }

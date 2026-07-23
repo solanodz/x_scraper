@@ -111,10 +111,11 @@ def _run_tool_step(
     label: str,
     *,
     on_step: Callable[[ResearchStepEvent], None] | None = None,
+    operator_id: str | None = None,
 ) -> None:
     if on_step:
         on_step(ResearchStepEvent(tool=tool_name, label=label, status="running"))
-    result, hits = execute_tool(tool_name, arguments)
+    result, hits = execute_tool(tool_name, arguments, operator_id=operator_id)
     record_tool_result(context, tool_name, arguments, result, hits)
     if on_step:
         on_step(ResearchStepEvent(tool=tool_name, label=label, status="done"))
@@ -126,6 +127,7 @@ def run_parallel_research(
     tickers: list[str],
     *,
     on_step: Callable[[ResearchStepEvent], None] | None = None,
+    operator_id: str | None = None,
 ) -> None:
     """Ejecuta el bundle Parallel Research: quotes + señales + corpus por Ticker."""
     if not tickers:
@@ -159,6 +161,7 @@ def run_parallel_research(
                 arguments,
                 label,
                 on_step=on_step,
+                operator_id=operator_id,
             ): tool_name
             for tool_name, arguments, label in tasks
         }

@@ -26,30 +26,38 @@ from backend.services.research_steps import (
     ResearchStepEvent,
     format_tool_step_label,
 )
+from backend.services.tools import (
+    reset_research_operator_id,
+    set_research_operator_id,
+)
 
 RESEARCH_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de X Scraper Terminal.
 
 Tenés herramientas para:
 - search_corpus: búsqueda semántica en el Corpus (narrativa, temas, contexto; filtros ticker, since_hours, source_type, min_relevance)
 - get_recent_signals: Signals más recientes por fecha (como el Signal Feed)
-- get_signal_detail: Article Body y metadata de un Signal concreto (lectura profunda)
-- corpus_stats: agregación y tendencias narrativas del Corpus (volumen, fuentes, tickers)
-- get_quotes: precios y variación % de cualquier Ticker (sin lista fija)
+- get_signal_detail: Article Body y metadata de un Signal (lectura profunda; indica content_depth full_body|summary_only)
+- corpus_stats: agregación y tendencias narrativas del Corpus (JSON determinístico para tablas)
+- get_quotes: precios y variación % de equities/crypto (sin lista fija)
 - get_watchlist_quotes: panel del carrusel Quote Strip (tickers activos en el Corpus)
-- get_price_history: historial de precios vía yfinance (tendencias, rangos, retornos)
+- get_price_history: historial OHLC vía yfinance (tendencias; alimenta Chart card)
+- get_dossier: Dossier persistente del Operator para un Ticker del Watch (base narrativa)
+- get_fx_quotes: FX — dólar Argentina (oficial/blue/MEP/CCL/tarjeta) y pares (EUR/USD, etc.)
 
 Según la Query del Operator, llamá las herramientas necesarias antes de redactar la respuesta final.
 Si hay historial de conversación, usalo para follow-ups (comparaciones, aclaraciones, referencias a turnos previos).
 
 Guía:
 - Última noticia / noticias recientes / qué pasó hoy: get_recent_signals (con ticker y hours si aplica). Preferir sobre search_corpus para "última noticia de X".
-- Preguntas sobre un Ticker o empresa (Intel, INTC, precio, qué pasó): get_quotes + get_recent_signals o search_corpus; get_price_history si piden tendencia o período
-- Comparar activos: get_quotes para todos los tickers + get_recent_signals o search_corpus si aporta contexto
+- Preguntas sobre un Ticker o empresa (Intel, INTC, precio, qué pasó): get_quotes + get_recent_signals o search_corpus; **si piden precio/evolución/ventana (30d, mes, gráfico), SIEMPRE get_price_history** (genera el Chart card)
+- Claims profundos: antes de terminar, get_signal_detail en los id_str clave; si body≈summary / content_depth=summary_only, anotalo (summary-only / paywall)
+- Comparar activos (A vs B): get_quotes + corpus por cada Ticker; evidencia etiquetada por símbolo
 - Solo narrativa o tema amplio (no reciente): search_corpus (usá ticker y since_hours si aplica)
 - Mercado en general / watchlist: get_watchlist_quotes + get_recent_signals o search_corpus sobre el tema
 - Cruce precio + noticias: siempre ambas fuentes cuando el Ticker sea relevante
 - Tendencias / volumen del Corpus: corpus_stats
-- Profundizar en un Signal citado: get_signal_detail con id_str
+- Dossier / análisis integral previo: get_dossier(symbol); si no hay Dossier, declararlo y caer a Corpus
+- Dólar blue/oficial/MEP/CCL, euro, FX: get_fx_quotes (nunca get_quotes / get_price_history / get_dossier). USD/ARS no son Tickers de equity.
 
 Podés llamar varias herramientas en una o más rondas. Cuando tengas datos suficientes, respondé al Operator con un breve resumen de lo recolectado."""
 
@@ -116,6 +124,7 @@ def _build_langchain_tools(
     context: ResearchContext,
     *,
     on_step: Callable[[ResearchStepEvent], None] | None = None,
+    operator_id: str | None = None,
 ) -> list[StructuredTool]:
     tools_module = _load_tools_module()
     execute_tool = tools_module.execute_tool
@@ -142,7 +151,11 @@ def _build_langchain_tools(
                             status="running",
                         )
                     )
-                result, hits = execute_tool(tool_name, clean_args)
+                result, hits = execute_tool(
+                    tool_name,
+                    clean_args,
+                    operator_id=operator_id,
+                )
                 record_tool_result(context, tool_name, clean_args, result, hits)
                 if on_step:
                     on_step(
@@ -215,12 +228,19 @@ def _run_parallel_gather(
     history: list[dict] | None,
     *,
     on_step: Callable[[ResearchStepEvent], None] | None = None,
+    operator_id: str | None = None,
 ) -> bool:
     tickers = _resolve_parallel_tickers(query, history, on_step=on_step)
     if not tickers:
         return False
 
-    run_parallel_research(context, query, tickers, on_step=on_step)
+    run_parallel_research(
+        context,
+        query,
+        tickers,
+        on_step=on_step,
+        operator_id=operator_id,
+    )
     finalize_research_context(context, query, on_step=on_step)
     return True
 
@@ -228,8 +248,27 @@ def _run_parallel_gather(
 def iter_gather_research_context(
     query: str,
     history: list[dict] | None = None,
+    *,
+    operator_id: str | None = None,
 ) -> Iterator[ResearchStepEvent | GatherResult]:
-    """Ejecuta el agente LangGraph y emite pasos antes del contexto final."""
+    """Ejecuta el agente LangGraph y emite pasos antes del contexto final.
+
+    operator_id se pasa explícito a las tools (no ContextVar alrededor del
+    generator: el SSE hace next() en threads distintos vía run_in_executor).
+    """
+    yield from _iter_gather_research_context_inner(
+        query,
+        history,
+        operator_id=operator_id,
+    )
+
+
+def _iter_gather_research_context_inner(
+    query: str,
+    history: list[dict] | None = None,
+    *,
+    operator_id: str | None = None,
+) -> Iterator[ResearchStepEvent | GatherResult]:
     context = ResearchContext(query=query)
     pending_steps: list[ResearchStepEvent] = []
 
@@ -237,7 +276,13 @@ def iter_gather_research_context(
         pending_steps.append(step)
 
     if parallel_research_enabled():
-        if _run_parallel_gather(context, query, history, on_step=on_step):
+        if _run_parallel_gather(
+            context,
+            query,
+            history,
+            on_step=on_step,
+            operator_id=operator_id,
+        ):
             while pending_steps:
                 yield pending_steps.pop(0)
             yield GatherResult(
@@ -245,10 +290,15 @@ def iter_gather_research_context(
                 hits=context.hits,
                 market_sections=list(context.market_sections),
                 corpus_sections=list(context.corpus_sections),
+                artifacts=list(context.artifacts),
             )
             return
 
-    tools = _build_langchain_tools(context, on_step=on_step)
+    tools = _build_langchain_tools(
+        context,
+        on_step=on_step,
+        operator_id=operator_id,
+    )
 
     model = ChatOpenAI(model=_research_model(), temperature=0)
     agent = create_react_agent(model, tools)
@@ -289,36 +339,49 @@ def iter_gather_research_context(
         hits=context.hits,
         market_sections=list(context.market_sections),
         corpus_sections=list(context.corpus_sections),
+        artifacts=list(context.artifacts),
     )
 
 
 def gather_research_context(
     query: str,
     history: list[dict] | None = None,
+    *,
+    operator_id: str | None = None,
 ) -> ResearchContext:
     """Ejecuta el agente LangGraph ReAct y devuelve contexto para sintetizar."""
-    context = ResearchContext(query=query)
+    # Sync path: ContextVar OK (mismo Context). Tools también reciben kwargs.
+    token = set_research_operator_id(operator_id)
+    try:
+        context = ResearchContext(query=query)
 
-    if parallel_research_enabled():
-        if _run_parallel_gather(context, query, history):
-            return context
+        if parallel_research_enabled():
+            if _run_parallel_gather(
+                context,
+                query,
+                history,
+                operator_id=operator_id,
+            ):
+                return context
 
-    tools = _build_langchain_tools(context)
+        tools = _build_langchain_tools(context, operator_id=operator_id)
 
-    model = ChatOpenAI(model=_research_model(), temperature=0)
-    agent = create_react_agent(model, tools)
+        model = ChatOpenAI(model=_research_model(), temperature=0)
+        agent = create_react_agent(model, tools)
 
-    messages: list[BaseMessage] = [SystemMessage(content=RESEARCH_SYSTEM_PROMPT)]
-    messages.extend(_history_to_messages(history))
-    messages.append(HumanMessage(content=query))
+        messages: list[BaseMessage] = [SystemMessage(content=RESEARCH_SYSTEM_PROMPT)]
+        messages.extend(_history_to_messages(history))
+        messages.append(HumanMessage(content=query))
 
-    agent.invoke(
-        {"messages": messages},
-        config={"recursion_limit": _research_max_turns() * 2 + 1},
-    )
+        agent.invoke(
+            {"messages": messages},
+            config={"recursion_limit": _research_max_turns() * 2 + 1},
+        )
 
-    finalize_research_context(context, query)
-    return context
+        finalize_research_context(context, query)
+        return context
+    finally:
+        reset_research_operator_id(token)
 
 
 def format_research_context(context: ResearchContext) -> str:
@@ -329,5 +392,7 @@ def format_research_context(context: ResearchContext) -> str:
             hits=context.hits,
             market_sections=context.market_sections,
             corpus_sections=context.corpus_sections,
+            dossier_sections=context.dossier_sections,
+            artifacts=context.artifacts,
         )
     )

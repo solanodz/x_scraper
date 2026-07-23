@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 from openai.types.chat import ChatCompletionMessage
 
@@ -18,6 +19,7 @@ from backend.services.research_steps import (
 from backend.services.retrieval import retrieve
 from backend.services.tools import (
     TOOL_DEFINITIONS,
+    build_price_chart_artifact,
     dedupe_hits,
     execute_tool,
 )
@@ -28,18 +30,27 @@ AGENT_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de X Scrap
 Tenés herramientas para:
 - search_corpus: búsqueda semántica en el Corpus (narrativa, temas, contexto)
 - get_recent_signals: Signals más recientes por fecha (como el Signal Feed)
-- get_quotes: precios y variación % de cualquier Ticker (sin lista fija)
+- get_signal_detail: Article Body / metadata de un Signal (lectura profunda; content_depth)
+- corpus_stats: agregación y tendencias del Corpus (JSON para tablas)
+- get_quotes: precios y variación % de cualquier Ticker equity/crypto (sin lista fija)
 - get_watchlist_quotes: panel del carrusel Quote Strip (tickers activos en el Corpus)
+- get_price_history: historial OHLC (tendencias; alimenta Chart card)
+- get_dossier: Dossier persistente del Operator para un Ticker del Watch
+- get_fx_quotes: FX (dólar Argentina oficial/blue/MEP/CCL/tarjeta; pares EUR/USD etc.)
 
 Según la Query del Operator, llamá las herramientas necesarias antes de redactar la respuesta final.
 
 Guía:
 - Última noticia / noticias recientes / qué pasó hoy: get_recent_signals (con ticker y hours si aplica). Preferir sobre search_corpus para "última noticia de X".
-- Preguntas sobre un Ticker o empresa (Intel, INTC, precio, qué pasó): get_quotes con el símbolo o nombre + get_recent_signals o search_corpus
-- Comparar activos: get_quotes para todos los tickers mencionados + get_recent_signals o search_corpus si aporta contexto
+- Preguntas sobre un Ticker o empresa (Intel, INTC, precio, qué pasó): get_quotes + get_recent_signals o search_corpus; **si piden precio/evolución/ventana (30d, mes, gráfico), SIEMPRE get_price_history** (genera el Chart card)
+- Antes de claims profundos sobre un artículo: get_signal_detail en los id_str clave; si content_depth=summary_only, anotalo en el contexto recolectado
+- Comparar activos: get_quotes para todos + corpus por Ticker; no mezclar evidencia sin etiquetar
 - Solo narrativa o tema amplio (no reciente): search_corpus (usá ticker y since_hours si aplica)
 - Mercado en general / watchlist: get_watchlist_quotes + get_recent_signals o search_corpus sobre el tema
 - Cruce precio + noticias: siempre ambas fuentes cuando el Ticker sea relevante
+- Tendencias / volumen del Corpus: corpus_stats
+- Dossier / análisis integral previo del Operator: get_dossier(symbol); si no hay, declaralo y caer a Corpus
+- Dólar blue / oficial / MEP / CCL / euro / FX: get_fx_quotes (NO get_quotes, NO get_price_history, NO get_dossier). USD/ARS no son Tickers.
 
 Podés llamar varias herramientas en una o más rondas. Cuando tengas datos suficientes, respondé exactamente: LISTO"""
 
@@ -52,6 +63,8 @@ class AgentContext:
     hits: list[SignalHit] = field(default_factory=list)
     market_sections: list[str] = field(default_factory=list)
     corpus_sections: list[str] = field(default_factory=list)
+    dossier_sections: list[str] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _append_assistant_message(
@@ -105,6 +118,44 @@ def _record_tool_result(
         label = f"get_recent_signals({', '.join(parts)})"
         context.corpus_sections.append(f"### {label}\n{result}")
 
+    elif tool_name == "get_signal_detail":
+        label = f"get_signal_detail(id_str={arguments.get('id_str')!r})"
+        context.corpus_sections.append(f"### {label}\n{result}")
+
+    elif tool_name == "corpus_stats":
+        parts = []
+        for key in ("ticker", "hours"):
+            if arguments.get(key) is not None:
+                parts.append(f"{key}={arguments.get(key)!r}")
+        label = f"corpus_stats({', '.join(parts) or ''})"
+        context.corpus_sections.append(
+            f"### {label}\n"
+            "<!-- Usar estos números en tablas markdown GFM; no inventar filas -->\n"
+            f"{result}"
+        )
+
+    elif tool_name == "get_price_history":
+        label = (
+            f"get_price_history(symbol={arguments.get('symbol')!r}"
+            f", period={arguments.get('period')!r})"
+        )
+        context.market_sections.append(f"### {label}\n{result}")
+        artifact = build_price_chart_artifact(result)
+        if artifact:
+            context.artifacts.append(artifact)
+
+    elif tool_name == "get_dossier":
+        label = f"get_dossier(symbol={arguments.get('symbol')!r})"
+        context.dossier_sections.append(f"### {label}\n{result}")
+
+    elif tool_name == "get_fx_quotes":
+        parts = []
+        for key in ("scope", "base", "quote", "pairs"):
+            if arguments.get(key) is not None:
+                parts.append(f"{key}={arguments.get(key)!r}")
+        label = f"get_fx_quotes({', '.join(parts) or ''})"
+        context.market_sections.append(f"### {label}\n{result}")
+
     elif tool_name in {"get_quotes", "get_watchlist_quotes"}:
         label = (
             "get_watchlist_quotes()"
@@ -114,15 +165,25 @@ def _record_tool_result(
         context.market_sections.append(f"### {label}\n{result}")
 
 
-def gather_agent_context(query: str, max_turns: int = 6) -> AgentContext:
+def gather_agent_context(
+    query: str,
+    max_turns: int = 6,
+    *,
+    operator_id: str | None = None,
+) -> AgentContext:
     """Ejecuta el loop de herramientas y devuelve contexto para sintetizar."""
-    for item in iter_gather_agent_context(query, max_turns=max_turns):
+    for item in iter_gather_agent_context(
+        query,
+        max_turns=max_turns,
+        operator_id=operator_id,
+    ):
         if isinstance(item, GatherResult):
             return AgentContext(
                 query=query,
                 hits=item.hits,
                 market_sections=item.market_sections or [],
                 corpus_sections=item.corpus_sections or [],
+                artifacts=item.artifacts or [],
             )
     raise RuntimeError("iter_gather_agent_context no devolvió GatherResult")
 
@@ -132,8 +193,29 @@ def iter_gather_agent_context(
     max_turns: int = 6,
     *,
     history: list[dict] | None = None,
+    operator_id: str | None = None,
 ) -> Iterator[ResearchStepEvent | GatherResult]:
-    """Loop legacy con emisión de pasos por tool."""
+    """Loop legacy con emisión de pasos por tool.
+
+    No usa ContextVar alrededor del generator: el Chat Stream llama next()
+    desde distintos threads (run_in_executor) y reset(token) rompe.
+    operator_id se pasa explícito a execute_tool.
+    """
+    yield from _iter_gather_agent_context_inner(
+        query,
+        max_turns=max_turns,
+        history=history,
+        operator_id=operator_id,
+    )
+
+
+def _iter_gather_agent_context_inner(
+    query: str,
+    max_turns: int = 6,
+    *,
+    history: list[dict] | None = None,
+    operator_id: str | None = None,
+) -> Iterator[ResearchStepEvent | GatherResult]:
     context = AgentContext(query=query)
     messages: list[dict] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
     for entry in prepare_chat_history(history):
@@ -176,7 +258,11 @@ def iter_gather_agent_context(
                 status="running",
             )
 
-            result, hits = execute_tool(fn.name, arguments)
+            result, hits = execute_tool(
+                fn.name,
+                arguments,
+                operator_id=operator_id,
+            )
             _record_tool_result(context, fn.name, arguments, result, hits)
             messages.append(
                 {
@@ -226,6 +312,7 @@ def iter_gather_agent_context(
         hits=context.hits,
         market_sections=list(context.market_sections),
         corpus_sections=list(context.corpus_sections),
+        artifacts=list(context.artifacts),
     )
 
 
@@ -235,8 +322,16 @@ def format_agent_context(context: AgentContext) -> str:
 
     if context.market_sections:
         blocks.append(
-            "## Market Data (delay ~15 min)\n\n" + "\n\n".join(context.market_sections)
+            "## Market Data (delay ~15 min) / FX\n\n"
+            + "\n\n".join(context.market_sections)
         )
+
+    if getattr(context, "dossier_sections", None):
+        dossier_sections = context.dossier_sections
+        if dossier_sections:
+            blocks.append(
+                "## Dossier del Operator\n\n" + "\n\n".join(dossier_sections)
+            )
 
     if context.corpus_sections:
         blocks.append(

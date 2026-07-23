@@ -29,6 +29,13 @@ def _normalize_note(note: str | None) -> str | None:
 
 
 def _canonical_symbol(raw: str) -> str:
+    from backend.services.fx import is_fx_currency_code
+
+    if is_fx_currency_code(raw):
+        raise TickerWatchRepoError(
+            "FX currency codes (USD, ARS, EUR, …) are not Tickers — "
+            "use Research Chat get_fx_quotes for dólar / FX"
+        )
     resolved = resolve_ticker_input(raw)
     if resolved:
         return resolved

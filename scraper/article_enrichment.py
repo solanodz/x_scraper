@@ -1,8 +1,12 @@
-"""Article Enrichment: extrae Article Body desde canonical_url (trafilatura)."""
+"""Article Enrichment: extrae Article Body desde canonical_url (trafilatura).
+
+También parsea og:image del mismo HTML descargado (sin fetch extra) cuando falta image_url.
+"""
 
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Any
 from urllib.parse import urlparse
@@ -19,6 +23,14 @@ SKIP_DOMAINS = frozenset(
         "www.marketwatch.com",
         "marketwatch.com",
     }
+)
+
+# meta property/content en cualquier orden (HTML ya descargado por trafilatura).
+_OG_IMAGE_RE = re.compile(
+    r"<meta\b[^>]*\bproperty\s*=\s*[\"']og:image[\"'][^>]*\bcontent\s*=\s*[\"']([^\"']+)[\"']"
+    r"|"
+    r"<meta\b[^>]*\bcontent\s*=\s*[\"']([^\"']+)[\"'][^>]*\bproperty\s*=\s*[\"']og:image[\"']",
+    re.IGNORECASE,
 )
 
 
@@ -62,6 +74,19 @@ def _domain(url: str) -> str:
         return ""
 
 
+def extract_og_image(html: str) -> str | None:
+    """Best-effort og:image desde HTML ya descargado (sin request extra)."""
+    if not html:
+        return None
+    match = _OG_IMAGE_RE.search(html)
+    if not match:
+        return None
+    url = (match.group(1) or match.group(2) or "").strip()
+    if not url or not url.startswith(("http://", "https://")):
+        return None
+    return url
+
+
 def needs_article_body(record: dict[str, Any]) -> bool:
     """True si el Signal de noticia puede enriquecerse con Article Body."""
     source_type = str(record.get("source_type") or "x")
@@ -77,17 +102,21 @@ def needs_article_body(record: dict[str, Any]) -> bool:
     return True
 
 
-def fetch_article_body(url: str) -> str | None:
-    """Best-effort: descarga y extrae texto con trafilatura. None si falla o paywall."""
+def fetch_article(url: str) -> tuple[str | None, str | None]:
+    """
+    Descarga una vez: (Article Body, og:image).
+    Body None si falla/paywall; image_url None si no hay meta og:image.
+    """
     try:
         import trafilatura
     except ImportError:
-        return None
+        return None, None
 
     try:
         downloaded = trafilatura.fetch_url(url)
         if not downloaded:
-            return None
+            return None, None
+        og_image = extract_og_image(downloaded)
         text = trafilatura.extract(
             downloaded,
             include_comments=False,
@@ -95,14 +124,20 @@ def fetch_article_body(url: str) -> str | None:
             favor_precision=True,
         )
     except Exception:
-        return None
+        return None, None
 
-    if not text:
-        return None
-    cleaned = text.strip()
-    if len(cleaned) < _min_body_chars():
-        return None
-    return cleaned
+    body: str | None = None
+    if text:
+        cleaned = text.strip()
+        if len(cleaned) >= _min_body_chars():
+            body = cleaned
+    return body, og_image
+
+
+def fetch_article_body(url: str) -> str | None:
+    """Best-effort: descarga y extrae texto con trafilatura. None si falla o paywall."""
+    body, _ = fetch_article(url)
+    return body
 
 
 def _apply_enriched_body(record: dict[str, Any], body: str) -> None:
@@ -112,13 +147,19 @@ def _apply_enriched_body(record: dict[str, Any], body: str) -> None:
     record["rawContent"] = f"{title}\n\n{body}" if title else body
 
 
+def _apply_image_url(record: dict[str, Any], image_url: str | None) -> None:
+    if not image_url or record.get("image_url"):
+        return
+    record["image_url"] = image_url
+
+
 def enrich_article_bodies(
     records: list[dict[str, Any]],
     *,
     max_fetch: int | None = None,
 ) -> tuple[int, int]:
     """
-    Enriquece records in-place con Article Body.
+    Enriquece records in-place con Article Body (+ og:image si falta image_url).
     Devuelve (intentados, exitosos).
     """
     if not _article_body_enabled():
@@ -144,10 +185,11 @@ def enrich_article_bodies(
 
         url = str(record["canonical_url"]).strip()
         attempted += 1
-        body = fetch_article_body(url)
+        body, og_image = fetch_article(url)
         if body:
             _apply_enriched_body(record, body)
             enriched += 1
+        _apply_image_url(record, og_image)
 
         if delay > 0 and attempted < limit:
             time.sleep(delay)
@@ -174,11 +216,16 @@ def backfill_article_bodies(limit: int = 30) -> int:
         if not url or _domain(url) in SKIP_DOMAINS:
             continue
 
-        body = fetch_article_body(url)
+        body, og_image = fetch_article(url)
         if body:
             title = str(signal.get("title") or "").strip()
             raw_content = f"{title}\n\n{body}" if title else body
-            update_signal_body(signal["id_str"], body=body, raw_content=raw_content)
+            update_signal_body(
+                signal["id_str"],
+                body=body,
+                raw_content=raw_content,
+                image_url=og_image,
+            )
             updated += 1
 
         if delay > 0 and index + 1 < len(signals):

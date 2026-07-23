@@ -2,7 +2,7 @@
 
 /**
  * Simulación estática fiel de la terminal real para el landing.
- * Layout horizontal: Feed | Chat, más ancho, menos alto.
+ * Layout horizontal: Signal Feed | Signal Detail.
  * Quote strip con carousel CSS en loop infinito.
  */
 
@@ -54,6 +54,7 @@ const MOCK_SIGNALS = [
     time: "4m",
     likes: "2.1K",
     rts: "842",
+    replies: "312",
     cluster: null,
   },
   {
@@ -62,10 +63,15 @@ const MOCK_SIGNALS = [
     cashtags: ["$NVDA"],
     topic: "Options Flow",
     text: "NVDA call volume surging ahead of earnings, 3x average. $140 strike leading the flow.",
+    detailText:
+      "NVDA call volume surging ahead of earnings, 3x average. $140 strike leading the flow.\n\nLargest blocks concentrated in near-term expirations. Institutional sweeps dominating vs retail singles. Watch IV into the print — currently elevated vs 20-day realized.",
     time: "11m",
     likes: "4.8K",
     rts: "1.9K",
+    replies: "640",
     cluster: "3 fuentes",
+    clusterMembers: ["x · @unusual_whales", "news · Reuters", "x · @zerohedge"],
+    quote: { symbol: "NVDA", price: "138.42", pct: "+3.82%", bull: true },
   },
   {
     author: "Reuters",
@@ -76,6 +82,7 @@ const MOCK_SIGNALS = [
     time: "18m",
     likes: null,
     rts: null,
+    replies: null,
     cluster: null,
   },
   {
@@ -87,6 +94,7 @@ const MOCK_SIGNALS = [
     time: "32m",
     likes: "6.2K",
     rts: "3.1K",
+    replies: "891",
     cluster: null,
   },
   {
@@ -98,6 +106,7 @@ const MOCK_SIGNALS = [
     time: "25m",
     likes: "1.3K",
     rts: "510",
+    replies: "98",
     cluster: "2 fuentes",
   },
   {
@@ -109,36 +118,13 @@ const MOCK_SIGNALS = [
     time: "41m",
     likes: null,
     rts: null,
+    replies: null,
     cluster: null,
   },
 ];
 
-const MOCK_CHAT = [
-  { role: "user" as const, text: "What's driving NVDA options flow today?" },
-  {
-    role: "assistant" as const,
-    text: "Based on the Corpus, NVDA is seeing 3x average call volume ahead of earnings. The $140 strike is leading the flow with institutional positioning strongly bullish. Key signals point to block trades and sweep activity in near-term expirations.",
-    citations: ["Signal #2841", "Signal #2839", "Signal #2835"],
-  },
-  {
-    role: "user" as const,
-    text: "How does this compare to last quarter?",
-  },
-  {
-    role: "assistant" as const,
-    text: "Last quarter saw 1.8x average volume pre-earnings with the $120 strike dominant. Current flow is significantly more aggressive, both in magnitude and concentration at higher strikes.",
-    citations: ["Signal #2614", "Signal #2601"],
-  },
-  {
-    role: "user" as const,
-    text: "Break down the risk/reward if I enter calls at current levels.",
-  },
-  {
-    role: "assistant" as const,
-    text: "At $138.42 with the $140 strike, you're looking at ~$1.60 out of the money. Implied vol is at 62% (vs 45% historical), so premiums are elevated. The Corpus shows 14 bullish signals in 48h against 3 bearish. Key risk: if earnings miss, IV crush alone could erase 35-40% of premium regardless of direction. Upside target from consensus is $152, which gives roughly 2.8:1 reward/risk on the $140C at current ask.",
-    citations: ["Signal #2841", "Signal #2838", "Signal #2830", "Signal #2822"],
-  },
-];
+const SELECTED_INDEX = 1;
+const SELECTED = MOCK_SIGNALS[SELECTED_INDEX];
 
 function QuoteItem({ q }: { q: (typeof MOCK_QUOTES)[number] }) {
   return (
@@ -176,6 +162,9 @@ export default function TerminalMockup() {
               Terminal
             </span>
             <span className="rounded px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
+              Research
+            </span>
+            <span className="rounded px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
               Dossier
             </span>
           </div>
@@ -208,7 +197,7 @@ export default function TerminalMockup() {
         </div>
       </div>
 
-      {/* ── Main: Feed | Chat side by side ── */}
+      {/* ── Main: Signal Feed | Signal Detail ── */}
       <div className="grid min-h-[28rem] grid-cols-1 sm:grid-cols-[1.2fr_1fr]">
         {/* Feed */}
         <div className="border-r border-zinc-800/60 pb-20">
@@ -229,7 +218,7 @@ export default function TerminalMockup() {
             {MOCK_SIGNALS.map((signal, i) => (
               <div
                 key={i}
-                className={`px-3 py-2 ${i === 1 ? "bg-zinc-800/30" : ""}`}
+                className={`px-3 py-2 ${i === SELECTED_INDEX ? "bg-zinc-800/30" : ""}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -250,8 +239,8 @@ export default function TerminalMockup() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-left font-mono text-[10px] leading-relaxed text-zinc-300 sm:text-[11px]">
-                    {signal.text}
-                  </p>
+                  {signal.text}
+                </p>
                 <div className="mt-1 flex items-center gap-2">
                   {signal.cashtags.map((tag) => (
                     <span
@@ -279,49 +268,107 @@ export default function TerminalMockup() {
           </div>
         </div>
 
-        {/* Chat */}
-        <div className="hidden sm:flex sm:flex-col">
+        {/* Signal Detail */}
+        <div className="hidden pb-20 sm:flex sm:flex-col">
           <div className="border-b border-zinc-800 px-3 py-1.5">
-            <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Research Chat
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-amber-500">
+              Signal Detail
             </span>
           </div>
-          <div className="flex flex-1 flex-col p-3">
-            <div className="space-y-3">
-              {MOCK_CHAT.map((msg, i) =>
-                msg.role === "user" ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-lg bg-zinc-800 px-3 py-2">
-                      <p className="font-sans text-[11px] text-zinc-200">
-                        {msg.text}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={i} className="max-w-[95%] text-left">
-                    <p className="font-sans text-[11px] leading-relaxed text-zinc-300 text-left">
-                      {msg.text}
-                    </p>
-                    {"citations" in msg && msg.citations && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {msg.citations.map((c) => (
-                          <span
-                            key={c}
-                            className="rounded bg-amber-950/30 px-1.5 py-0.5 font-mono text-[8px] text-amber-500/80"
-                          >
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ),
-              )}
+          <div className="flex flex-1 flex-col space-y-3 p-3 text-left">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-mono text-[12px] font-semibold text-amber-400">
+                {SELECTED.author}
+              </span>
+              <span className="font-mono text-[9px] text-zinc-500">
+                {SELECTED.time}
+              </span>
             </div>
+
+            {"clusterMembers" in SELECTED && SELECTED.clusterMembers && (
+              <div className="rounded border border-amber-900/40 bg-amber-950/20 px-2 py-1.5">
+                <p className="font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                  Story Cluster
+                </p>
+                <p className="mt-1 font-mono text-[10px] text-zinc-300">
+                  {SELECTED.cluster}
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {SELECTED.clusterMembers.map((member) => (
+                    <li
+                      key={member}
+                      className="font-mono text-[9px] text-zinc-500"
+                    >
+                      {member}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="whitespace-pre-wrap text-left font-mono text-[11px] leading-relaxed text-zinc-200">
+              {"detailText" in SELECTED && SELECTED.detailText
+                ? SELECTED.detailText
+                : SELECTED.text}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {SELECTED.cashtags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded border border-emerald-800/50 bg-emerald-950/30 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            {"quote" in SELECTED && SELECTED.quote && (
+              <div className="flex w-fit items-center gap-1.5 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
+                <TickerIcon symbol={SELECTED.quote.symbol} />
+                <span className="font-semibold text-zinc-300">
+                  {SELECTED.quote.symbol}
+                </span>
+                <span className="text-zinc-100">${SELECTED.quote.price}</span>
+                <span
+                  className={
+                    SELECTED.quote.bull ? "text-emerald-400" : "text-red-400"
+                  }
+                >
+                  {SELECTED.quote.pct}
+                </span>
+              </div>
+            )}
+
+            {SELECTED.likes && (
+              <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-3">
+                <div className="text-center">
+                  <p className="font-mono text-[12px] text-zinc-200">
+                    {SELECTED.likes}
+                  </p>
+                  <p className="font-sans text-[9px] text-zinc-500">Likes</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-[12px] text-zinc-200">
+                    {SELECTED.rts}
+                  </p>
+                  <p className="font-sans text-[9px] text-zinc-500">Retweets</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-mono text-[12px] text-zinc-200">
+                    {SELECTED.replies}
+                  </p>
+                  <p className="font-sans text-[9px] text-zinc-500">Replies</p>
+                </div>
+              </div>
+            )}
+
+            <span className="font-mono text-[10px] text-amber-600">
+              Ver en X →
+            </span>
           </div>
         </div>
       </div>
-
     </div>
   );
 }

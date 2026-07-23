@@ -41,6 +41,7 @@ class SignalSummary(BaseModel):
     sentiment: str | None = None
     cluster_id: str | None = None
     cluster_sources: list[ClusterSource] = Field(default_factory=list)
+    image_url: str | None = None
 
 
 class SignalDetail(SignalSummary):
@@ -71,6 +72,7 @@ class ChatMessageRecord(BaseModel):
     role: str
     content: str
     citations: list[ChatCitation] | None = None
+    artifacts: list[dict[str, Any]] | None = None
     created_at: datetime
 
 

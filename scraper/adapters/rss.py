@@ -62,10 +62,49 @@ ARGENTINA_FEEDS: list[tuple[str, str]] = [
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_IMAGE_EXT_RE = re.compile(r"\.(jpe?g|png|gif|webp|avif)(\?|$)", re.I)
+_MEDIA_NS = {"media": "http://search.yahoo.com/mrss/"}
 
 
 def _strip_html(text: str) -> str:
     return unescape(_TAG_RE.sub("", text)).strip()
+
+
+def _is_image_ref(url: str, mime: str = "") -> bool:
+    if mime.lower().startswith("image/"):
+        return True
+    return bool(url and _IMAGE_EXT_RE.search(url))
+
+
+def _item_image_url(item: ET.Element) -> str | None:
+    """enclosure url o media:content url cuando apunta a imagen."""
+    for enc in item.findall("enclosure"):
+        url = (enc.get("url") or "").strip()
+        mime = (enc.get("type") or "").strip()
+        if url and _is_image_ref(url, mime):
+            return url
+
+    for media in item.findall("media:content", _MEDIA_NS):
+        url = (media.get("url") or "").strip()
+        mime = (media.get("type") or media.get("medium") or "").strip()
+        if mime == "image":
+            mime = "image/"
+        if url and _is_image_ref(url, mime):
+            return url
+
+    # Fallback: tag con namespace expandido
+    for el in item:
+        tag = el.tag.rsplit("}", 1)[-1] if "}" in el.tag else el.tag
+        if tag != "content":
+            continue
+        url = (el.get("url") or "").strip()
+        mime = (el.get("type") or el.get("medium") or "").strip()
+        if mime == "image":
+            mime = "image/"
+        if url and _is_image_ref(url, mime):
+            return url
+    return None
+
 
 
 def _stable_id(url: str) -> str:
@@ -186,6 +225,7 @@ class RssNewsAdapter(SourceAdapter):
             seen_urls.add(link)
 
             published = _parse_pub_date(_item_field(item, "pubDate", atom_ns))
+            image_url = _item_image_url(item)
             records.append(
                 {
                     "id_str": _stable_id(link),
@@ -198,6 +238,7 @@ class RssNewsAdapter(SourceAdapter):
                     "sentiment": None,
                     "topic": None,
                     "relevance_score": None,
+                    "image_url": image_url,
                     "date": published.isoformat(),
                     "user": {"username": feed_name},
                     "rawContent": title,

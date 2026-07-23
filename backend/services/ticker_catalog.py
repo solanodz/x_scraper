@@ -36,6 +36,11 @@ def resolve_ticker_input(raw: str | None) -> str | None:
 
     text = str(raw).strip()
     as_symbol = normalize_symbol(text)
+    # Divisas ≠ Tickers: USD/ARS/EUR etc. van por get_fx_quotes, no Market Data equity.
+    from backend.services.fx import is_fx_currency_code
+
+    if is_fx_currency_code(as_symbol):
+        return None
     if as_symbol in CURATED_TICKER_LABELS or as_symbol in CURATED_EXTRA_SYMBOLS:
         return as_symbol
 

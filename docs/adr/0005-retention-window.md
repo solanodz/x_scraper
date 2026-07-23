@@ -2,9 +2,11 @@
 status: accepted
 ---
 
-# Retention Window: 60 días sobre published_at
+# Retention Window: 30 días sobre published_at
 
-El Store acumula Signals sin límite; eso crece el Vector Index, el costo de embeddings y el ruido del RAG. Se adopta una **Retention Window** de **60 días** calculada sobre `published_at`, uniforme para todas las fuentes, que elimina filas vencidas al final de cada ciclo de Ingestion y también vía CLI standalone. El embedding vive en la misma fila que el Signal (columna `embedding` en `signals`); borrar la fila borra el embedding. Se agrega `ingested_at` solo para observabilidad (cuándo entró al Store), sin participar en la política de retención.
+El Store acumula Signals sin límite; eso crece el Vector Index, el costo de embeddings y el ruido del RAG. Se adopta una **Retention Window** de **30 días** calculada sobre `published_at`, uniforme para todas las fuentes, que elimina filas vencidas al final de cada ciclo de Ingestion y también vía CLI standalone. El embedding vive en la misma fila que el Signal (columna `embedding` en `signals`); borrar la fila borra el embedding. Se agrega `ingested_at` solo para observabilidad (cuándo entró al Store), sin participar en la política de retención.
+
+> **Amend 2026-07-22:** default bajó de 60 → 30 para alinear con la ventana narrativa del Dossier (7–30d) y el Chart Plan timeline; menos ruido en RAG y Store más chico.
 
 ## Considered Options
 
@@ -21,11 +23,11 @@ El Store acumula Signals sin límite; eso crece el Vector Index, el costo de emb
 - **`ingested_at`**: columna `TIMESTAMPTZ NOT NULL DEFAULT now()` con índice descendente; solo métricas y debugging (lag de ingesta, volumen por día), no input de retención.
 - **Embeddings best-effort**: la ingesta intenta embedear al persistir; un job de backfill cubre filas sin embedding; la retención no distingue — si el Signal vence, se borra con o sin vector.
 - **Citas rotas**: Research Chat y referencias a Signals eliminados pueden quedar huérfanas; trade-off aceptado a cambio de un Corpus acotado y RAG más fresco.
-- **Configuración**: variable de entorno `RETENTION_DAYS` (default `60`). Valor `0` deshabilita la purga (comportamiento explícito para dev o conservación total).
+- **Configuración**: variable de entorno `RETENTION_DAYS` (default `30`). Valor `0` deshabilita la purga (comportamiento explícito para dev o conservación total).
 
 ## Consequences
 
 - Migración `004_signals_ingested_at.sql` agrega `ingested_at` e índice; filas existentes reciben `now()` como default en el ALTER.
 - El Worker y/o módulo de retención leen `RETENTION_DAYS` del entorno; sin valor o con `0`, no se ejecutan `DELETE`.
-- Operadores deben asumir que Signals con más de 60 días de antigüedad (por fecha de publicación) desaparecen del feed, del detalle y del índice vectorial.
+- Operadores deben asumir que Signals con más de 30 días de antigüedad (por fecha de publicación) desaparecen del feed, del detalle y del índice vectorial.
 - Monitoreo posible vía `ingested_at` vs `published_at` para detectar retrasos de ingesta o backfills masivos.

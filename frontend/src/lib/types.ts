@@ -31,6 +31,7 @@ export interface SignalSummary {
   sentiment?: string | null;
   cluster_id?: string | null;
   cluster_sources?: ClusterSource[];
+  image_url?: string | null;
 }
 
 export interface SignalDetail extends SignalSummary {
@@ -46,12 +47,38 @@ export interface ChatCitation {
   excerpt: string;
 }
 
+/** Candle payload for Research Chat price_chart artifacts (SSE / history). */
+export interface PriceChartCandle {
+  t: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+/** Compact price chart card from Market Data (get_price_history). */
+export interface PriceChartArtifact {
+  type: "price_chart";
+  symbol: string;
+  period: string;
+  interval?: string;
+  candles: PriceChartCandle[];
+  start_price?: number | null;
+  end_price?: number | null;
+  change_percent?: number | null;
+}
+
+/** Structured chat artifacts (extensible). Unknown types are ignored by the UI. */
+export type ChatArtifact = PriceChartArtifact;
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   citations?: ChatCitation[];
   /** Pasos del agente (solo durante streaming; no persistidos). */
   steps?: ResearchStep[];
+  /** Chart cards / structured UI from SSE `event: artifact` or history. */
+  artifacts?: ChatArtifact[];
 }
 
 export interface ResearchStep {
@@ -73,6 +100,8 @@ export interface ChatMessageRecord {
   role: "user" | "assistant";
   content: string;
   citations?: ChatCitation[] | null;
+  /** Present when backend persists message artifacts. */
+  artifacts?: ChatArtifact[] | null;
   created_at: string;
 }
 

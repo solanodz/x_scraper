@@ -13,7 +13,7 @@ El conjunto acumulado de contenido scrapeado de X (tweets, artículos enlazados,
 _Avoid_: Database, dataset, dump
 
 **Signal**:
-Una unidad de contenido del Corpus con relevancia potencial para el usuario, _source-agnostic_: una noticia (artículo), un tweet o un hilo, sin importar de qué fuente venga (X, RSS, News API). Es lo que aparece en el feed de la Terminal. Un Source Adapter la normaliza a la misma forma.
+Una unidad de contenido del Corpus con relevancia potencial para el usuario, _source-agnostic_: una noticia (artículo), un tweet o un hilo, sin importar de qué fuente venga (X, RSS, News API). Es lo que aparece en el feed de la Terminal. Un Source Adapter la normaliza a la misma forma. Las noticias pueden llevar `image_url` (hotlink al publisher) para el hero del Signal Detail.
 _Avoid_: Post, item, entry, tweet (un tweet es solo un tipo de Signal)
 
 **News Source**:
@@ -48,6 +48,10 @@ _Avoid_: Quotes, live prices
 Cotización de un Ticker: precio actual, cambio absoluto y porcentual. Se obtiene vía Finnhub `/quote` (fallback: Alpha Vantage GLOBAL_QUOTE).
 _Avoid_: Price, tick, quote data
 
+**FX Quote**:
+Cotización de divisas (FX), separada de **Quote** de equities. Argentina USD (oficial, blue; MEP/CCL/tarjeta si la fuente los expone) vía dolarapi; pares comunes (EUR/USD, BRL, etc.) vía Frankfurter. El Research Agent los obtiene con `get_fx_quotes` (cache corto; nunca inventa números; incluye fuente y timestamp). Códigos ISO (`USD`, `ARS`, `EUR`, …) **no** son Tickers: no van al Ticker Watch, Dossier ni Chart Plan. Ver ADR-0014.
+_Avoid_: Forex tick, currency quote, dolar blue API (usar el término canónico)
+
 **Quote Strip**:
 Barra bajo el header de la Terminal que muestra Quotes de la Watchlist en carrusel continuo. Clic en un Ticker abre el **Ticker Chart** (mismo control Operator-first que en `/dossier`). Datos con delay ~15 min.
 _Avoid_: Ticker tape, price bar, market strip
@@ -59,7 +63,7 @@ _Avoid_: Portfolio, favorites, bookmarks
 ## Terminal Layout
 
 **Signal Feed**:
-Panel superior de la Terminal. Muestra un representante por Story Cluster, ordenado por fecha de publicación (más reciente primero, sin importar la fuente), filtrable por fuente, ticker o tema. Indica las fuentes del cluster cuando la misma noticia llegó por varios canales. Aplica Signal Filter por reglas y umbral de Relevance Score (`RELEVANCE_SCORE_MIN`).
+Panel izquierdo de la Terminal (`/terminal`). Muestra un representante por Story Cluster, ordenado por fecha de publicación (más reciente primero, sin importar la fuente), filtrable por fuente, ticker o tema. Indica las fuentes del cluster cuando la misma noticia llegó por varios canales. Aplica Signal Filter por reglas y umbral de Relevance Score (`RELEVANCE_SCORE_MIN`). Seleccionar un Signal actualiza la URL (`/terminal?signal=<id>`) y abre el Signal Detail.
 _Avoid_: Timeline, news list, stream
 
 **Signal Filter**:
@@ -67,11 +71,11 @@ Reglas de relevancia en `.env` (`SIGNAL_FILTER`, `SIGNAL_KEYWORDS`, `SIGNAL_BLOC
 _Avoid_: Content moderation, spam filter
 
 **Signal Detail**:
-Panel inferior izquierdo de la Terminal. Muestra el contenido completo del Signal seleccionado en el Feed.
+Panel derecho de la Terminal. Muestra el contenido completo del Signal seleccionado en el Feed (o llegado por deep-link / Citation desde Research). Sin selección: empty state. Es la única superficie canónica para leer un Signal.
 _Avoid_: Preview, sidebar, drawer
 
 **Research Chat**:
-Panel inferior derecho. Chatbot RAG donde el Operator consulta el Corpus por ticker, pide resúmenes o hace preguntas analíticas.
+Superficie dedicada en `/research` (Header + Quote Strip + chat a full height). Chatbot RAG donde el Operator consulta el Corpus por ticker, pide resúmenes o hace preguntas analíticas. Las Citations navegan a `/terminal?signal=<id>`. Ver ADR-0013.
 _Avoid_: Assistant, copilot, chatbot
 
 ## Data Pipeline
@@ -81,7 +85,7 @@ Proceso que corre los Source Adapters (News Sources + X), normaliza el contenido
 _Avoid_: Sync, import, fetch
 
 **Retention Window**:
-Ventana temporal (default 60 días, configurable con `RETENTION_DAYS`; `0` la desactiva) más allá de la cual un Signal se elimina del Store. Como el embedding vive en la misma fila que el Signal, el borrado limpia también el Vector Index. Se mide sobre `published_at` (edad del contenido) para mantener el Corpus fresco y acotado. Corre al final de cada Ingestion y como comando standalone.
+Ventana temporal (default 30 días, configurable con `RETENTION_DAYS`; `0` la desactiva) más allá de la cual un Signal se elimina del Store. Como el embedding vive en la misma fila que el Signal, el borrado limpia también el Vector Index. Se mide sobre `published_at` (edad del contenido) para mantener el Corpus fresco y acotado. Corre al final de cada Ingestion y como comando standalone.
 _Avoid_: TTL, expiry, purge, archivado
 
 **Store**:
@@ -109,7 +113,7 @@ _Avoid_: AI provider, model vendor
 ## Repository
 
 **Web**:
-App Next.js en `frontend/`. Renderiza la Terminal: Signal Feed, Signal Detail y Research Chat.
+App Next.js en `frontend/`. Renderiza las superficies del Operator: Terminal (Signal Feed + Signal Detail), Research Chat (`/research`) y Dossier (`/dossier`).
 _Avoid_: Client, UI, app
 
 **API**:
@@ -141,7 +145,7 @@ _Avoid_: Business logic, service layer, use cases
 ## Research Chat Behavior
 
 **Query**:
-Consulta en lenguaje natural del Operator al Research Chat. El Research Agent puede usar herramientas: búsqueda semántica en el Corpus (con filtros de ticker, tipo de fuente, ventana temporal y relevancia), noticias recientes por fecha, detalle de un Signal (Article Body), estadísticas/tendencias del Corpus, cotizaciones de Tickers e histórico de precios (Market Data), y la Watchlist. Cruza precios con Signals cuando aplica. Cubre preguntas abiertas, análisis por Ticker, research multi-paso, resúmenes temporales, tendencias y comparaciones.
+Consulta en lenguaje natural del Operator al Research Chat. El Research Agent puede usar herramientas: búsqueda semántica en el Corpus (con filtros de ticker, tipo de fuente, ventana temporal y relevancia), noticias recientes por fecha, detalle de un Signal (Article Body), estadísticas/tendencias del Corpus, cotizaciones de Tickers e histórico de precios (Market Data), la Watchlist, el **Dossier** persistente (`get_dossier`) y **FX Quotes** (`get_fx_quotes`). Cruza precios con Signals cuando aplica. Cubre preguntas abiertas, análisis por Ticker, research multi-paso, resúmenes temporales, tendencias, comparaciones y cotizaciones FX.
 _Avoid_: Prompt, question, command
 
 **Research Agent**:
@@ -157,7 +161,7 @@ Ejecución concurrente y determinística del bundle de research por Ticker: coti
 _Avoid_: Parallel agents, sub-agents, worker pool, map-reduce
 
 **Citation**:
-Referencia a un Signal fuente que respalda una afirmación de la respuesta del Research Chat. Obligatoria en toda respuesta; clickeable, abre el Signal Detail.
+Referencia a un Signal fuente que respalda una afirmación de la respuesta del Research Chat. Obligatoria en toda respuesta; clickeable, navega a `/terminal?signal=<id>` y abre el Signal Detail.
 _Avoid_: Reference, link
 
 **Source**:
@@ -184,7 +188,7 @@ Preferencias persistidas en Supabase (`operator_settings`): watchlist personaliz
 _Avoid_: User profile, preferences table, config
 
 **Chat Session**:
-Conversación del Research Chat guardada en Supabase (`chat_sessions` + `chat_messages`), con Citations serializadas por mensaje assistant.
+Conversación del Research Chat guardada en Supabase (`chat_sessions` + `chat_messages`), con Citations y artifacts opcionales (p. ej. Chart card `price_chart`) serializados por mensaje assistant.
 _Avoid_: Thread, conversation history, chat log
 
 **Corpus en Store**:
@@ -204,6 +208,10 @@ _Avoid_: Note, watch note, investment thesis document, conviction score
 **Briefing**:
 Memo ejecutivo on-demand, grounded y con Citations, sobre los Tickers del Ticker Watch. Resume lo material del día (prioridad alta, delta vs Briefing anterior, temas cruzados, preguntas abiertas) y apunta al **Dossier** de cada Ticker para profundidad. Refresca Dossiers seleccionados antes de sintetizar (ADR-0009). Prioriza velocidad de lectura: el Operator entiende qué cambió y qué merece atención sin leer un informe completo. No reemplaza al Dossier. Analítico: sin recomendaciones de compra/venta ni predicción de precios; afirmaciones sobre el Corpus respaldadas por Signal. On-demand en Chat Session dedicada (permite follow-up). Ver ADR-0007 y ADR-0009.
 _Avoid_: Digest, report, newsletter, resumen
+
+**Morning Briefing Email**:
+Email diario (CLI + cron) del Briefing del Ticker Watch más bloque FX solo USD/ARS (oficial/blue/MEP/CCL/tarjeta vía dolarapi; sin Frankfurter ni otras monedas), CTAs a Terminal y Research, y pie de disclaimer. Destinatario único (`BRIEFING_EMAIL_TO`). Se envía vía Resend; idempotente por Operator + día calendario en `BRIEFING_EMAIL_TZ`. También persiste la Chat Session `Briefing DD/MM/YYYY` como el Briefing on-demand. Ver F46 y spec `docs/superpowers/specs/2026-07-23-morning-briefing-email-design.md`.
+_Avoid_: newsletter blast, digest email, multi-currency FX mail
 
 **Dossier**:
 Análisis integral persistente por Ticker del Ticker Watch. Estructura en seis bloques: (1) Panorama de mercado, (2) Narrativa del Corpus — ventana larga en dos subcapas: últimos 7 días (urgente) y 7–30 días (contexto), hilos materiales no headlines sueltos, (3) Sentimiento del Corpus — agregado híbrido: estadísticas determinísticas (conteos, tono, fuentes) más síntesis LLM anclada a esos números, (4) Contexto macro/sector, (5) Fundamentals (placeholder honesto hasta que haya fuente), (6) Lectura integrada con alineación a la **Thesis** y lagunas de datos declaradas. Pantalla dedicada `/dossier` (navbar); selector por Ticker del Watch; links desde el Briefing y el popover Watch. Ver ADR-0009. Cruza capas de evidencia con Citations donde aplique al Corpus. Se actualiza on-demand y se **refresca al generar un Briefing**: siempre los Tickers en **prioridad alta**; el resto solo si tuvieron Signals en la ventana del Briefing; los demás reutilizan la última versión. El Briefing consume Dossiers como contexto antes del memo ejecutivo. Conserva historial de versiones (últimas 10 o 30 días por Ticker, lo que ocurra primero). Analítico: sin recomendaciones de compra/venta. El **Chart Plan** es artefacto aparte, on-demand.

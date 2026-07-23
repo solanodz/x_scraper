@@ -4,8 +4,11 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FeedFilterQuery } from "./feedFilters";
 import type {
   ChartPlanVersion,
+  ChatArtifact,
   ChatCitation,
   DossierVersion,
+  PriceChartArtifact,
+  PriceChartCandle,
   Quote,
   ResearchStep,
   SignalDetail,
@@ -13,6 +16,91 @@ import type {
   TickerSuggestion,
   TickerWatchEntry,
 } from "./types";
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function parsePriceChartCandle(raw: unknown): PriceChartCandle | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  // Backend Market Data uses `date`; chat artifact contract prefers `t`.
+  const tRaw = row.t ?? row.date;
+  const t =
+    typeof tRaw === "string"
+      ? tRaw
+      : typeof tRaw === "number"
+        ? String(tRaw)
+        : null;
+  const open = asFiniteNumber(row.open);
+  const high = asFiniteNumber(row.high);
+  const low = asFiniteNumber(row.low);
+  const close = asFiniteNumber(row.close);
+  if (!t || open == null || high == null || low == null || close == null) {
+    return null;
+  }
+  return { t, open, high, low, close };
+}
+
+/** Defensive parse for SSE / history artifacts. Returns null if unusable. */
+export function parseChatArtifact(raw: unknown): ChatArtifact | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (obj.type !== "price_chart") return null;
+
+  const symbol =
+    typeof obj.symbol === "string" ? obj.symbol.trim().toUpperCase() : "";
+  const period = typeof obj.period === "string" ? obj.period.trim() : "";
+  if (!symbol || !period) return null;
+  // Never treat ISO FX codes as equity Chart cards (e.g. mistaken USD ~$92).
+  const FX_CODES = new Set([
+    "USD",
+    "ARS",
+    "EUR",
+    "GBP",
+    "JPY",
+    "BRL",
+    "CNY",
+    "MXN",
+    "CLP",
+    "UYU",
+    "CAD",
+    "AUD",
+    "CHF",
+    "NZD",
+  ]);
+  if (FX_CODES.has(symbol)) return null;
+
+  const candlesRaw = Array.isArray(obj.candles) ? obj.candles : [];
+  const candles: PriceChartCandle[] = [];
+  for (const item of candlesRaw) {
+    const candle = parsePriceChartCandle(item);
+    if (candle) candles.push(candle);
+  }
+  if (candles.length === 0) return null;
+
+  const interval =
+    typeof obj.interval === "string" && obj.interval.trim()
+      ? obj.interval.trim()
+      : undefined;
+
+  const artifact: PriceChartArtifact = {
+    type: "price_chart",
+    symbol,
+    period,
+    interval,
+    candles,
+    start_price: asFiniteNumber(obj.start_price),
+    end_price: asFiniteNumber(obj.end_price),
+    change_percent: asFiniteNumber(obj.change_percent),
+  };
+  return artifact;
+}
 
 function normalizeApiUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, "");
@@ -352,6 +440,7 @@ export type StreamChatCallbacks = {
   onCitations: (citations: ChatCitation[]) => void;
   onStep?: (step: ResearchStep) => void;
   onSession?: (sessionId: string) => void;
+  onArtifact?: (artifact: ChatArtifact) => void;
   onError?: (error: Error) => void;
 };
 
@@ -397,6 +486,14 @@ async function readSseStream(
             currentEvent = "";
           } else if (currentEvent === "step") {
             callbacks.onStep?.(JSON.parse(raw) as ResearchStep);
+            currentEvent = "";
+          } else if (currentEvent === "artifact") {
+            try {
+              const artifact = parseChatArtifact(JSON.parse(raw));
+              if (artifact) callbacks.onArtifact?.(artifact);
+            } catch {
+              // Malformed artifact payloads must not break the stream.
+            }
             currentEvent = "";
           } else {
             const token = JSON.parse(raw) as string;

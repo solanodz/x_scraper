@@ -15,6 +15,28 @@ class ChatRepoError(Exception):
     pass
 
 
+_artifacts_column_ready: bool | None = None
+
+
+def _has_artifacts_column() -> bool:
+    global _artifacts_column_ready
+    if _artifacts_column_ready is not None:
+        return _artifacts_column_ready
+    sql = """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'chat_messages'
+          AND column_name = 'artifacts'
+        LIMIT 1
+    """
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            _artifacts_column_ready = cur.fetchone() is not None
+    return _artifacts_column_ready
+
+
 def _row_to_session(row: tuple) -> dict[str, Any]:
     sid, user_id, title, created_at, updated_at = row
     return {
@@ -27,13 +49,19 @@ def _row_to_session(row: tuple) -> dict[str, Any]:
 
 
 def _row_to_message(row: tuple) -> dict[str, Any]:
-    mid, session_id, role, content, citations, created_at = row
+    # Compatible con SELECT de 6 cols (sin artifacts) o 7 cols.
+    if len(row) >= 7:
+        mid, session_id, role, content, citations, artifacts, created_at = row[:7]
+    else:
+        mid, session_id, role, content, citations, created_at = row
+        artifacts = None
     return {
         "id": str(mid),
         "session_id": str(session_id),
         "role": role,
         "content": content,
         "citations": citations if isinstance(citations, list) else None,
+        "artifacts": artifacts if isinstance(artifacts, list) else None,
         "created_at": created_at,
     }
 
@@ -110,13 +138,23 @@ def list_messages(*, user_id: str, session_id: str) -> list[dict[str, Any]]:
     if get_session(user_id=user_id, session_id=session_id) is None:
         raise ChatRepoError("session not found")
 
-    sql = """
-        SELECT m.id, m.session_id, m.role, m.content, m.citations, m.created_at
-        FROM chat_messages m
-        JOIN chat_sessions s ON s.id = m.session_id
-        WHERE m.session_id = %(session_id)s AND s.user_id = %(user_id)s
-        ORDER BY m.created_at ASC
-    """
+    if _has_artifacts_column():
+        sql = """
+            SELECT m.id, m.session_id, m.role, m.content, m.citations,
+                   m.artifacts, m.created_at
+            FROM chat_messages m
+            JOIN chat_sessions s ON s.id = m.session_id
+            WHERE m.session_id = %(session_id)s AND s.user_id = %(user_id)s
+            ORDER BY m.created_at ASC
+        """
+    else:
+        sql = """
+            SELECT m.id, m.session_id, m.role, m.content, m.citations, m.created_at
+            FROM chat_messages m
+            JOIN chat_sessions s ON s.id = m.session_id
+            WHERE m.session_id = %(session_id)s AND s.user_id = %(user_id)s
+            ORDER BY m.created_at ASC
+        """
     with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, {"session_id": session_id, "user_id": user_id})
@@ -131,28 +169,38 @@ def append_message(
     role: str,
     content: str,
     citations: list[dict[str, Any]] | None = None,
+    artifacts: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if role not in {"user", "assistant"}:
         raise ChatRepoError("invalid role")
     if get_session(user_id=user_id, session_id=session_id) is None:
         raise ChatRepoError("session not found")
 
-    sql = """
-        INSERT INTO chat_messages (session_id, role, content, citations)
-        VALUES (%(session_id)s, %(role)s, %(content)s, %(citations)s)
-        RETURNING id, session_id, role, content, citations, created_at
-    """
+    params = {
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "citations": Json(citations) if citations else None,
+        "artifacts": Json(artifacts) if artifacts else None,
+    }
+    if _has_artifacts_column():
+        sql = """
+            INSERT INTO chat_messages
+                (session_id, role, content, citations, artifacts)
+            VALUES (
+                %(session_id)s, %(role)s, %(content)s, %(citations)s, %(artifacts)s
+            )
+            RETURNING id, session_id, role, content, citations, artifacts, created_at
+        """
+    else:
+        sql = """
+            INSERT INTO chat_messages (session_id, role, content, citations)
+            VALUES (%(session_id)s, %(role)s, %(content)s, %(citations)s)
+            RETURNING id, session_id, role, content, citations, created_at
+        """
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                sql,
-                {
-                    "session_id": session_id,
-                    "role": role,
-                    "content": content,
-                    "citations": Json(citations) if citations else None,
-                },
-            )
+            cur.execute(sql, params)
             row = cur.fetchone()
             cur.execute(
                 "UPDATE chat_sessions SET updated_at = now() WHERE id = %(id)s",

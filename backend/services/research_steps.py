@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 TOOL_STEP_LABELS: dict[str, str] = {
@@ -13,6 +13,8 @@ TOOL_STEP_LABELS: dict[str, str] = {
     "get_quotes": "Obteniendo cotizaciones",
     "get_watchlist_quotes": "Consultando panel de mercado",
     "get_price_history": "Cargando historial de precios",
+    "get_dossier": "Leyendo Dossier del Ticker",
+    "get_fx_quotes": "Consultando FX",
     "research_plan": "Resolviendo contexto del hilo…",
     "parallel_research": "Investigación paralela",
 }
@@ -30,6 +32,19 @@ class ResearchStepEvent:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ChatArtifact:
+    """Artefacto estructurado del Research Chat (p. ej. Chart card de precio)."""
+
+    type: str
+    data: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {"type": self.type}
+        payload.update(self.data)
+        return payload
+
+
 @dataclass
 class GatherResult:
     """Resultado de la fase de research antes de la síntesis."""
@@ -38,6 +53,7 @@ class GatherResult:
     hits: list[Any]
     market_sections: list[str] | None = None
     corpus_sections: list[str] | None = None
+    artifacts: list[dict[str, Any]] | None = None
 
 
 def format_tool_step_label(tool_name: str, arguments: dict[str, Any]) -> str:
@@ -78,6 +94,18 @@ def format_tool_step_label(tool_name: str, arguments: dict[str, Any]) -> str:
             return f"{base} ({sym}, {period})"
         if sym:
             return f"{base} ({sym})"
+
+    if tool_name == "get_dossier" and args.get("symbol"):
+        return f"{base} ({args['symbol']})"
+
+    if tool_name == "get_fx_quotes":
+        scope = args.get("scope") or "ars_usd"
+        if scope == "pair":
+            if args.get("pairs"):
+                return f"{base} ({', '.join(str(p) for p in args['pairs'][:3])})"
+            if args.get("base") and args.get("quote"):
+                return f"{base} ({args['base']}/{args['quote']})"
+        return f"{base} ({scope})"
 
     if tool_name == "corpus_stats":
         if args.get("ticker"):
