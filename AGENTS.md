@@ -7,9 +7,10 @@ Dominio y lenguaje canónico en `CONTEXT.md`. Decisiones en `docs/adr/`.
 
 1. Leer `progress.md` — estado actual y próximo paso.
 2. Leer `feature_list.json` — feature activa y su verificación.
-3. Leer `CONTEXT.md` — usar el lenguaje canónico (Signal, Corpus, Store, etc.).
-4. Revisar `git log --oneline -10` — qué se hizo último.
-5. Correr `./init.sh` — sincroniza dependencias y verifica baseline.
+3. Leer `session-handoff.md` — si existe trabajo a medias.
+4. Leer `CONTEXT.md` — usar el lenguaje canónico (Signal, Corpus, Store, etc.).
+5. Revisar `git log --oneline -10` — qué se hizo último.
+6. Correr `./init.sh` — sync deps, baseline compile, verify de feature `in_progress`.
 
 No apilar trabajo nuevo sobre un baseline roto: si `init.sh` falla, arreglar eso primero.
 
@@ -43,9 +44,17 @@ Una feature es `passing` solo si:
 
 1. Actualizar `progress.md`: qué se hizo, evidencia, próximo paso concreto.
 2. Actualizar `feature_list.json`: status de la feature activa.
-3. Commit seguro (solo si el usuario lo pide) con mensaje descriptivo.
-4. Si el contexto queda a medias, dejar nota en `session-handoff.md`.
+3. Actualizar `session-handoff.md` si el trabajo queda a medias (o vaciar "Next" si quedó limpio).
+4. Commit seguro (solo si el usuario lo pide) con mensaje descriptivo.
 
-## Verification commands
+## Verification
 
-Ver `init.sh`. Baseline actual: sintaxis del scraper + servicios de Docker Compose.
+| Level | Command |
+|-------|---------|
+| Baseline | `./init.sh` |
+| Feature activa | `./scripts/verify_active.sh` |
+| Feature forzada | `VERIFY_FEATURE=F49 ./scripts/verify_active.sh` |
+| Smoke prod (manual) | Ver `progress.md` → Próximo paso |
+
+Baseline: `py_compile` scraper/backend + `docker compose config` + verify de `in_progress`.
+Cada feature `passing` debe listar en `verification[]` un `python -m backend.scripts.verify_*` cuando exista script.

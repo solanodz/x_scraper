@@ -18,7 +18,8 @@ from backend.services.ticker_extract import (
 from backend.services.tools import execute_tool
 
 _QUOTE_SNAPSHOT_RE = re.compile(
-    r"\b(?:precio|cotizaci[oó]n|cotizacion|cotiza|quote|cu[aá]nto\s+vale)\b",
+    r"\b(?:precios?|cotizaci[oó]n(?:es)?|cotizacion(?:es)?|cotiza|"
+    r"quote|cu[aá]nto\s+vale|c[oó]mo\s+est[aá]\s+de\s+precios?)\b",
     re.IGNORECASE,
 )
 _HISTORICAL_PRICE_RE = re.compile(
@@ -261,6 +262,14 @@ def resolve_fast_path(query: str) -> FastPath | None:
         return None
 
     if len(tickers) == 1 and _RECENT_SIGNALS_RE.search(text):
+        # Mixed intents (noticia + precio / "conviene comprar") must not take the
+        # news-only shortcut — that starves Market Data and the LLM inventa "N/A".
+        if (
+            _QUOTE_SNAPSHOT_RE.search(text)
+            or _ANALYTICAL_RE.search(text)
+            or _HISTORICAL_PRICE_RE.search(text)
+        ):
+            return None
         ticker = tickers[0]
         return FastPath(
             kind="recent_signals",

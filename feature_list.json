@@ -1,4 +1,9 @@
 {
+  "rules": {
+    "single_active_feature": true,
+    "passing_requires_evidence": true,
+    "do_not_skip_verification": true
+  },
   "features": [
     {
       "id": "F1",
@@ -951,10 +956,32 @@
         "Fast path routea precio BTC → get_quotes, dólar blue → get_fx_quotes, última noticia MSFT → get_recent_signals",
         "Comparaciones tipo NVDA vs AMD no usan fast path; siguen Parallel Research",
         "Parallel Research emite step running antes de terminar el bundle",
+        "Mixed-intent (noticia + precios / conviene comprar) no usa recent_signals alone (ver F49)",
         "python -m backend.scripts.verify_f48_fast_chat => OK"
       ],
       "evidence": [
-        "2026-07-24: .venv/bin/python -m backend.scripts.verify_f48_fast_chat => OK (fast paths + live parallel steps)"
+        "2026-07-24: .venv/bin/python -m backend.scripts.verify_f48_fast_chat => OK (fast paths + live parallel steps)",
+        "2026-07-24: verify_f48 ampliado con mixed-intent + precios plural (regresión F49)"
+      ]
+    },
+    {
+      "id": "F49",
+      "priority": 49,
+      "title": "Research Chat: Fast Path mixed-intent (noticia + precio)",
+      "user_visible_behavior": "Una Query que pide última noticia Y precio / 'conviene comprar' no usa el atajo news-only: el Research Chat obtiene Market Data (quotes) además del Corpus, en vez de responder 'precio no disponible'.",
+      "status": "passing",
+      "dependencies": [
+        "F48"
+      ],
+      "notes": "Bug: resolve_fast_path priorizaba get_recent_signals y cortaba el gather. Fix: no tomar recent_signals si también hay intent quote/analítico/histórico; regex precio acepta plural 'precios'.",
+      "verification": [
+        "última noticia de MSFT sola → fast path recent_signals",
+        "ultima noticia de msft? y como esta de precios? conviene comprar ahora? → sin fast path (Research completo)",
+        "cómo está de precios MSFT → fast path quote",
+        "python -m backend.scripts.verify_f48_fast_chat => OK"
+      ],
+      "evidence": [
+        "2026-07-24: repro local resolve_fast_path mixed query → None (antes recent_signals); verify_f48_fast_chat => OK (0.39s) con casos mixed-intent + precios plural"
       ]
     }
   ]

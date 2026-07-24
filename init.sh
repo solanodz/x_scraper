@@ -137,5 +137,16 @@ else
 fi
 
 echo ""
+echo "== baseline compile/config OK =="
+
+# Feature activa: corre su verify_* si está listado en verification[].
+# Forzar: VERIFY_FEATURE=F49 ./scripts/verify_active.sh
+if [ -x "scripts/verify_active.sh" ] || [ -f "scripts/verify_active.sh" ]; then
+  echo "[verify] feature activa"
+  bash scripts/verify_active.sh
+fi
+
+echo ""
 echo "== baseline OK =="
 echo "Startup: revisar progress.md -> feature_list.json -> feature activa"
+echo "Handoff: session-handoff.md (si el trabajo queda a medias)"

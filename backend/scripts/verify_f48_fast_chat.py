@@ -37,6 +37,11 @@ def _verify_fast_path_routes() -> int:
         ("precio BTC", "quote"),
         ("dólar blue hoy", "fx"),
         ("última noticia de MSFT", "recent_signals"),
+        (
+            "ultima noticia de msft? y como esta de precios? conviene comprar ahora?",
+            None,
+        ),
+        ("cómo está de precios MSFT", "quote"),
         ("compará NVDA vs AMD", None),
         ("que noticias hubo sobre el dolar esta semana?", None),
         ("que se dijo sobre el dolar en argentina esta semana?", None),
@@ -55,6 +60,10 @@ def _verify_fast_path_routes() -> int:
         ("precio BTC", "concise"),
         ("compará NVDA vs AMD y qué implica", "memo"),
         ("que noticias hubo sobre el dolar esta semana?", "memo"),
+        (
+            "ultima noticia de msft? y como esta de precios? conviene comprar ahora?",
+            "memo",
+        ),
     ]
     for query, expected in style_cases:
         got = infer_response_style(query)
