@@ -20,7 +20,7 @@ Compact restart path for the next agent/session. Keep this current when work is 
 
 ## Next (una sola cosa)
 
-1. Deploy API (Railway) con el commit que incluya F49 + harness.
+1. Push `main` (`3e458ad`) + deploy API (Railway).
 2. Smoke prod: `ultima noticia de msft? y como esta de precios? conviene comprar ahora?` debe traer precio (no “no disponible”).
 3. Confirmar vars: `RESEARCH_ENGINE=langgraph`, `RESEARCH_PARALLEL_ENABLED=true`.
 
