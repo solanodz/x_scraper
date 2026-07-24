@@ -360,8 +360,8 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
           </p>
         )}
 
-        {(analyzing || steps.length > 0) && (
-          <ResearchStepLoader steps={steps} active={analyzing} />
+        {analyzing && (
+          <ResearchStepLoader steps={steps} active />
         )}
 
         <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/40 p-3">

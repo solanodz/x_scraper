@@ -59,6 +59,10 @@ No uses `uvicorn ... --port $PORT` a secas: Docker exec form no expande `$PORT` 
 | `SIGNAL_REQUIRE_LINK` | no | `true` / `false` (default `false`) |
 | `QUOTE_CACHE_TTL_SECONDS` | no | Quote cache TTL (default `900`) |
 | `QUOTE_MAX_DAILY_REQUESTS` | no | Alpha Vantage fallback daily cap (default `25`) |
+| `RESEARCH_ENGINE` | recommended | `langgraph` para el Research Chat rápido (rollback: `legacy`) |
+| `RESEARCH_PARALLEL_ENABLED` | recommended | `true` para Parallel Research por Ticker |
+| `RESEARCH_MAX_TURNS` | no | Default recomendado `6` |
+| `CHAT_HISTORY_MAX_MESSAGES` | no | Default recomendado `10` |
 | `CORS_ORIGINS` | yes | Comma-separated origins, e.g. `https://<app>.vercel.app,http://localhost:3000` |
 
 **Example `CORS_ORIGINS`:**

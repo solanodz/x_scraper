@@ -14,6 +14,7 @@ import TerminalHeader from "@/components/TerminalHeader";
 import TickerLogo from "@/components/TickerLogo";
 import {
   closeBotPosition,
+  fetchQuotes,
   fetchTickerLogos,
   getBotConfig,
   listBotEvents,
@@ -27,6 +28,10 @@ const SYMBOL_OPTIONS = ["BTC", "ETH"] as const;
 const INTERVAL_OPTIONS = ["15m", "30m", "1h", "4h", "1d"] as const;
 /** Paper account baseline for equity curve (USD). */
 const PAPER_START_USD = 10_000;
+/** Positions / fills / events. */
+const BOT_POLL_MS = 15_000;
+/** Live marks drive Price + unrealized PnL (bypasses 15m quote cache). */
+const MARK_POLL_MS = 3_000;
 
 const INPUT =
   "w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-200 outline-none focus:border-zinc-600";
@@ -112,6 +117,19 @@ function unrealizedPct(p: BotPosition): number | null {
   if (!Number.isFinite(mark)) return null;
   const raw = ((mark - entry) / entry) * 100;
   return p.side === "short" ? -raw : raw;
+}
+
+/** Prefer live quote mark over stale DB mark for open positions. */
+function withLiveMarks(
+  positions: BotPosition[],
+  liveMarks: Record<string, number>,
+): BotPosition[] {
+  if (Object.keys(liveMarks).length === 0) return positions;
+  return positions.map((p) => {
+    const live = liveMarks[p.symbol.toUpperCase()];
+    if (live == null || !Number.isFinite(live)) return p;
+    return { ...p, mark_price: live };
+  });
 }
 
 function signedClass(value: number | null | undefined): string {
@@ -222,6 +240,8 @@ function BotPageContent() {
   const [closingId, setClosingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [logos, setLogos] = useState<Record<string, string | null>>({});
+  const [liveMarks, setLiveMarks] = useState<Record<string, number>>({});
+  const [marksUpdatedAt, setMarksUpdatedAt] = useState<number | null>(null);
   const [configOpen, setConfigOpen] = useState(true);
 
   useEffect(() => {
@@ -238,9 +258,37 @@ function BotPageContent() {
     };
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refreshMarks = useCallback(async (symbols: string[]) => {
+    const unique = [
+      ...new Set(symbols.map((s) => s.toUpperCase()).filter(Boolean)),
+    ];
+    if (unique.length === 0) {
+      setLiveMarks({});
+      return;
+    }
+    try {
+      const quotes = await fetchQuotes(unique, { fresh: true });
+      const next: Record<string, number> = {};
+      for (const q of quotes) {
+        if (q.price != null && Number.isFinite(q.price)) {
+          next[q.symbol.toUpperCase()] = q.price;
+        }
+      }
+      if (Object.keys(next).length > 0) {
+        setLiveMarks((prev) => ({ ...prev, ...next }));
+        setMarksUpdatedAt(Date.now());
+      }
+    } catch {
+      // Keep previous marks.
+    }
+  }, []);
+
+  const loadAll = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [cfg, openPositions, closed, recentFills, recentEvents] =
         await Promise.all([
@@ -251,31 +299,92 @@ function BotPageContent() {
           listBotEvents(),
         ]);
       setConfig(cfg);
-      setForm(configToForm(cfg));
+      // Don't clobber an in-progress config edit on background polls.
+      if (!silent) {
+        setForm(configToForm(cfg));
+      }
       setPositions(openPositions);
       setClosedPositions(closed);
       setFills(recentFills);
       setEvents(recentEvents);
+
+      const quoteSymbols = [
+        ...new Set([
+          ...openPositions.map((p) => p.symbol.toUpperCase()),
+          ...(cfg.symbols ?? []).map((s) => s.toUpperCase()),
+        ]),
+      ];
+      await refreshMarks(quoteSymbols);
+
+      if (silent) setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setConfig(null);
-      setForm(null);
-      setPositions([]);
-      setClosedPositions([]);
-      setFills([]);
-      setEvents([]);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!silent) {
+        setError(msg);
+        setConfig(null);
+        setForm(null);
+        setPositions([]);
+        setClosedPositions([]);
+        setFills([]);
+        setEvents([]);
+        setLiveMarks({});
+      } else {
+        setError(msg);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [refreshMarks]);
 
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
 
+  // Positions / fills on a slower cadence.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadAll({ silent: true });
+    };
+    const interval = window.setInterval(tick, BOT_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadAll({ silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadAll]);
+
+  // Marks / PnL on a fast cadence (fresh quotes, no 15m cache).
+  useEffect(() => {
+    const symbols = [
+      ...new Set([
+        ...positions.map((p) => p.symbol.toUpperCase()),
+        ...(config?.symbols ?? []).map((s) => s.toUpperCase()),
+      ]),
+    ];
+    if (symbols.length === 0) return;
+
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      void refreshMarks(symbols);
+    };
+    const interval = window.setInterval(tick, MARK_POLL_MS);
+    return () => window.clearInterval(interval);
+  }, [positions, config?.symbols, refreshMarks]);
+
+  const markedOpen = useMemo(
+    () => withLiveMarks(positions, liveMarks),
+    [positions, liveMarks],
+  );
+
   const stats = useMemo(
-    () => buildStats(positions, closedPositions),
-    [positions, closedPositions],
+    () => buildStats(markedOpen, closedPositions),
+    [markedOpen, closedPositions],
   );
 
   async function handleToggleArmed() {
@@ -327,7 +436,7 @@ function BotPageContent() {
     try {
       await closeBotPosition(id);
       setActionMsg("Closed");
-      await loadAll();
+      await loadAll({ silent: true });
     } catch (err) {
       setActionMsg(err instanceof Error ? err.message : String(err));
     } finally {
@@ -441,6 +550,21 @@ function BotPageContent() {
                         {formatUsd(stats.unrealized)}
                       </span>
                     </span>
+                    {marksUpdatedAt != null ? (
+                      <span className="text-zinc-600" title="Last live mark">
+                        mark{" "}
+                        <span className="text-zinc-500">
+                          {new Date(marksUpdatedAt).toLocaleTimeString(
+                            undefined,
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            },
+                          )}
+                        </span>
+                      </span>
+                    ) : null}
                     <span>
                       Trades{" "}
                       <span className="text-zinc-400">
@@ -551,14 +675,14 @@ function BotPageContent() {
                           <th className="px-3 py-2 font-medium">Side</th>
                           <th className="px-3 py-2 font-medium">Size</th>
                           <th className="px-3 py-2 font-medium">Entry</th>
-                          <th className="px-3 py-2 font-medium">Mark</th>
+                          <th className="px-3 py-2 font-medium">Price</th>
                           <th className="px-3 py-2 font-medium">PnL</th>
                           <th className="px-3 py-2 font-medium">TP / SL</th>
                           <th className="px-3 py-2 font-medium" />
                         </tr>
                       </thead>
                       <tbody>
-                        {positions.length === 0 ? (
+                        {markedOpen.length === 0 ? (
                           <tr>
                             <td
                               colSpan={8}
@@ -568,9 +692,11 @@ function BotPageContent() {
                             </td>
                           </tr>
                         ) : (
-                          positions.map((p) => {
+                          markedOpen.map((p) => {
                             const pct = unrealizedPct(p);
                             const usd = unrealizedUsd(p);
+                            const live =
+                              liveMarks[p.symbol.toUpperCase()] != null;
                             return (
                               <tr
                                 key={p.id}
@@ -598,8 +724,14 @@ function BotPageContent() {
                                 <td className="px-3 py-2.5">
                                   {formatNum(p.entry_price, 4)}
                                 </td>
-                                <td className="px-3 py-2.5">
+                                <td className="px-3 py-2.5 text-zinc-100">
                                   {formatNum(p.mark_price, 4)}
+                                  {live ? (
+                                    <span
+                                      className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80"
+                                      title="Live quote"
+                                    />
+                                  ) : null}
                                 </td>
                                 <td
                                   className={`px-3 py-2.5 ${signedClass(usd)}`}

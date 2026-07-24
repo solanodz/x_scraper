@@ -324,12 +324,19 @@ export async function fetchWatchlistQuotes(): Promise<Quote[]> {
   return res.json();
 }
 
-export async function fetchQuotes(symbols: string[]): Promise<Quote[]> {
+export async function fetchQuotes(
+  symbols: string[],
+  opts?: { fresh?: boolean },
+): Promise<Quote[]> {
   if (symbols.length === 0) return [];
   const normalized = symbols.map((s) => s.replace(/^\$/, "").toUpperCase());
   const params = new URLSearchParams({ symbols: normalized.join(",") });
+  if (opts?.fresh) {
+    params.set("fresh", "true");
+  }
   const res = await fetch(`${API_URL}/quotes?${params}`, {
     headers: await authHeaders(),
+    cache: "no-store",
   });
   if (!res.ok) {
     throw new Error(`Failed to fetch quotes: ${res.status}`);

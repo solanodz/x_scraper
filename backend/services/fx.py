@@ -51,6 +51,8 @@ ARS_USD_CASAS: tuple[tuple[str, str], ...] = (
     ("bolsa", "mep"),
     ("contadoconliqui", "ccl"),
     ("tarjeta", "tarjeta"),
+    ("cripto", "cripto"),
+    ("mayorista", "mayorista"),
 )
 
 _cache: dict[str, tuple[Any, float]] = {}

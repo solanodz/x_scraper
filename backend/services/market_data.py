@@ -29,6 +29,8 @@ CRYPTO_FINNHUB_SYMBOLS: dict[str, str] = {
     "SOL": "BINANCE:SOLUSDT",
 }
 DEFAULT_CACHE_TTL_SECONDS = 900  # 15 min (Finnhub free: 60 req/min)
+# Crypto marks move continuously — keep a short TTL for Paper Bot / live UI.
+CRYPTO_CACHE_TTL_SECONDS = 15
 DEFAULT_MAX_DAILY_REQUESTS = 25  # Solo aplica al fallback Alpha Vantage
 FINNHUB_MIN_REQUEST_INTERVAL_SECONDS = 0.2
 AV_MIN_REQUEST_INTERVAL_SECONDS = 1.2
@@ -134,9 +136,21 @@ def _get_cached(symbol: str) -> Quote | None:
     return quote
 
 
-def _set_cached(quote: Quote) -> None:
-    expires_at = time.monotonic() + get_cache_ttl_seconds()
+def _set_cached(quote: Quote, *, ttl_seconds: int | None = None) -> None:
+    ttl = ttl_seconds if ttl_seconds is not None else get_cache_ttl_seconds()
+    if quote.symbol in CRYPTO_FINNHUB_SYMBOLS:
+        ttl = min(ttl, CRYPTO_CACHE_TTL_SECONDS)
+    expires_at = time.monotonic() + ttl
     _cache[quote.symbol] = (quote, expires_at)
+
+
+def invalidate_quote_cache(symbols: list[str] | None = None) -> None:
+    """Drop cached quotes (all, or only the given symbols)."""
+    if symbols is None:
+        _cache.clear()
+        return
+    for symbol in symbols:
+        _cache.pop(normalize_symbol(symbol), None)
 
 
 def _parse_change_percent(raw: str | None) -> float:
@@ -390,7 +404,11 @@ def fetch_quote(symbol: str) -> Quote | None:
     return quote
 
 
-def fetch_quotes(symbols: list[str]) -> list[Quote]:
+def fetch_quotes(
+    symbols: list[str],
+    *,
+    bypass_cache: bool = False,
+) -> list[Quote]:
     quotes: list[Quote] = []
     seen: set[str] = set()
     pending: list[str] = []
@@ -401,10 +419,13 @@ def fetch_quotes(symbols: list[str]) -> list[Quote]:
             continue
         seen.add(normalized)
 
-        cached = _get_cached(normalized)
-        if cached is not None:
-            quotes.append(cached)
-            continue
+        if not bypass_cache:
+            cached = _get_cached(normalized)
+            if cached is not None:
+                quotes.append(cached)
+                continue
+        else:
+            _cache.pop(normalized, None)
 
         finnhub_quote = _fetch_quote_finnhub(normalized)
         if finnhub_quote is not None:

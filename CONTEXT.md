@@ -149,7 +149,7 @@ Consulta en lenguaje natural del Operator al Research Chat. El Research Agent pu
 _Avoid_: Prompt, question, command
 
 **Research Agent**:
-El agente que responde una Query orquestando herramientas sobre el Corpus y el Market Data antes de sintetizar la respuesta. Elige el camino de research según la Query: **Parallel Research** cuando hay Tickers claros o un **Research Plan** de follow-up; **ReAct** secuencial para el resto. Produce una respuesta grounded con Citations obligatorias derivadas de los Signals que las herramientas devolvieron. Recuerda el hilo de la Chat Session para responder follow-ups. Ver ADR-0006 y ADR-0008.
+El agente que responde una Query orquestando herramientas sobre el Corpus y el Market Data antes de sintetizar la respuesta. Elige el camino de research según la Query: **Parallel Research** cuando hay Tickers claros o un **Research Plan** de follow-up; **ReAct** secuencial para el resto; **fast paths** determinísticos para FX/precio puntual. Produce una respuesta grounded con Citations cuando afirma hechos del Corpus. Si el Operator pide criterio ("conviene comprar?", "qué hago?"), responde con una lectura explícita (alcista/bajista/mixto/insuficiente) anclada a precios + Corpus, con disclaimer de que no es consejo de inversión personalizado — no evade la pregunta. Recuerda el hilo de la Chat Session para follow-ups. Ver ADR-0006 y ADR-0008.
 _Avoid_: Bot, assistant, copilot, chain
 
 **Research Plan**:

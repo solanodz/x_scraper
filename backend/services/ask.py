@@ -27,6 +27,22 @@ def _research_engine() -> str:
     return os.getenv("RESEARCH_ENGINE", "legacy").strip().lower()
 
 
+def _iter_text_tokens(text: str) -> Iterator[str]:
+    """Parte texto en trozos chicos para SSE (UX de streaming)."""
+    import re
+
+    content = text or ""
+    if not content:
+        return
+    # Palabras + whitespace / saltos de línea, para que el bubble crezca fluido.
+    parts = re.findall(r"\S+\s*|\n+", content)
+    if not parts:
+        yield content
+        return
+    for part in parts:
+        yield part
+
+
 def _iter_gather(
     query: str,
     history: list[dict] | None = None,
@@ -34,6 +50,15 @@ def _iter_gather(
     operator_id: str | None = None,
 ):
     prior = prepare_chat_history(history)
+    from backend.services.research_fast_path import iter_fast_path_context
+
+    fast_path_used = False
+    for item in iter_fast_path_context(query, operator_id=operator_id):
+        fast_path_used = True
+        yield item
+    if fast_path_used:
+        return
+
     if _research_engine() == "langgraph":
         from backend.services.research_agent import iter_gather_research_context
 
@@ -62,9 +87,14 @@ def ask(
 
     context = ""
     hits: list = []
+    direct_answer: str | None = None
     for item in _iter_gather(query, history=history, operator_id=operator_id):
         if isinstance(item, GatherResult):
             context, hits = item.context, item.hits
+            direct_answer = item.direct_answer
+
+    if direct_answer:
+        return AskResult(answer=direct_answer, citations=[])
 
     if not hits and "Sin datos" in context:
         return AskResult(
@@ -88,6 +118,7 @@ def ask_stream(
     context = ""
     hits: list = []
     artifacts: list[dict] = []
+    direct_answer: str | None = None
 
     for item in _iter_gather(query, history=history, operator_id=operator_id):
         if isinstance(item, ResearchStepEvent):
@@ -95,9 +126,29 @@ def ask_stream(
         elif isinstance(item, GatherResult):
             context, hits = item.context, item.hits
             artifacts = list(item.artifacts or [])
+            direct_answer = item.direct_answer
+
+    if direct_answer:
+        yield ResearchStepEvent(
+            tool="synthesis",
+            label="Redactando respuesta…",
+            status="running",
+        )
+        for token in _iter_text_tokens(direct_answer):
+            yield token
+        yield ResearchStepEvent(
+            tool="synthesis",
+            label="Redactando respuesta…",
+            status="done",
+        )
+        yield []
+        return
 
     if not hits and "Sin datos" in context:
-        yield "No encontré Signals ni Market Data relevantes para esta Query."
+        for token in _iter_text_tokens(
+            "No encontré Signals ni Market Data relevantes para esta Query."
+        ):
+            yield token
         yield []
         return
 

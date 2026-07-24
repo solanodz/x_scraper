@@ -19,6 +19,7 @@ import {
   stripSentimentMarker,
 } from "@/lib/briefingMarkdown";
 import type { ChatCitation } from "@/lib/types";
+import { colorizeSignedPrices } from "@/lib/signedPriceText";
 
 /** ISO FX codes are not Tickers — never open Dossier/Chart Plan for them. */
 const FX_CURRENCY_CODES = new Set([
@@ -111,12 +112,18 @@ function createBaseComponents(
       </h3>
     ),
     p: ({ children }) => (
-      <p className="mb-2 leading-relaxed text-zinc-200 last:mb-0">{children}</p>
+      <p className="mb-2 leading-relaxed text-zinc-200 last:mb-0">
+        {colorizeSignedPrices(children)}
+      </p>
     ),
     strong: ({ children }) => (
-      <strong className="font-semibold text-zinc-50">{children}</strong>
+      <strong className="font-semibold text-zinc-50">
+        {colorizeSignedPrices(children)}
+      </strong>
     ),
-    em: ({ children }) => <em className="text-zinc-300">{children}</em>,
+    em: ({ children }) => (
+      <em className="text-zinc-300">{colorizeSignedPrices(children)}</em>
+    ),
     ul: ({ children }) => (
       <ul className="mb-2 list-disc space-y-1 pl-4 text-zinc-200 last:mb-0">
         {children}
@@ -127,7 +134,9 @@ function createBaseComponents(
         {children}
       </ol>
     ),
-    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+    li: ({ children }) => (
+      <li className="leading-relaxed">{colorizeSignedPrices(children)}</li>
+    ),
     a: ({ href, children }) => {
       if (href?.startsWith("dossier:") && onDossierClick) {
         const symbol = href.slice("dossier:".length).trim().toUpperCase();
@@ -223,7 +232,7 @@ function createBaseComponents(
     ),
     td: ({ children }) => (
       <td className="border-t border-zinc-800/80 px-2.5 py-1.5 align-top text-zinc-300">
-        {children}
+        {colorizeSignedPrices(children)}
       </td>
     ),
   };
@@ -307,7 +316,7 @@ function createBriefingComponents(
       const raw = nodeText(children);
       return (
         <p className={sentimentParagraphClass(raw)}>
-          {renderSentimentText(children, raw)}
+          {colorizeSignedPrices(renderSentimentText(children, raw))}
         </p>
       );
     },
@@ -320,18 +329,22 @@ function createBriefingComponents(
       if (sentiment === "positive") {
         return (
           <strong className={`font-semibold ${sentimentTextClass.positive}`}>
-            {children}
+            {colorizeSignedPrices(children)}
           </strong>
         );
       }
       if (sentiment === "negative") {
         return (
           <strong className={`font-semibold ${sentimentTextClass.negative}`}>
-            {children}
+            {colorizeSignedPrices(children)}
           </strong>
         );
       }
-      return <strong className="font-semibold text-zinc-300">{children}</strong>;
+      return (
+        <strong className="font-semibold text-zinc-300">
+          {colorizeSignedPrices(children)}
+        </strong>
+      );
     },
     li: ({ children }) => {
       const raw = nodeText(children);
@@ -341,7 +354,7 @@ function createBriefingComponents(
           <li
             className={`mb-1.5 leading-relaxed ${sentimentBlockClass.positive} ${sentimentTextClass.positive}`}
           >
-            {renderSentimentText(children, raw)}
+            {colorizeSignedPrices(renderSentimentText(children, raw))}
           </li>
         );
       }
@@ -350,13 +363,13 @@ function createBriefingComponents(
           <li
             className={`mb-1.5 leading-relaxed ${sentimentBlockClass.negative} ${sentimentTextClass.negative}`}
           >
-            {renderSentimentText(children, raw)}
+            {colorizeSignedPrices(renderSentimentText(children, raw))}
           </li>
         );
       }
       return (
         <li className="leading-relaxed text-zinc-200 pl-4 before:mr-2 before:text-zinc-600 before:content-['•']">
-          {children}
+          {colorizeSignedPrices(children)}
         </li>
       );
     },

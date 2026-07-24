@@ -137,7 +137,14 @@ def get_price_candles(
 @router.get("", response_model=list[Quote])
 def get_quotes(
     symbols: str = Query(..., description="Comma-separated tickers, e.g. AAPL,NVDA"),
+    fresh: bool = Query(
+        False,
+        description="Bypass quote cache (Paper Bot marks / live PnL).",
+    ),
 ) -> list[Quote]:
     symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
-    quotes = [_to_schema(q) for q in market_data.fetch_quotes(symbol_list)]
+    quotes = [
+        _to_schema(q)
+        for q in market_data.fetch_quotes(symbol_list, bypass_cache=fresh)
+    ]
     return _attach_logos(quotes)

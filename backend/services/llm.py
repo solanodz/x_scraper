@@ -107,25 +107,33 @@ Reglas:
 - Para datos de mercado y FX, usá solo números del contexto; aclará delayed / fuente / timestamp si aplica.
 - **Dólar / FX ≠ Ticker**: el precio del dólar en Argentina (oficial, blue, MEP, CCL) es FX Quote, no una acción. No inventes links `dossier:USD`, no trates USD/ARS/EUR como equity, no cites un Chart Plan de "$USD".
 - Si falta información en una fuente, decilo y usá lo que tengas.
-- **No** des recomendaciones de compra/venta ni predicciones de precio.
+- **Criterio cuando te lo piden** ("conviene comprar?", "qué hago?", "entrarías?"):
+  **Respondé la pregunta** con una lectura propia grounded en el contexto
+  (sesgo **alcista / bajista / mixto / insuficiente**).
+  Apoyate en precio vs máximos/mínimos de la ventana, variación reciente,
+  catalizadores del Corpus y gaps. Separá **a favor** vs **en contra**.
+  No inventes targets, stops ni promesas. Cerrá con una línea: no es consejo
+  de inversión personalizado — es lectura analítica del Terminal.
+  **No evadas** con "no doy recomendaciones" si hay datos útiles; si faltan
+  datos, decí qué falta y igual dá la mejor lectura posible con lo disponible.
 - No inventes precios, FX, Dossiers ni Signals que no estén en el contexto.
 - Si el detalle de un Signal marca `content_depth: summary_only` (o equivalente), **declaralo**: no finjas profundidad de Article Body completo (paywall / summary-only).
 - Si el contexto incluye JSON de **corpus_stats**, renderizá los desgloses clave como **tablas markdown GFM**; números solo del contexto (no inventes filas).
 - Comparación multi-Ticker: secciones paralelas `## Ticker: SYMBOL` (una por símbolo). Citations etiquetadas por lado; no mezcles evidencia sin etiquetar.
 
-Formato según tipo de Query:
-- **Trivial / solo precio o FX puntual**: respuesta corta (precio + contexto mínimo). No fuerces el memo completo.
-- **Analítica** (hay Tickers y/o ventana temporal, o pide drivers / qué pasó / comparación): usá esta estructura markdown:
+Estilo de respuesta (prioridad alta — leé el bloque `Response style` del mensaje de usuario):
+- **Default = conciso.** Contestá solo lo pedido. Preferí 2–6 líneas. Sin plantilla fija.
+- **Follow-ups cortos** ("y el oficial?", "y MEP?", "y AMD?"): una respuesta puntual.
+- **Precio / FX**: bid/ask o precio + fuente + timestamp. Sin secciones de relleno.
+- **Última noticia**: 1–3 bullets + Citations.
+- **Respuesta analítica** (style `memo`/`analytical` o Query de análisis/juicio):
+  Elegí la estructura que mejor sirva a esa Query. **No** uses siempre los mismos títulos.
+  Si preguntan criterio de entrada/salida, abrí con la lectura (alcista/bajista/mixto),
+  después evidencia (precio + noticias) y riesgos/gaps.
+  Podés usar prosa, bullets o `##` ad-hoc. Omití bloques vacíos o genéricos.
+  **Prohibido** forzar la plantilla fija "Qué pasó / Por qué importa / Corpus vs precio / Incertidumbre / Preguntas abiertas".
 
-## Qué pasó
-## Por qué importa
-## Corpus vs precio
-(Omití esta sección si no hay Market Data en el contexto.)
-## Incertidumbre / data gaps
-## Preguntas abiertas
-Al final, follow-ups sugeridos como bullets (preguntas concretas, sin recomendar operaciones).
-
-Estructurá con markdown: títulos (##), listas, tablas GFM cuando aplique, **negritas** y links [@username](url).
+Estructurá con markdown liviano: bullets, **negritas**, tablas GFM si hay stats, links [@username](url).
 """
 
 
@@ -164,11 +172,36 @@ def hits_to_citations(hits: list) -> list:
     ]
 
 
+def _style_directive(style: str) -> str:
+    if style == "memo":
+        return (
+            "Response style: analytical\n"
+            "Respondé con la profundidad que pida la Query. "
+            "Si preguntan si conviene comprar/vender o qué hacer: "
+            "dá una lectura explícita (alcista/bajista/mixto/insuficiente) "
+            "anclada a precio + Corpus; no evadas la pregunta. "
+            "Elegí títulos/secciones ad-hoc según el contenido; "
+            "NO uses la plantilla fija Qué pasó / Por qué importa / "
+            "Corpus vs precio / Incertidumbre / Preguntas abiertas. "
+            "Sin relleno ni secciones vacías. Citations en hechos del Corpus. "
+            "Una línea de disclaimer: no es consejo de inversión personalizado."
+        )
+    return (
+        "Response style: concise\n"
+        "Respondé en formato corto (2–6 líneas). "
+        "Prohibido abrir plantillas de memo o secciones de relleno. "
+        "Solo el dato pedido + fuente/timestamp o Citations si aplica."
+    )
+
+
 def _build_synthesis_messages(
     context: str,
     query: str,
     history: list[dict] | None = None,
 ) -> list[dict[str, str]]:
+    from backend.services.research_fast_path import infer_response_style
+
+    style = infer_response_style(query)
     messages: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
     ]
@@ -181,6 +214,7 @@ def _build_synthesis_messages(
         {
             "role": "user",
             "content": (
+                f"{_style_directive(style)}\n\n"
                 f"Signals del Corpus:\n\n{context}\n\n---\n\nQuery: {query}"
             ),
         }

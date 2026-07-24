@@ -45,6 +45,7 @@ python -m py_compile \
   backend/services/research_plan.py \
   backend/services/parallel_research.py \
   backend/services/research_gather.py \
+  backend/services/research_fast_path.py \
   backend/services/research_agent.py \
   backend/services/corpus_stats.py \
   backend/services/fx.py \
@@ -89,7 +90,8 @@ python -m py_compile \
   backend/scripts/verify_f21.py \
   backend/scripts/verify_f22.py \
   backend/scripts/verify_f23.py \
-  backend/scripts/verify_f24.py
+  backend/scripts/verify_f24.py \
+  backend/scripts/verify_f48_fast_chat.py
 
 if [ -f "backend/scripts/verify_f30.py" ]; then
   python -m py_compile backend/scripts/verify_f30.py

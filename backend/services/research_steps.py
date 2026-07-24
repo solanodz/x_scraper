@@ -54,6 +54,8 @@ class GatherResult:
     market_sections: list[str] | None = None
     corpus_sections: list[str] | None = None
     artifacts: list[dict[str, Any]] | None = None
+    # Si está seteado, ask_stream responde esto sin pasar por el LLM.
+    direct_answer: str | None = None
 
 
 def format_tool_step_label(tool_name: str, arguments: dict[str, Any]) -> str:

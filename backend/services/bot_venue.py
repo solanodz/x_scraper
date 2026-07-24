@@ -68,7 +68,7 @@ def _realized_pnl(
 def _default_mark_fn(symbol: str) -> Decimal:
     from backend.services.market_data import fetch_quotes
 
-    quotes = fetch_quotes([symbol])
+    quotes = fetch_quotes([symbol], bypass_cache=True)
     for q in quotes:
         price = getattr(q, "price", None)
         if price is None and isinstance(q, dict):
@@ -204,6 +204,12 @@ class PaperVenue:
             elif mark >= sl:
                 reason = "sl"
         if reason is None:
+            # Keep mark fresh so UI / equity reflect live price between closes.
+            bot_repo.update_mark_price(
+                operator_id=operator_id,
+                position_id=position["id"],
+                mark_price=mark,
+            )
             return None
         return self.close(
             operator_id=operator_id,

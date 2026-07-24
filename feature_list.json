@@ -934,6 +934,28 @@
         "2026-07-23: .venv/bin/python -m backend.scripts.verify_f47_paper_bot => OK",
         "2026-07-23: frontend /bot + TerminalHeader Bot nav; tsc --noEmit OK"
       ]
+    },
+    {
+      "id": "F48",
+      "priority": 48,
+      "title": "Research Chat Fast Path",
+      "user_visible_behavior": "El Research Chat responde más rápido: queries simples de Quote/FX/última noticia evitan el agente completo, y las queries por Ticker muestran pasos de Parallel Research mientras las herramientas siguen corriendo.",
+      "status": "passing",
+      "dependencies": [
+        "F24",
+        "F39",
+        "F45"
+      ],
+      "notes": "Fast paths determinísticos antes del ReAct: get_quotes, get_fx_quotes y get_recent_signals. Parallel Research conserva un sintetizador final pero streamea steps en vivo desde un worker thread.",
+      "verification": [
+        "Fast path routea precio BTC → get_quotes, dólar blue → get_fx_quotes, última noticia MSFT → get_recent_signals",
+        "Comparaciones tipo NVDA vs AMD no usan fast path; siguen Parallel Research",
+        "Parallel Research emite step running antes de terminar el bundle",
+        "python -m backend.scripts.verify_f48_fast_chat => OK"
+      ],
+      "evidence": [
+        "2026-07-24: .venv/bin/python -m backend.scripts.verify_f48_fast_chat => OK (fast paths + live parallel steps)"
+      ]
     }
   ]
 }

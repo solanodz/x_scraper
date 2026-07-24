@@ -360,6 +360,39 @@ def insert_position(
     return _position_row(row)
 
 
+def update_mark_price(
+    *,
+    operator_id: str,
+    position_id: str,
+    mark_price: float,
+) -> dict[str, Any] | None:
+    """Actualiza mark de una Position open (mark-to-market entre ticks)."""
+    sql = """
+        UPDATE bot_positions
+        SET mark_price = %(mark_price)s
+        WHERE id = %(position_id)s::uuid
+          AND operator_id = %(operator_id)s::uuid
+          AND status = 'open'
+        RETURNING id, operator_id, symbol, side, size_usd, qty, leverage,
+                  entry_price, tp_price, sl_price, status, opened_at, closed_at,
+                  close_reason, realized_pnl, venue, external_id, mark_price
+    """
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql,
+                {
+                    "operator_id": operator_id,
+                    "position_id": position_id,
+                    "mark_price": mark_price,
+                },
+            )
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return _position_row(row)
+
+
 def close_position_row(
     *,
     operator_id: str,

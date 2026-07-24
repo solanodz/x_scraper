@@ -89,8 +89,16 @@ export default function ResearchChat({
   const sessionIdRef = useRef<string | null>(null);
   const messagesRef = useRef(messages);
   const streamingRef = useRef(streaming);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   messagesRef.current = messages;
   streamingRef.current = streaming;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: streaming ? "auto" : "smooth",
+      block: "end",
+    });
+  }, [messages, streaming, loading]);
 
   const persistActiveSession = useCallback((sessionId: string | null) => {
     sessionIdRef.current = sessionId;
@@ -501,19 +509,13 @@ export default function ResearchChat({
                 </div>
               ) : (
                 <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
-                  {msg.steps && msg.steps.length > 0 && (
-                    <ResearchStepLoader
-                      steps={msg.steps}
-                      active={
-                        streaming && i === messages.length - 1 && !msg.content
-                      }
-                    />
-                  )}
                   {streaming &&
                     i === messages.length - 1 &&
-                    !msg.content &&
-                    !msg.steps?.length && (
-                      <ResearchStepLoader steps={[]} active />
+                    !msg.content && (
+                      <ResearchStepLoader
+                        steps={msg.steps ?? []}
+                        active
+                      />
                     )}
                   {(msg.content ||
                     !(streaming && i === messages.length - 1)) && (
@@ -545,6 +547,7 @@ export default function ResearchChat({
                 </div>
               ),
             )}
+            <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
           </div>
         </div>
 

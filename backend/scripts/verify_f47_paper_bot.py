@@ -243,6 +243,21 @@ class _MemStore:
         self.positions[pos_id] = row
         return deepcopy(row)
 
+    def update_mark_price(
+        self,
+        *,
+        operator_id: str,
+        position_id: str,
+        mark_price: float,
+    ) -> dict[str, Any] | None:
+        row = self.positions.get(position_id)
+        if row is None or row.get("status") != "open":
+            return None
+        if row.get("operator_id") != operator_id:
+            return None
+        row["mark_price"] = float(mark_price)
+        return deepcopy(row)
+
     def close_position_row(
         self,
         *,
@@ -347,6 +362,7 @@ def _patch_bot_repo(store: _MemStore):
         "list_positions",
         "get_position",
         "insert_position",
+        "update_mark_price",
         "close_position_row",
         "insert_fill",
         "list_fills",
@@ -394,6 +410,12 @@ def test_paper_venue_open_tp() -> None:
         assert abs(pos["tp_price"] - 102.0) < 1e-6
         assert abs(pos["sl_price"] - 99.0) < 1e-6
         assert opened["fill"]["price"] == 100.0
+
+        # Mark-to-market without hitting TP/SL should refresh mark_price.
+        marks["BTC"] = 100.5
+        none_close = venue.check_tp_sl(operator_id=operator_id, position=pos)
+        assert none_close is None
+        assert abs(float(store.positions[pos["id"]]["mark_price"]) - 100.5) < 1e-6
 
         marks["BTC"] = 103.0
         closed = venue.check_tp_sl(operator_id=operator_id, position=pos)

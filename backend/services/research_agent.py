@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import queue
+import threading
 from collections.abc import Iterator
 from typing import Any, Callable
 
@@ -50,6 +52,7 @@ Si hay historial de conversación, usalo para follow-ups (comparaciones, aclarac
 Guía:
 - Última noticia / noticias recientes / qué pasó hoy: get_recent_signals (con ticker y hours si aplica). Preferir sobre search_corpus para "última noticia de X".
 - Preguntas sobre un Ticker o empresa (Intel, INTC, precio, qué pasó): get_quotes + get_recent_signals o search_corpus; **si piden precio/evolución/ventana (30d, mes, gráfico), SIEMPRE get_price_history** (genera el Chart card)
+- Criterio de entrada/salida ("conviene comprar?", "qué hago?", precio vs máximo): get_quotes + get_price_history + get_recent_signals/search_corpus (y get_dossier si hay). No alcanza solo el snapshot.
 - Claims profundos: antes de terminar, get_signal_detail en los id_str clave; si body≈summary / content_depth=summary_only, anotalo (summary-only / paywall)
 - Comparar activos (A vs B): get_quotes + corpus por cada Ticker; evidencia etiquetada por símbolo
 - Solo narrativa o tema amplio (no reciente): search_corpus (usá ticker y since_hours si aplica)
@@ -276,15 +279,12 @@ def _iter_gather_research_context_inner(
         pending_steps.append(step)
 
     if parallel_research_enabled():
-        if _run_parallel_gather(
+        if (yield from _iter_parallel_gather(
             context,
             query,
             history,
-            on_step=on_step,
             operator_id=operator_id,
-        ):
-            while pending_steps:
-                yield pending_steps.pop(0)
+        )):
             yield GatherResult(
                 context=format_research_context(context),
                 hits=context.hits,
@@ -341,6 +341,52 @@ def _iter_gather_research_context_inner(
         corpus_sections=list(context.corpus_sections),
         artifacts=list(context.artifacts),
     )
+
+
+def _iter_parallel_gather(
+    context: ResearchContext,
+    query: str,
+    history: list[dict] | None,
+    *,
+    operator_id: str | None = None,
+) -> Iterator[ResearchStepEvent | bool]:
+    """Run Parallel Research in a worker so step events stream while tools run."""
+    step_queue: queue.Queue[ResearchStepEvent | BaseException | bool] = queue.Queue()
+
+    def on_step(step: ResearchStepEvent) -> None:
+        step_queue.put(step)
+
+    def run() -> None:
+        try:
+            used = _run_parallel_gather(
+                context,
+                query,
+                history,
+                on_step=on_step,
+                operator_id=operator_id,
+            )
+            step_queue.put(used)
+        except BaseException as exc:  # noqa: BLE001 - propagate to generator
+            step_queue.put(exc)
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+
+    used_parallel = False
+    while worker.is_alive() or not step_queue.empty():
+        try:
+            item = step_queue.get(timeout=0.05)
+        except queue.Empty:
+            continue
+        if isinstance(item, ResearchStepEvent):
+            yield item
+            continue
+        if isinstance(item, BaseException):
+            raise item
+        used_parallel = bool(item)
+
+    worker.join()
+    return used_parallel
 
 
 def gather_research_context(
