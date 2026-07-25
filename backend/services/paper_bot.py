@@ -218,6 +218,10 @@ def run_tick(
                 "reason": reason,
             }
         )
+        # Holding a position re-emits the same Donchian breakout every tick —
+        # logging symbol_already_open floods bot_events (100s/day) without value.
+        if reason == "symbol_already_open":
+            return
         kind = "skip_duplicate" if reason == "duplicate_bar" else "skip"
         bot_repo.insert_event(
             operator_id=operator_id,

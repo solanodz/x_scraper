@@ -120,8 +120,8 @@ def _default_mark_fn(symbol: str) -> Decimal:
 class PaperVenue:
     """Fills al mark; persiste Position/Fill vía bot_repo.
 
-    size_usd = notional USD (ADR-0015). leverage se guarda para Risk Policy /
-    Hyperliquid futuro; en paper MVP no multiplica qty ni PnL.
+    size_usd = base USD del Operator; notional efectivo = size_usd × leverage;
+    qty = notional / mark. PnL usa qty (el leverage amplifica exposición).
     """
 
     def __init__(
@@ -153,8 +153,11 @@ class PaperVenue:
         mark = float(self.get_mark_price(symbol))
         if mark <= 0:
             raise bot_repo.BotRepoError(f"invalid mark for {symbol}")
-        # Notional USD → qty. Leverage is NOT applied to qty in paper MVP.
-        qty = float(size_usd) / mark
+        lev = max(float(leverage), 1.0)
+        notional = float(size_usd) * lev
+        if notional <= 0:
+            raise bot_repo.BotRepoError(f"invalid notional for {symbol}")
+        qty = notional / mark
         tp_price, sl_price = _tp_sl_prices(
             side=side,
             entry=mark,
@@ -167,7 +170,7 @@ class PaperVenue:
             side=side,
             size_usd=float(size_usd),
             qty=qty,
-            leverage=float(leverage),
+            leverage=lev,
             entry_price=mark,
             tp_price=tp_price,
             sl_price=sl_price,

@@ -720,6 +720,12 @@ function BotPageContent() {
                                 <td className="px-3 py-2.5">
                                   ${formatNum(p.size_usd)} ·{" "}
                                   {formatNum(p.leverage, 1)}x
+                                  {p.leverage != null &&
+                                  p.size_usd != null &&
+                                  Number.isFinite(p.leverage) &&
+                                  Number.isFinite(p.size_usd)
+                                    ? ` (n $${formatNum(p.size_usd * p.leverage, 0)})`
+                                    : ""}
                                 </td>
                                 <td className="px-3 py-2.5">
                                   {formatNum(p.entry_price, 4)}
@@ -945,7 +951,7 @@ function BotPageContent() {
                   />
                 </label>
                 <label>
-                  <span className={LABEL}>Size USD (notional)</span>
+                  <span className={LABEL}>Size USD (× lev = notional)</span>
                   <input
                     type="number"
                     min={1}
@@ -961,7 +967,7 @@ function BotPageContent() {
                   />
                 </label>
                 <label>
-                  <span className={LABEL}>Leverage (display)</span>
+                  <span className={LABEL}>Leverage</span>
                   <input
                     type="number"
                     min={1}
@@ -974,7 +980,7 @@ function BotPageContent() {
                         leverage: Number(e.target.value) || 1,
                       })
                     }
-                    title="Paper MVP: size is notional USD; leverage does not multiply qty/PnL yet"
+                    title="Notional = size_usd × leverage; qty = notional / mark"
                   />
                 </label>
                 <label>

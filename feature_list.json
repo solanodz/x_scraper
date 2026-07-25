@@ -984,6 +984,26 @@
         "2026-07-24: repro local resolve_fast_path mixed query → None (antes recent_signals); verify_f48_fast_chat => OK (0.39s) con casos mixed-intent + precios plural",
         "2026-07-24: smoke prod post-Railway redeploy — mixed MSFT+precios+conviene incluye precio; BTC/blue/noticia sola/NVDA vs AMD OK"
       ]
+    },
+    {
+      "id": "F50",
+      "priority": 50,
+      "title": "Paper Bot: leverage real + menos spam de skips",
+      "user_visible_behavior": "En paper, leverage multiplica la exposición (qty = size_usd × leverage / mark) y el Events del bot ya no se inunda con skips symbol_already_open mientras hay una Position open.",
+      "status": "passing",
+      "dependencies": [
+        "F47"
+      ],
+      "notes": "Desde soak: 432 skips symbol_already_open + confusión leverage. size_usd pasa a base; notional = size × lev. ADR-0015/CONTEXT actualizados.",
+      "verification": [
+        "PaperVenue open con leverage=4 → qty = (size_usd×4)/mark",
+        "run_tick con posición open + breakout: summary skipped incluye symbol_already_open pero bot_events no persiste esos skips",
+        "python -m backend.scripts.verify_f47_paper_bot => OK"
+      ],
+      "evidence": [
+        "2026-07-25: .venv/bin/python -m backend.scripts.verify_f47_paper_bot => OK (lev×qty + silent symbol_already_open)",
+        "2026-07-25: VERIFY_FEATURE=F50 ./scripts/verify_active.sh => OK"
+      ]
     }
   ]
 }

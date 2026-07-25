@@ -250,7 +250,7 @@ Reglas determinísticas de entrada/salida del Paper Bot. MVP: **Donchian Breakou
 _Avoid_: trading tip engine, AI entry model, signal tip generator
 
 **Risk Policy**:
-Límites y defaults de tamaño (notional USD), leverage, take-profit y stop-loss del Paper Bot. MVP: estáticos en **Bot Config** (Operator). Más adelante puede incorporar sentimiento del Corpus u otras variables sin cambiar el puerto del Execution Venue. Caps: `max_positions` ∈ [1, 10]; una sola Position open por símbolo.
+Límites y defaults de tamaño (`size_usd` base × **leverage** = notional efectivo), take-profit y stop-loss del Paper Bot. MVP: estáticos en **Bot Config** (Operator). `qty = (size_usd × leverage) / mark`. Más adelante puede incorporar sentimiento del Corpus u otras variables sin cambiar el puerto del Execution Venue. Caps: `max_positions` ∈ [1, 10]; una sola Position open por símbolo.
 _Avoid_: money management tip, Kelly tip, portfolio allocator
 
 **Trade Signal**:

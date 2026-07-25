@@ -412,6 +412,24 @@ def test_paper_venue_open_tp() -> None:
         assert abs(pos["tp_price"] - entry * 1.02) < 1e-6
         assert abs(pos["sl_price"] - entry * 0.99) < 1e-6
         assert opened["fill"]["price"] == entry
+        # leverage=1 → notional = size_usd
+        assert abs(float(pos["qty"]) - (1000.0 / entry)) < 1e-9
+
+        # Leverage multiplies notional / qty (F50).
+        eth_mark = 3_000.0
+        marks["ETH"] = eth_mark
+        opened_lev = venue.open(
+            operator_id=operator_id,
+            symbol="ETH",
+            side="long",
+            size_usd=100.0,
+            leverage=4.0,
+            tp_pct=2,
+            sl_pct=1,
+        )
+        expected_qty = (100.0 * 4.0) / eth_mark
+        assert abs(float(opened_lev["position"]["qty"]) - expected_qty) < 1e-9
+        assert float(opened_lev["position"]["leverage"]) == 4.0
 
         # Mark-to-market without hitting TP/SL should refresh mark_price.
         marks["BTC"] = entry * 1.005
@@ -460,6 +478,54 @@ def test_paper_venue_open_tp() -> None:
             p.stop()
 
     print("  PaperVenue open + TP close (injected marks, no network) OK")
+
+
+def test_skip_symbol_already_open_not_persisted() -> None:
+    """Holding a position must not flood bot_events with symbol_already_open (F50)."""
+    from backend.services.bot_venue import PaperVenue
+    from backend.services.paper_bot import run_tick
+
+    operator_id = f"00000000-0000-4000-8000-{uuid.uuid4().hex[:12]}"
+    store = _MemStore(operator_id)
+    entry = 65_000.0
+    marks = {"BTC": entry}
+    patches = _patch_bot_repo(store)
+    for p in patches:
+        p.start()
+    try:
+        venue = PaperVenue(mark_fn=lambda s: Decimal(str(marks[s])))
+        opened = venue.open(
+            operator_id=operator_id,
+            symbol="BTC",
+            side="long",
+            size_usd=500,
+            leverage=1,
+            tp_pct=2,
+            sl_pct=1,
+        )
+        store.config["armed"] = True
+        candles = _synthetic_breakout_up(period=20)
+        # Same breakout while long is open → filter symbol_already_open every tick.
+        summary = run_tick(
+            operator_id,
+            candles_by_symbol={"BTC": candles},
+            mark_prices=marks,
+        )
+        assert any(
+            s.get("reason") == "symbol_already_open" for s in (summary.get("skipped") or [])
+        ), summary
+        skip_events = [
+            e
+            for e in store.events
+            if e.get("kind") == "skip"
+            and (e.get("payload") or {}).get("reason") == "symbol_already_open"
+        ]
+        assert skip_events == [], skip_events
+        assert store.positions[opened["position"]["id"]]["status"] == "open"
+    finally:
+        for p in patches:
+            p.stop()
+    print("  symbol_already_open skips not persisted OK")
 
 
 def test_api_venue_reject_hyperliquid() -> None:
@@ -515,6 +581,7 @@ def main() -> int:
     test_donchian_and_strategy()
     test_hyperliquid_stub()
     test_paper_venue_open_tp()
+    test_skip_symbol_already_open_not_persisted()
     test_api_venue_reject_hyperliquid()
     print("OK")
     return 0
