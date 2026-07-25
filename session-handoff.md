@@ -2,22 +2,22 @@
 
 ## Verified now
 
-- F51: `verify_f51` OK (multi-ticker OR, empty→FALSE, UI Mis tickers + empty Watch).
+- F52: `verify_f52` OK (crypto N/A, Finnhub equity mock, dossier attach, UI panel).
 
 ## Changed this session
 
-- `GET /signals?tickers=AAPL,MSFT` (+ count)
-- Feed toggle Mis tickers desde Ticker Watch
-- Empty Watch → empty state (no feed general)
-- CONTEXT Signal Feed actualizado
+- `backend/services/fundamentals.py` — Finnhub profile2+metric → yfinance
+- Dossier gather/context overwrites bloque Fundamentals + `content.fundamentals`
+- DossierPanel: FundamentalsSnapshotPanel
+- CONTEXT + ADR-0009 actualizados
 
 ## Blockers
 
-- Redeploy API + frontend para ver F51 en prod.
+- Redeploy API + frontend. Operator debe Refresh Dossier para persistir snapshot nuevo.
 
 ## Next
 
-F52 — Dossier Fundamentals snapshot (Finnhub→yfinance).
+F53 — Landing honest copy + empty/disabled states + Research chips Rápido/Research.
 
 ## Do not touch
 

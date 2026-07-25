@@ -134,9 +134,23 @@ export interface TickerWatchEntry {
   created_at: string;
 }
 
+export interface DossierFundamentalsSnapshot {
+  symbol: string;
+  asset_kind: "equity" | "crypto" | "unknown" | string;
+  price: number | null;
+  market_cap: number | null;
+  pe: number | null;
+  eps: number | null;
+  sector: string | null;
+  industry: string | null;
+  source: string;
+  as_of?: string;
+}
+
 export interface DossierBlockContent {
   blocks: Record<string, string>;
   sentiment_stats?: Record<string, number | string | Record<string, number>>;
+  fundamentals?: DossierFundamentalsSnapshot | null;
 }
 
 export interface DossierVersion {

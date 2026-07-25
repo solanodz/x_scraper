@@ -9,7 +9,10 @@ import {
   fetchTickerLogos,
   refreshDossier,
 } from "@/lib/api";
-import type { DossierVersion } from "@/lib/types";
+import type {
+  DossierFundamentalsSnapshot,
+  DossierVersion,
+} from "@/lib/types";
 
 const DOSSIER_BLOCKS = [
   { key: "panorama_mercado", label: "Panorama de mercado" },
@@ -193,6 +196,7 @@ function DossierContent({
 
   const blocks = dossier.content?.blocks ?? {};
   const sentimentStats = dossier.content?.sentiment_stats;
+  const fundamentals = dossier.content?.fundamentals ?? null;
   const hasBlocks = DOSSIER_BLOCKS.some(({ key }) => blocks[key]?.trim());
 
   return (
@@ -204,7 +208,7 @@ function DossierContent({
       )}
       {DOSSIER_BLOCKS.map(({ key, label }) => {
         const body = blocks[key]?.trim();
-        if (!body) return null;
+        if (!body && !(key === "fundamentals" && fundamentals)) return null;
 
         return (
           <section
@@ -217,10 +221,93 @@ function DossierContent({
             {key === "sentimiento" && sentimentStats && (
               <SentimentStatsPanel stats={sentimentStats} />
             )}
-            <ChatMarkdown content={body} citations={dossier.citations} />
+            {key === "fundamentals" && fundamentals ? (
+              <FundamentalsSnapshotPanel snapshot={fundamentals} />
+            ) : (
+              body && (
+                <ChatMarkdown content={body} citations={dossier.citations} />
+              )
+            )}
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function formatMcap(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "no disponible";
+  if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+function formatNum(value: number | null | undefined, digits = 2): string {
+  if (value == null || Number.isNaN(value)) return "no disponible";
+  return value.toFixed(digits);
+}
+
+function FundamentalsSnapshotPanel({
+  snapshot,
+}: {
+  snapshot: DossierFundamentalsSnapshot;
+}) {
+  const rows = [
+    {
+      label: "precio",
+      value:
+        snapshot.price == null
+          ? "no disponible"
+          : `$${snapshot.price.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`,
+    },
+    { label: "market cap", value: formatMcap(snapshot.market_cap) },
+    { label: "P/E", value: formatNum(snapshot.pe) },
+    { label: "EPS", value: formatNum(snapshot.eps) },
+    { label: "sector", value: snapshot.sector?.trim() || "no disponible" },
+    {
+      label: "industry",
+      value: snapshot.industry?.trim() || "no disponible",
+    },
+  ];
+
+  return (
+    <div className="mb-2 space-y-2 rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
+        <span>snapshot</span>
+        <span className="text-zinc-600">·</span>
+        <span className="text-emerald-500/80">{snapshot.source || "none"}</span>
+        {snapshot.asset_kind === "crypto" && (
+          <>
+            <span className="text-zinc-600">·</span>
+            <span className="text-amber-500/80">crypto</span>
+          </>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {rows.map(({ label, value }) => (
+          <span key={label} className="font-mono text-[10px] text-zinc-400">
+            <span className="text-zinc-500">{label}:</span>{" "}
+            <span
+              className={
+                value === "no disponible"
+                  ? "text-zinc-600"
+                  : "text-emerald-400/90"
+              }
+            >
+              {value}
+            </span>
+          </span>
+        ))}
+      </div>
+      {snapshot.asset_kind === "crypto" && (
+        <p className="font-mono text-[10px] text-zinc-600">
+          PE/EPS/market cap equity no aplican; solo precio de Market Data.
+        </p>
+      )}
     </div>
   );
 }

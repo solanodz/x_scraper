@@ -93,7 +93,8 @@ python -m py_compile \
   backend/scripts/verify_f24.py \
   backend/scripts/verify_f48_fast_chat.py \
   backend/scripts/verify_f38.py \
-  backend/scripts/verify_f51.py
+  backend/scripts/verify_f51.py \
+  backend/scripts/verify_f52.py
 
 if [ -f "backend/scripts/verify_f30.py" ]; then
   python -m py_compile backend/scripts/verify_f30.py

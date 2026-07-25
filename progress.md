@@ -2,21 +2,19 @@
 
 ## Estado actual
 
-**F51 `passing`.** Signal Feed: toggle Mis tickers (`tickers=` OR) + empty state si Watch vacío.
+**F52 `passing`.** Dossier Fundamentals: snapshot Finnhub→yfinance (precio, mkt cap, P/E, EPS, sector; "no disponible" por campo; crypto honesto).
 
-Programa grill: ~~F38~~ → ~~F51~~ → **siguiente: F52** Dossier Fundamentals → F53 polish.
+Programa grill: ~~F38~~ → ~~F51~~ → ~~F52~~ → **siguiente: F53** polish confianza.
 
 ## Próximo paso
 
-Abrir **F52** in_progress: snapshot Fundamentals (Finnhub→yfinance) en Dossier.
+Abrir **F53** in_progress: landing + empty states + Research chips.
 
 ## Notas
 
-- 2026-07-25 — F51: API `tickers=`, toggle Feed, empty Watch.  
-- 2026-07-25 — F38 Article Body caps.  
-- Redeploy **API + Web** para F51 en prod.
+- 2026-07-25 — F52 fundamentals snapshot; bloque Dossier ya no usa placeholder F31.  
+- Redeploy **API + Web** para F51/F52 en prod. Refresh de un Dossier equity para ver el panel.
 
 ## Roadmap
 
-- **F52** pending (next)  
-- **F53** pending  
+- **F53** pending (next)  

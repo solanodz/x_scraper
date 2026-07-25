@@ -155,6 +155,7 @@ class TickerWatchUpdateRequest(BaseModel):
 class DossierBlockContent(BaseModel):
     blocks: dict[str, str]
     sentiment_stats: dict[str, Any] | None = None
+    fundamentals: dict[str, Any] | None = None
 
 
 class DossierVersion(BaseModel):

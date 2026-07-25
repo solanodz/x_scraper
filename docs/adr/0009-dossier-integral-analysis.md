@@ -16,7 +16,7 @@ El Operator necesita un análisis en el que pueda confiar — que cruce narrativ
 ## Decisiones asociadas
 
 - **Briefing** = memo ejecutivo on-demand (novedad del día, delta vs Briefing anterior, prioridad alta). **Dossier** = análisis integral por Ticker, artefacto de referencia.
-- **Estructura del Dossier** (seis bloques): (1) Panorama de mercado, (2) Narrativa del Corpus en dos subcapas — últimos 7d (urgente) y 7–30d (contexto), (3) Sentimiento del Corpus — híbrido (stats determinísticas + síntesis LLM anclada), (4) Contexto macro/sector, (5) Fundamentals — placeholder honesto en F30 hasta F31, (6) Lectura integrada con alineación a **Thesis** y lagunas declaradas.
+- **Estructura del Dossier** (seis bloques): (1) Panorama de mercado, (2) Narrativa del Corpus en dos subcapas — últimos 7d (urgente) y 7–30d (contexto), (3) Sentimiento del Corpus — híbrido (stats determinísticas + síntesis LLM anclada), (4) Contexto macro/sector, (5) Fundamentals — snapshot determinístico (F52; Finnhub→yfinance; campos ausentes = "no disponible"), (6) Lectura integrada con alineación a **Thesis** y lagunas declaradas.
 - **Refresh al Briefing**: antes de sintetizar el memo, refrescar Dossiers de Tickers en **prioridad alta** siempre; el resto solo si tuvieron Signals en la ventana del Briefing; los demás reutilizan la última versión (ADR-0007 prioridad_alta determinística se reusa).
 - **Persistencia**: tabla `ticker_dossier_versions` por Operator + Ticker; cada refresh crea versión nueva; retención últimas **10 versiones** o **30 días** (lo que ocurra primero).
 - **UI**: Signal Detail en **modo Dossier** al abrir desde Ticker Watch o link en el Briefing; modo Signal sin cambios al clicar un Signal del Feed. Research Chat profundiza un bloque del Dossier.
@@ -31,5 +31,5 @@ El Operator necesita un análisis en el que pueda confiar — que cruce narrativ
 - Nuevo servicio `backend/services/dossier.py` (o equivalente) y endpoints `GET /dossier/{symbol}`, `POST /dossier/{symbol}/refresh` (on-demand).
 - Signal Detail en frontend: toggle Signal | Dossier; historial de versiones.
 - Costo de OpenAI sube en Briefing (refresh de 2+ Dossiers) — mitigable con política de refresh B y ventanas acotadas.
-- **F31** añade fundamentals reales al bloque 5; **F32** unifica provenance/Citations para datos no-Signal.
+- **F52** (ex-F31) añade fundamentals snapshot al bloque 5; **F32** unifica provenance/Citations para datos no-Signal.
 - Implementación en feature **F30**; verificación con script dedicado y regresión Briefing (F20–F23).

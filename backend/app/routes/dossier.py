@@ -81,11 +81,14 @@ def _content_to_schema(raw: dict[str, Any]) -> DossierBlockContent:
         blocks = {
             key: value
             for key, value in raw.items()
-            if key != "sentiment_stats" and isinstance(value, str)
+            if key not in ("sentiment_stats", "fundamentals")
+            and isinstance(value, str)
         }
+    fundamentals = raw.get("fundamentals")
     return DossierBlockContent(
         blocks=blocks,
         sentiment_stats=raw.get("sentiment_stats"),
+        fundamentals=fundamentals if isinstance(fundamentals, dict) else None,
     )
 
 

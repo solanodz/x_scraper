@@ -1036,18 +1036,22 @@
       "priority": 52,
       "title": "Dossier Fundamentals snapshot (Finnhub→yfinance)",
       "user_visible_behavior": "El bloque Fundamentals del Dossier muestra un snapshot básico (precio, mkt cap, PE/EPS/sector si hay) vía Finnhub con fallback yfinance; si falta dato, declara no disponible (sin placeholder F31).",
-      "status": "pending",
+      "status": "passing",
       "dependencies": [
         "F30",
         "F7"
       ],
       "notes": "Grill 2026-07-25: snapshot only, no lectura buy/sell. Cascada Market Data. Cierra hueco ADR-0009 bloque 5.",
       "verification": [
-        "Dossier de equity líquido incluye fundamentals numéricos o 'no disponible' por campo",
-        "Sin inventar PE/mkt cap ausentes",
-        "Crypto/FX: bloque honesto (N/A o omitido)"
+        "python -m backend.scripts.verify_f52 => OK",
+        "Equity mock Finnhub: PE/mkt cap numéricos; ausentes = no disponible",
+        "Crypto: sin inventar PE/EPS/mkt cap",
+        "DossierPanel muestra FundamentalsSnapshotPanel"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f52 => OK (crypto N/A, Finnhub mock, attach+UI)",
+        "2026-07-25: VERIFY_FEATURE=F52 ./scripts/verify_active.sh => OK"
+      ]
     },
     {
       "id": "F53",

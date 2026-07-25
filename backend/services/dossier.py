@@ -19,6 +19,12 @@ from backend.services.llm import (
     stream_dossier_answer,
     synthesize_dossier_answer,
 )
+from backend.services.fundamentals import (
+    FundamentalsSnapshot,
+    fetch_fundamentals_snapshot,
+    format_fundamentals_context,
+    format_fundamentals_markdown,
+)
 from backend.services.market_data import Quote, fetch_quotes
 from backend.services.recent_signals import get_recent_signals
 from backend.services.research_steps import ResearchStepEvent
@@ -41,16 +47,13 @@ _DOSSIER_BLOCK_SPECS: tuple[tuple[str, str], ...] = (
     ("lectura_integrada", "Lectura integrada"),
 )
 
-_FUNDAMENTALS_PLACEHOLDER = (
-    "F31 pendiente — sin datos de fundamentals en F30"
-)
-
 
 @dataclass
 class DossierGather:
     symbol: str
     thesis: str | None
     quote: Quote | None
+    fundamentals: FundamentalsSnapshot
     hits_7d: list[SignalHit]
     hits_7_30d: list[SignalHit]
     sentiment_stats: dict
@@ -200,11 +203,13 @@ def _gather_bundle(*, symbol: str, thesis: str | None = None) -> _GatherBundle:
     sentiment_stats = _sentiment_stats_for_ticker(normalized, hours=URGENT_HOURS)
     corpus_stats_30d = get_corpus_stats(hours=CONTEXT_HOURS, ticker=normalized)
     macro_hits = _fetch_macro_hits(normalized)
+    fundamentals = fetch_fundamentals_snapshot(normalized, quote=quote)
 
     gather = DossierGather(
         symbol=normalized,
         thesis=thesis,
         quote=quote,
+        fundamentals=fundamentals,
         hits_7d=hits_7d,
         hits_7_30d=hits_7_30d,
         sentiment_stats=sentiment_stats,
@@ -310,10 +315,27 @@ def build_dossier_context(
     else:
         sections.append("Sin hits macro/sector en el Corpus para esta ventana.")
 
-    sections.append("## Fundamentals")
-    sections.append(_FUNDAMENTALS_PLACEHOLDER)
+    sections.append("## Fundamentals (snapshot determinístico)")
+    sections.append(format_fundamentals_context(gather.fundamentals))
 
     return "\n\n".join(sections)
+
+
+def _attach_deterministic_layers(
+    content: dict[str, Any],
+    gather: DossierGather,
+) -> dict[str, Any]:
+    """Adjunta stats + overwrite del bloque Fundamentals con snapshot honesto."""
+    blocks = content.get("blocks")
+    if not isinstance(blocks, dict):
+        blocks = {}
+    else:
+        blocks = dict(blocks)
+    blocks["fundamentals"] = format_fundamentals_markdown(gather.fundamentals)
+    content["blocks"] = blocks
+    content["sentiment_stats"] = gather.sentiment_stats
+    content["fundamentals"] = gather.fundamentals.to_dict()
+    return content
 
 
 def _header_pattern(title: str) -> re.Pattern[str]:
@@ -402,6 +424,9 @@ def dossier_content_payload(content: dict[str, Any]) -> dict[str, Any]:
     stats = content.get("sentiment_stats")
     if isinstance(stats, dict):
         payload["sentiment_stats"] = stats
+    fundamentals = content.get("fundamentals")
+    if isinstance(fundamentals, dict):
+        payload["fundamentals"] = fundamentals
     return payload
 
 
@@ -418,8 +443,7 @@ def generate_dossier(
 
     if not _openai_configured():
         mock = _mock_dossier_content(normalized)
-        mock["sentiment_stats"] = bundle.gather.sentiment_stats
-        return mock, []
+        return _attach_deterministic_layers(mock, bundle.gather), []
 
     context = build_dossier_context(
         bundle.gather,
@@ -427,7 +451,7 @@ def generate_dossier(
     )
     markdown = synthesize_dossier_answer(context, thesis=resolved_thesis)
     content = _content_from_markdown(normalized, markdown)
-    content["sentiment_stats"] = bundle.gather.sentiment_stats
+    content = _attach_deterministic_layers(content, bundle.gather)
     citations = hits_to_citations(_all_citation_hits(bundle))
     return content, citations
 
@@ -461,7 +485,10 @@ def iter_dossier_refresh_stream(
     )
 
     if not _openai_configured():
-        content = _mock_dossier_content(bundle.gather.symbol)
+        content = _attach_deterministic_layers(
+            _mock_dossier_content(bundle.gather.symbol),
+            bundle.gather,
+        )
         yield content
         yield []
         return
@@ -485,6 +512,7 @@ def iter_dossier_refresh_stream(
 
     markdown = "".join(markdown_parts)
     content = _content_from_markdown(bundle.gather.symbol, markdown)
+    content = _attach_deterministic_layers(content, bundle.gather)
     citations = hits_to_citations(_all_citation_hits(bundle))
     yield content
     yield citations
