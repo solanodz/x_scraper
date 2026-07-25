@@ -74,7 +74,7 @@ export default function QuoteStrip() {
 
           {!loading && unavailable && (
             <span className="font-mono text-[11px] text-zinc-500">
-              Market data unavailable
+              Cotizaciones no disponibles — Market Data offline o sin símbolos
             </span>
           )}
 

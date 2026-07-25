@@ -285,12 +285,17 @@ def _iter_gather_research_context_inner(
             history,
             operator_id=operator_id,
         )):
+            formatted = format_research_context(context)
+            from backend.services.research_steps import context_mentions_summary_only
+
             yield GatherResult(
-                context=format_research_context(context),
+                context=formatted,
                 hits=context.hits,
                 market_sections=list(context.market_sections),
                 corpus_sections=list(context.corpus_sections),
                 artifacts=list(context.artifacts),
+                path="research",
+                summary_only=context_mentions_summary_only(formatted),
             )
             return
 
@@ -334,12 +339,17 @@ def _iter_gather_research_context_inner(
     while pending_steps:
         yield pending_steps.pop(0)
 
+    formatted = format_research_context(context)
+    from backend.services.research_steps import context_mentions_summary_only
+
     yield GatherResult(
-        context=format_research_context(context),
+        context=formatted,
         hits=context.hits,
         market_sections=list(context.market_sections),
         corpus_sections=list(context.corpus_sections),
         artifacts=list(context.artifacts),
+        path="research",
+        summary_only=context_mentions_summary_only(formatted),
     )
 
 

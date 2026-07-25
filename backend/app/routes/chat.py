@@ -31,7 +31,11 @@ from backend.app.services.chat_repo import (
 from backend.services.ask import ask_stream
 from backend.services.briefing import iter_briefing_stream
 from backend.services.chat_history import prepare_chat_history
-from backend.services.research_steps import ChatArtifact, ResearchStepEvent
+from backend.services.research_steps import (
+    ChatArtifact,
+    ResearchAnswerMeta,
+    ResearchStepEvent,
+)
 from backend.services.types import Citation
 from fastapi.responses import StreamingResponse
 
@@ -148,6 +152,9 @@ async def _consume_stream_chunks(
         if isinstance(chunk, ResearchStepEvent):
             payload = chunk.to_dict()
             yield f"event: step\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        elif isinstance(chunk, ResearchAnswerMeta):
+            payload = chunk.to_dict()
+            yield f"event: meta\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
         elif isinstance(chunk, ChatArtifact):
             payload = chunk.to_dict()
             yield f"event: artifact\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

@@ -1058,18 +1058,22 @@
       "priority": 53,
       "title": "Polish confianza: landing + empty states + Research chips",
       "user_visible_behavior": "Landing con copy alineada a Corpus/Citations (sin mocks de forecast inventados) y mención breve Bot/Briefing; Chart Plan/quotes/briefing con empty/disabled claros; cada respuesta Research muestra chip Rápido|Research y Solo summary cuando aplica.",
-      "status": "pending",
+      "status": "passing",
       "dependencies": [
         "F48",
         "F44"
       ],
       "notes": "Grill 2026-07-25: polish liviano tras F38/F51/F52.",
       "verification": [
-        "Landing sin promesas de forecast/institutional flow falsas",
-        "Estados disabled/empty visibles en Chart Plan o quotes",
-        "Mensaje Research muestra badge Rápido o Research; Solo summary si content_depth summary"
+        "python -m backend.scripts.verify_f53 => OK",
+        "Landing sin Forecast/institutional flow falsos; menciona Briefing/Bot",
+        "QuoteStrip + ChartPlan empty/disabled claros",
+        "SSE meta + chips Rápido|Research y Solo summary"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f53 => OK (landing, empty states, meta+chips)",
+        "2026-07-25: VERIFY_FEATURE=F53 ./scripts/verify_active.sh => OK"
+      ]
     }
   ]
 }

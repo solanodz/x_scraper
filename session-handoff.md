@@ -2,22 +2,21 @@
 
 ## Verified now
 
-- F52: `verify_f52` OK (crypto N/A, Finnhub equity mock, dossier attach, UI panel).
+- F53: `verify_f53` OK (landing, empty states, ResearchAnswerMeta + UI chips).
 
-## Changed this session
+## Changed this session (F53)
 
-- `backend/services/fundamentals.py` — Finnhub profile2+metric → yfinance
-- Dossier gather/context overwrites bloque Fundamentals + `content.fundamentals`
-- DossierPanel: FundamentalsSnapshotPanel
-- CONTEXT + ADR-0009 actualizados
+- Landing/hero/FeaturesBento: copy Corpus/Citations; Briefing + Paper Bot; sin Forecast/institutional flow
+- QuoteStrip + ChartPlan empty/disabled más claros
+- SSE `event: meta` (`path`, `summary_only`) → chips Rápido|Research + Solo summary
 
 ## Blockers
 
-- Redeploy API + frontend. Operator debe Refresh Dossier para persistir snapshot nuevo.
+- Redeploy API + frontend (y Worker F38) para ver todo en prod.
 
 ## Next
 
-F53 — Landing honest copy + empty/disabled states + Research chips Rápido/Research.
+Fuera del grill: smoke prod o nueva feature a elegir.
 
 ## Do not touch
 

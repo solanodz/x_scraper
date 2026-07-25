@@ -334,6 +334,8 @@ def build_fast_path_context(
         corpus_sections=list(context.corpus_sections),
         artifacts=list(context.artifacts),
         direct_answer=direct_answer,
+        path="fast",
+        summary_only=False,
     )
 
 

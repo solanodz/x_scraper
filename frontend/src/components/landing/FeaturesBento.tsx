@@ -13,26 +13,25 @@ const MOCK_SIGNALS_MINI = [
 ];
 
 const SUGGESTED_QUERIES = [
-  "Forecast Q3 earnings for $NVDA",
-  "Find bearish signals on $TSLA",
-  "Compare sentiment: $AAPL vs $MSFT",
-  "Top signals by volume today",
-  "Track institutional flow in $GLD",
+  "¿Qué dice el Corpus de $NVDA en 48h?",
+  "Signals bajistas recientes sobre $TSLA",
+  "Compará sentimiento: $AAPL vs $MSFT",
+  "Últimas noticias del Watch",
+  "Precio de BTC y contexto en el Corpus",
 ];
 
 const MOCK_CHAT_TURNS = [
-  { role: "user" as const, text: "What's the bull case for NVDA right now?" },
+  { role: "user" as const, text: "¿Qué está diciendo el Corpus de NVDA ahora?" },
   { role: "ai" as const, paragraphs: [
-    { heading: null, body: "Based on 47 Signals from the last 48 hours, the Corpus shows strong institutional conviction around NVDA heading into earnings." },
-    { heading: "Options flow", body: "Unusual call volume at 3.2x the 20-day average. The largest blocks are concentrated at the $140 and $145 strikes expiring next Friday, suggesting traders are positioning for a move above current levels." },
-    { heading: "Analyst sentiment", body: "Three upgrades in the last week — Goldman raised PT to $160 citing \"accelerating AI capex cycle,\" Morgan Stanley reiterated Overweight, and Bernstein initiated with a Buy noting datacenter GPU demand is \"structurally underappreciated.\"" },
-  ], citations: ["Signal #2841", "Signal #2839", "Signal #2835", "Signal #2812", "Signal #2807"] },
-  { role: "user" as const, text: "What are the main risks? Compare with $AMD positioning." },
+    { heading: null, body: "En las últimas 48h hay varios Signals sobre NVDA (noticias + X). Resumen anclado al Corpus — no es un forecast." },
+    { heading: "Narrativa", body: "Aparece volumen de opciones y menciones pre-earnings en cuentas de mercado; el Detail marca Solo summary cuando el artículo no tiene body completo." },
+    { heading: "Mercado", body: "Quote delayed ~15 min: precio y variación % desde Market Data. Sin predicción de target." },
+  ], citations: ["@unusual_whales", "Reuters", "Signal cluster"] },
+  { role: "user" as const, text: "¿Y los riesgos que menciona el Corpus?" },
   { role: "ai" as const, paragraphs: [
-    { heading: "Valuation risk", body: "At 35x forward PE, NVDA is pricing in near-flawless execution. The Corpus flagged 12 bearish signals citing stretched multiples relative to historical ranges." },
-    { heading: "China exposure", body: "Export restrictions remain a wildcard. 3 signals from policy-focused accounts suggest new licensing requirements could impact datacenter revenue by 8-12% in H2." },
-    { heading: "AMD comparison", body: "AMD positioning is notably different — put volume spiking 2.1x ahead of guidance, with sentiment split 52/48 bull/bear. The Corpus shows a narrative divergence: NVDA is \"AI winner\" while AMD is \"show-me story.\"" },
-  ], citations: ["Signal #2838", "Signal #2830", "Signal #2824", "Signal #2819"] },
+    { heading: "Lagunas", body: "Si un campo de fundamentals o un artículo es summary-only, el chat lo declara — no inventa PE ni flujo institucional." },
+    { heading: "Contraste", body: "Podés pedir Briefing del Watch o abrir el Dossier para profundidad; el Paper Bot opera aparte en paper." },
+  ], citations: ["Dossier NVDA", "Corpus 7d"] },
 ];
 
 export default function FeaturesBento() {
@@ -43,8 +42,9 @@ export default function FeaturesBento() {
           Todo el Corpus, desde cada ángulo
         </h2>
         <p className="mt-4 max-w-2xl font-sans text-base leading-relaxed text-zinc-400">
-          Cuatro superficies conectadas al mismo Corpus. Precio, conversación,
-          narrativa y análisis en un solo lugar.
+          Superficies conectadas al mismo Corpus: Feed, Research con Citations,
+          Dossier / Chart Plan, más Briefing del Watch y Paper Bot. Analítico —
+          sin recomendaciones de compra/venta.
         </p>
 
         {/* Bento Grid: 2 grandes arriba, 3 chicos abajo */}
@@ -103,7 +103,8 @@ export default function FeaturesBento() {
             <div className="p-6 sm:p-8">
               <p className="font-mono text-sm text-amber-500">Queries sugeridas</p>
               <p className="mt-2 font-sans text-sm leading-relaxed text-zinc-400">
-                Templates listos para investigar el Corpus — empezá con un click.
+                Preguntas típicas al Corpus (precios, Signals, contraste) — sin
+                templates de forecast inventado.
               </p>
             </div>
             <div className="relative px-6 pb-8 sm:px-8 sm:pb-10">

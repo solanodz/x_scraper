@@ -71,6 +71,13 @@ export interface PriceChartArtifact {
 /** Structured chat artifacts (extensible). Unknown types are ignored by the UI. */
 export type ChatArtifact = PriceChartArtifact;
 
+export interface ResearchAnswerMeta {
+  /** fast = Rápido (Fast Path); research = Research Agent. */
+  path: "fast" | "research" | string;
+  /** True si el gather vio content_depth summary_only. */
+  summary_only?: boolean;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -79,6 +86,8 @@ export interface ChatMessage {
   steps?: ResearchStep[];
   /** Chart cards / structured UI from SSE `event: artifact` or history. */
   artifacts?: ChatArtifact[];
+  /** Camino de respuesta (SSE meta; no persistido en historial). */
+  meta?: ResearchAnswerMeta;
 }
 
 export interface ResearchStep {

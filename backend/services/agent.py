@@ -14,6 +14,7 @@ from backend.services.chat_history import prepare_chat_history
 from backend.services.research_steps import (
     GatherResult,
     ResearchStepEvent,
+    context_mentions_summary_only,
     format_tool_step_label,
 )
 from backend.services.retrieval import retrieve
@@ -307,12 +308,15 @@ def _iter_gather_agent_context_inner(
         status="done",
     )
 
+    formatted = format_agent_context(context)
     yield GatherResult(
-        context=format_agent_context(context),
+        context=formatted,
         hits=context.hits,
         market_sections=list(context.market_sections),
         corpus_sections=list(context.corpus_sections),
         artifacts=list(context.artifacts),
+        path="research",
+        summary_only=context_mentions_summary_only(formatted),
     )
 
 

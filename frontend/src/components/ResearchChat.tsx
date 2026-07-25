@@ -22,8 +22,31 @@ import type {
   ChatMessage,
   ChatMessageRecord,
   ChatSessionSummary,
+  ResearchAnswerMeta,
   ResearchStep,
 } from "@/lib/types";
+
+function ResearchPathChips({ meta }: { meta: ResearchAnswerMeta }) {
+  const isFast = meta.path === "fast";
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span
+        className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
+          isFast
+            ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-400"
+            : "border-sky-800/50 bg-sky-950/30 text-sky-400"
+        }`}
+      >
+        {isFast ? "Rápido" : "Research"}
+      </span>
+      {meta.summary_only && (
+        <span className="rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+          Solo summary
+        </span>
+      )}
+    </div>
+  );
+}
 
 const ACTIVE_SESSION_KEY = "xscraper:activeChatSession";
 const BRIEFING_USER_MESSAGE = "Briefing de mi Ticker Watch";
@@ -290,6 +313,15 @@ export default function ResearchChat({
                 return updated;
               });
             },
+            onMeta: (meta) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const msg = updated[assistantIndex];
+                if (msg?.role !== "assistant") return prev;
+                updated[assistantIndex] = { ...msg, meta };
+                return updated;
+              });
+            },
           },
           controller.signal,
           sessionId,
@@ -406,6 +438,15 @@ export default function ResearchChat({
               return updated;
             });
           },
+          onMeta: (meta) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const msg = updated[assistantIndex];
+              if (msg?.role !== "assistant") return prev;
+              updated[assistantIndex] = { ...msg, meta };
+              return updated;
+            });
+          },
         },
         controller.signal,
         sessionId,
@@ -509,6 +550,7 @@ export default function ResearchChat({
                 </div>
               ) : (
                 <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
+                  {msg.meta && <ResearchPathChips meta={msg.meta} />}
                   {streaming &&
                     i === messages.length - 1 &&
                     !msg.content && (

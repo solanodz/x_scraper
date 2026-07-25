@@ -185,8 +185,8 @@ export function GradientBarHeroSection({
           className="mx-auto mt-5 max-w-xl animate-[landing-fadeIn_0.7s_ease-out_both] font-sans text-base leading-relaxed text-zinc-400 sm:mt-6 md:text-lg"
           style={{ animationDelay: "120ms" }}
         >
-          Signals en vivo, Research Chat con citas, Dossier por Ticker y Chart
-          Plan. Fuentes reales, sin ruido.
+          Signals en vivo, Research Chat con Citations, Dossier, Chart Plan,
+          Briefing del Watch y Paper Bot. Corpus real — sin inventar forecasts.
         </p>
 
         <div

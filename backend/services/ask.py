@@ -16,11 +16,19 @@ from backend.services.llm import (
 from backend.services.research_steps import (
     ChatArtifact,
     GatherResult,
+    ResearchAnswerMeta,
     ResearchStepEvent,
+    context_mentions_summary_only,
 )
 from backend.services.types import AskResult, Citation
 
-AskStreamChunk = Union[str, list[Citation], ResearchStepEvent, ChatArtifact]
+AskStreamChunk = Union[
+    str,
+    list[Citation],
+    ResearchStepEvent,
+    ChatArtifact,
+    ResearchAnswerMeta,
+]
 
 
 def _research_engine() -> str:
@@ -119,6 +127,9 @@ def ask_stream(
     hits: list = []
     artifacts: list[dict] = []
     direct_answer: str | None = None
+    answer_path = "research"
+    summary_only = False
+    meta_emitted = False
 
     for item in _iter_gather(query, history=history, operator_id=operator_id):
         if isinstance(item, ResearchStepEvent):
@@ -127,6 +138,18 @@ def ask_stream(
             context, hits = item.context, item.hits
             artifacts = list(item.artifacts or [])
             direct_answer = item.direct_answer
+            answer_path = item.path or "research"
+            summary_only = bool(item.summary_only) or context_mentions_summary_only(
+                context
+            )
+            if not meta_emitted:
+                yield ResearchAnswerMeta(
+                    path=answer_path, summary_only=summary_only
+                )
+                meta_emitted = True
+
+    if not meta_emitted:
+        yield ResearchAnswerMeta(path=answer_path, summary_only=summary_only)
 
     if direct_answer:
         yield ResearchStepEvent(

@@ -64,7 +64,7 @@ const MOCK_SIGNALS = [
     topic: "Options Flow",
     text: "NVDA call volume surging ahead of earnings, 3x average. $140 strike leading the flow.",
     detailText:
-      "NVDA call volume surging ahead of earnings, 3x average. $140 strike leading the flow.\n\nLargest blocks concentrated in near-term expirations. Institutional sweeps dominating vs retail singles. Watch IV into the print — currently elevated vs 20-day realized.",
+      "NVDA call volume surging ahead of earnings, 3x average. $140 strike leading the flow.\n\nDetalle del Signal en el Corpus (puede ser Solo summary si el publisher no da body). Market Data delayed ~15 min — sin forecast de precio.",
     time: "11m",
     likes: "4.8K",
     rts: "1.9K",

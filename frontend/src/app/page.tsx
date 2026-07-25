@@ -11,15 +11,15 @@ import { createClient } from "@/lib/supabase/client";
 const STEPS = [
   {
     title: "Entrá",
-    body: "Con tu cuenta de operator. No hay signup público: el acceso es por invitación.",
+    body: "Con tu cuenta de Operator. No hay signup público: el acceso es por invitación.",
   },
   {
     title: "Observá",
-    body: "El Feed corre en vivo; abrís un Signal y lo leés en el Detail. Agregá tickers al Watch.",
+    body: "El Feed corre en vivo; abrís un Signal y lo leés en el Detail. Agregá Tickers al Watch.",
   },
   {
     title: "Investigá",
-    body: "Pasá a Research para preguntar al Corpus, o abrí un Dossier / Chart Plan por ticker.",
+    body: "Research Chat sobre el Corpus (con Citations), Dossier / Chart Plan por Ticker, Briefing del Watch o el Paper Bot en paper.",
   },
 ] as const;
 

@@ -355,9 +355,15 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
         )}
 
         {disabled && (
-          <p className="font-mono text-xs text-zinc-500">
-            Chart Agent deshabilitado (CHART_AGENT_ENABLED=false).
-          </p>
+          <div className="space-y-1 rounded border border-dashed border-zinc-700 bg-zinc-950/60 px-3 py-3">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+              Deshabilitado
+            </p>
+            <p className="font-mono text-xs text-zinc-400">
+              Chart Agent apagado (`CHART_AGENT_ENABLED=false`). El Ticker Chart
+              sigue disponible; no se genera Chart Plan nuevo.
+            </p>
+          </div>
         )}
 
         {analyzing && (
@@ -395,6 +401,10 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
           ) : candlesError ? (
             <p className="py-8 text-center font-mono text-xs text-red-400">
               {candlesError}
+            </p>
+          ) : candles.length === 0 ? (
+            <p className="py-10 text-center font-mono text-xs text-zinc-500">
+              Sin velas para ${symbol}. Market Data no devolvió historial OHLC.
             </p>
           ) : (
             <TickerChartStack
@@ -469,11 +479,14 @@ function EmptyState({
   onAnalyze: () => void;
 }) {
   return (
-    <div className="space-y-3 rounded border border-dashed border-zinc-800 px-4 py-6 text-center">
-      <p className="font-mono text-xs text-zinc-500">
+    <div className="space-y-3 rounded border border-dashed border-zinc-700 bg-zinc-950/40 px-4 py-6 text-center">
+      <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+        Empty
+      </p>
+      <p className="font-mono text-xs text-zinc-400">
         {needsDossier
           ? "Generá el Dossier primero (panel izquierdo) y luego analizá gráficos."
-          : "Sin Chart Plan todavía. Ejecutá el Chart Agent para generar vistas."}
+          : "Sin Chart Plan todavía. Ejecutá el Chart Agent para generar lecturas."}
       </p>
       {!needsDossier && (
         <button

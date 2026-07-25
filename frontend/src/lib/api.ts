@@ -457,6 +457,7 @@ export type StreamChatCallbacks = {
   onStep?: (step: ResearchStep) => void;
   onSession?: (sessionId: string) => void;
   onArtifact?: (artifact: ChatArtifact) => void;
+  onMeta?: (meta: import("./types").ResearchAnswerMeta) => void;
   onError?: (error: Error) => void;
 };
 
@@ -509,6 +510,14 @@ async function readSseStream(
               if (artifact) callbacks.onArtifact?.(artifact);
             } catch {
               // Malformed artifact payloads must not break the stream.
+            }
+            currentEvent = "";
+          } else if (currentEvent === "meta") {
+            try {
+              const meta = JSON.parse(raw) as import("./types").ResearchAnswerMeta;
+              if (meta?.path) callbacks.onMeta?.(meta);
+            } catch {
+              // ignore malformed meta
             }
             currentEvent = "";
           } else {

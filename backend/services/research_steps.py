@@ -45,6 +45,30 @@ class ChatArtifact:
         return payload
 
 
+@dataclass(frozen=True)
+class ResearchAnswerMeta:
+    """Meta visible del Research Chat: camino Rápido vs Research + summary-only."""
+
+    path: str  # fast | research
+    summary_only: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"path": self.path, "summary_only": self.summary_only}
+
+
+def context_mentions_summary_only(context: str | None) -> bool:
+    """True si el gather vio Signals summary-only / paywall."""
+    text = (context or "").lower()
+    markers = (
+        "summary_only",
+        "summary-only",
+        "solo summary",
+        "content_depth\": \"summary",
+        "content_depth': 'summary",
+    )
+    return any(marker in text for marker in markers)
+
+
 @dataclass
 class GatherResult:
     """Resultado de la fase de research antes de la síntesis."""
@@ -56,6 +80,8 @@ class GatherResult:
     artifacts: list[dict[str, Any]] | None = None
     # Si está seteado, ask_stream responde esto sin pasar por el LLM.
     direct_answer: str | None = None
+    path: str = "research"  # fast | research
+    summary_only: bool = False
 
 
 def format_tool_step_label(tool_name: str, arguments: dict[str, Any]) -> str:
