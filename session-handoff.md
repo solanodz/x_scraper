@@ -1,28 +1,58 @@
 # Session handoff
 
-Compact restart path for the next agent/session. Keep this current when work is mid-flight.
-
 ## Verified now
 
-- F49 mixed-intent Fast Path **en prod** (Railway redeploy + smoke OK 2026-07-24).
-- Paper Bot: trade contaminado BTC mark@$28 borrado; `assert_sane_mark` + verify_f47 OK local.
-- Harness: `scripts/verify_active.sh`, `session-handoff.md`.
+- F49 en prod (smoke OK).
+- Mark sanity guardrail en trader (Operator confirmó redeploy 2026-07-25).
+- Historial paper limpio (trade @$28 borrado).
 
-## Changed this session
+## Active mode: Paper Bot soak
 
-- `backend/services/bot_venue.py` — mark sanity guard (floor BTC/ETH + max jump vs entry).
-- `backend/scripts/verify_f47_paper_bot.py` — regresión mark $28.
-- `/bot` UI labels: size notional; leverage display-only in paper.
-- Store: deleted position `9739ed80-…` (+fills).
+No feature `in_progress`. No abrir F38/F50 hasta cerrar el soak con notas.
+
+### Config sugerida (estable)
+
+- Armed: **on**
+- Symbols: BTC (o BTC+ETH si querés cobertura)
+- Size USD: notional realista (ej. 50–200); **no es margen**
+- Leverage: ignorar para PnL (display-only en paper)
+- TP / SL: defaults o los que uses siempre (no retocar a mitad del soak)
+- Donchian: dejar fijos period/interval
+
+### Qué mirar cada día (~5 min)
+
+En `/bot`:
+
+1. Open positions: Price se mueve; PnL coherente con entry↔mark (~% del notional).
+2. Closed: razón `tp` / `sl` / manual; exit cerca del TP/SL (no marks absurdos).
+3. Events: errores de mark / venue.
+4. Equity / Unreal: sin saltos imposibles.
+
+### Log de dolores (copiá al cerrar el día)
+
+```
+Fecha:
+Config (size/tp/sl/interval):
+Trades del día (symbol/side/entry/exit/pnl/reason):
+¿Algo raro? (mark, PnL, UI, señales, cooldown):
+¿Qué cambiarías mañana?
+```
+
+### Criterio para terminar soak
+
+Después de 2–3 días con al menos algunas entradas/salidas (o “no tradó” documentado):
+
+→ Abrir **F50** con máximo 3 items del log (ej. leverage real, UI, strategy).
 
 ## Blockers
 
-- Redeploy **xscraper-trader** (y API si sirve UI) para activar el guardrail en Railway.
+- Ninguno.
 
-## Next (una sola cosa)
+## Next
 
-Redeploy trader en Railway; confirmar que un mark basura ya no cierra posiciones.
+Operator corre soak; próxima sesión de código = F50 desde el log (o F38 si elige pivot).
 
 ## Do not touch
 
-- Root `package-lock.json` (basura; no commitear).
+- Root `package-lock.json`.
+- No Hyperliquid live / F38 en paralelo al soak.
