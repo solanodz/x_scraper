@@ -103,7 +103,7 @@ export default function LandingPage() {
             <div className="mt-8">
               <Link
                 href={ctaHref}
-                className="inline-flex rounded-full bg-zinc-100 px-8 py-3.5 font-sans text-sm font-medium text-zinc-950 transition-transform hover:scale-[1.02] hover:bg-white active:scale-[0.98] md:text-base"
+                className="inline-flex bg-zinc-100 px-8 py-3.5 font-sans text-sm font-medium text-zinc-950 transition-transform hover:scale-[1.02] hover:bg-white active:scale-[0.98] md:text-base"
               >
                 {ctaLabel}
               </Link>

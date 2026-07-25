@@ -49,7 +49,7 @@ const GradientBars = () => {
                 maxWidth: "calc(100% / 15)",
                 height: "100%",
                 background:
-                  "linear-gradient(to top, rgba(245, 158, 11, 0.6), rgba(245, 158, 11, 0.15) 55%, transparent)",
+                  "linear-gradient(to top, rgba(161, 161, 170, 0.45), rgba(113, 113, 122, 0.12) 55%, transparent)",
                 transform: `scaleY(${height / 100})`,
                 transformOrigin: "bottom",
               }}
@@ -98,7 +98,7 @@ function Navbar({
     <nav className="relative z-50 px-6 pb-0 pt-6 md:px-12">
       <div className="mx-auto flex h-10 max-w-5xl items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span className="font-mono text-sm text-amber-500" aria-hidden>
+          <span className="font-mono text-sm text-zinc-300" aria-hidden>
             ▮
           </span>
           <span className="font-sans text-sm font-semibold tracking-tight text-zinc-100">
@@ -118,7 +118,7 @@ function Navbar({
           ))}
           <Link
             href={ctaHref}
-            className="rounded-full bg-zinc-100 px-4 py-1.5 font-sans text-[13px] font-medium text-zinc-950 transition-colors hover:bg-white"
+            className="bg-zinc-100 px-4 py-1.5 font-sans text-[13px] font-medium text-zinc-950 transition-colors hover:bg-white"
           >
             {ctaLabel}
           </Link>
@@ -136,13 +136,13 @@ function Navbar({
       </div>
 
       {isMenuOpen ? (
-        <div className="mx-auto mt-3 max-w-5xl rounded-xl border border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur-sm md:hidden">
+        <div className="mx-auto mt-3 max-w-5xl border border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur-sm md:hidden">
           <div className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="rounded-lg px-3 py-2.5 font-sans text-sm text-zinc-300 hover:bg-zinc-900"
+                className="px-3 py-2.5 font-sans text-sm text-zinc-300 hover:bg-zinc-900"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
@@ -150,7 +150,7 @@ function Navbar({
             ))}
             <Link
               href={ctaHref}
-              className="mt-2 rounded-full bg-zinc-100 px-4 py-2.5 text-center font-sans text-sm font-medium text-zinc-950"
+              className="mt-2 bg-zinc-100 px-4 py-2.5 text-center font-sans text-sm font-medium text-zinc-950"
               onClick={() => setIsMenuOpen(false)}
             >
               {ctaLabel}
@@ -195,13 +195,13 @@ export function GradientBarHeroSection({
         >
           <Link
             href={ctaHref}
-            className="inline-flex rounded-full bg-zinc-100 px-7 py-3 font-sans text-sm font-medium text-zinc-950 transition-transform hover:scale-[1.02] hover:bg-white active:scale-[0.98]"
+            className="inline-flex bg-zinc-100 px-7 py-3 font-sans text-sm font-medium text-zinc-950 transition-transform hover:scale-[1.02] hover:bg-white active:scale-[0.98]"
           >
             {ctaLabel}
           </Link>
           <a
             href="#que-es"
-            className="inline-flex rounded-full border border-zinc-700 px-7 py-3 font-sans text-sm text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
+            className="inline-flex border border-zinc-700 px-7 py-3 font-sans text-sm text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
           >
             Saber más
           </a>

@@ -90,6 +90,27 @@ body {
   }
 }
 
+@keyframes landing-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-chat-bubble {
+  animation: landing-chat-in 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-chat-bubble {
+    animation: none;
+  }
+}
+
 /* Grano tipo película: turbulence suave + blur para textura orgánica continua */
 .landing-grain {
   pointer-events: none;

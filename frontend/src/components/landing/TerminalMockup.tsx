@@ -18,7 +18,7 @@ const TICKER_LOGOS: Record<string, string> = {
 function TickerIcon({ symbol }: { symbol: string }) {
   const url = TICKER_LOGOS[symbol];
   return (
-    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900">
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-zinc-700 bg-zinc-900">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-2.5 w-2.5 object-contain" />
@@ -144,7 +144,7 @@ function QuoteItem({ q }: { q: (typeof MOCK_QUOTES)[number] }) {
 export default function TerminalMockup() {
   return (
     <div
-      className="overflow-hidden rounded-t-2xl border border-b-0 border-zinc-800 bg-zinc-900 text-left shadow-[0_-8px_60px_rgba(0,0,0,0.7)]"
+      className="overflow-hidden border border-b-0 border-zinc-800 bg-zinc-900 text-left shadow-[0_-8px_60px_rgba(0,0,0,0.7)]"
       style={{
         maskImage: "linear-gradient(to bottom, black 78%, transparent 94%)",
         WebkitMaskImage: "linear-gradient(to bottom, black 78%, transparent 94%)",
@@ -153,27 +153,27 @@ export default function TerminalMockup() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-sm text-amber-500">▮</span>
+          <span className="font-mono text-sm text-zinc-300">▮</span>
           <span className="font-sans text-[11px] font-semibold text-zinc-100 sm:text-xs">
             X Scraper Terminal
           </span>
           <div className="flex items-center gap-1">
-            <span className="rounded bg-amber-950/40 px-2 py-0.5 font-sans text-[9px] font-semibold text-amber-400 sm:text-[10px]">
+            <span className="border border-zinc-700 bg-zinc-900 px-2 py-0.5 font-sans text-[9px] font-semibold text-zinc-200 sm:text-[10px]">
               Terminal
             </span>
-            <span className="rounded px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
+            <span className="px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
               Research
             </span>
-            <span className="rounded px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
+            <span className="px-2 py-0.5 font-sans text-[9px] text-zinc-500 sm:text-[10px]">
               Dossier
             </span>
           </div>
         </div>
         <div className="hidden items-center gap-2 sm:flex">
-          <span className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 font-sans text-[10px] text-zinc-400">
+          <span className="border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 font-sans text-[10px] text-zinc-400">
             Refresh
           </span>
-          <span className="rounded border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 font-sans text-[10px] text-zinc-500">
+          <span className="border border-zinc-700 bg-zinc-900 px-2.5 py-0.5 font-sans text-[10px] text-zinc-500">
             Cerrar sesión
           </span>
         </div>
@@ -181,7 +181,7 @@ export default function TerminalMockup() {
 
       {/* ── Quote Strip Carousel ── */}
       <div className="flex items-center gap-1 overflow-hidden border-b border-zinc-800/60 bg-zinc-950/80 px-4 py-1.5">
-        <span className="shrink-0 rounded border border-zinc-700 px-1 py-0.5 font-mono text-[8px] uppercase tracking-wide text-zinc-600">
+        <span className="shrink-0 border border-zinc-700 px-1 py-0.5 font-mono text-[8px] uppercase tracking-wide text-zinc-600">
           15m delayed
         </span>
         <div className="quote-carousel-mask ml-2 flex-1">
@@ -203,7 +203,7 @@ export default function TerminalMockup() {
         <div className="border-r border-zinc-800/60 pb-20">
           <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
             <div className="flex items-baseline gap-2">
-              <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-amber-500">
+              <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
                 Signal Feed
               </span>
               <span className="font-mono text-[9px] text-zinc-600">
@@ -222,14 +222,14 @@ export default function TerminalMockup() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="font-mono text-[11px] font-semibold text-amber-400">
+                    <span className="font-mono text-[11px] font-semibold text-zinc-300">
                       {signal.author}
                     </span>
-                    <span className="shrink-0 rounded border border-zinc-700 px-1 font-mono text-[8px] uppercase text-zinc-500">
+                    <span className="shrink-0 border border-zinc-700 px-1 font-mono text-[8px] uppercase text-zinc-500">
                       {signal.sourceType === "x" ? "x" : "news"}
                     </span>
                     {signal.cluster && (
-                      <span className="shrink-0 rounded border border-amber-900/50 bg-amber-950/30 px-1 font-mono text-[8px] text-amber-500">
+                      <span className="shrink-0 border border-zinc-700 bg-zinc-900 px-1 font-mono text-[8px] text-zinc-400">
                         {signal.cluster}
                       </span>
                     )}
@@ -271,13 +271,13 @@ export default function TerminalMockup() {
         {/* Signal Detail */}
         <div className="hidden pb-20 sm:flex sm:flex-col">
           <div className="border-b border-zinc-800 px-3 py-1.5">
-            <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-amber-500">
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
               Signal Detail
             </span>
           </div>
           <div className="flex flex-1 flex-col space-y-3 p-3 text-left">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[12px] font-semibold text-amber-400">
+              <span className="font-mono text-[12px] font-semibold text-zinc-300">
                 {SELECTED.author}
               </span>
               <span className="font-mono text-[9px] text-zinc-500">
@@ -286,8 +286,8 @@ export default function TerminalMockup() {
             </div>
 
             {"clusterMembers" in SELECTED && SELECTED.clusterMembers && (
-              <div className="rounded border border-amber-900/40 bg-amber-950/20 px-2 py-1.5">
-                <p className="font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+              <div className="border border-zinc-700 bg-zinc-900/60 px-2 py-1.5">
+                <p className="font-sans text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
                   Story Cluster
                 </p>
                 <p className="mt-1 font-mono text-[10px] text-zinc-300">
@@ -316,7 +316,7 @@ export default function TerminalMockup() {
               {SELECTED.cashtags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded border border-emerald-800/50 bg-emerald-950/30 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400"
+                  className="border border-emerald-800/50 bg-emerald-950/30 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400"
                 >
                   {tag}
                 </span>
@@ -324,7 +324,7 @@ export default function TerminalMockup() {
             </div>
 
             {"quote" in SELECTED && SELECTED.quote && (
-              <div className="flex w-fit items-center gap-1.5 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
+              <div className="flex w-fit items-center gap-1.5 border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
                 <TickerIcon symbol={SELECTED.quote.symbol} />
                 <span className="font-semibold text-zinc-300">
                   {SELECTED.quote.symbol}
@@ -363,7 +363,7 @@ export default function TerminalMockup() {
               </div>
             )}
 
-            <span className="font-mono text-[10px] text-amber-600">
+            <span className="font-mono text-[10px] text-zinc-500">
               Ver en X →
             </span>
           </div>
