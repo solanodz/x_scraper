@@ -181,7 +181,7 @@ def persist_records(
 
 def _run_post_ingestion_steps(args: argparse.Namespace) -> None:
     if not args.skip_article_body:
-        updated = backfill_article_bodies(limit=30)
+        updated = backfill_article_bodies()
         if updated:
             print(f"→ Backfill Article Body: {updated} Signal(s) enriquecidos")
 

@@ -313,16 +313,25 @@ _BODY_BACKFILL_COLUMNS = """
 
 
 def fetch_signals_needing_body(limit: int) -> list[dict[str, Any]]:
-    """Noticias recientes sin Article Body completo (para backfill trafilatura)."""
+    """Noticias recientes sin Article Body completo (para backfill trafilatura).
+
+    Omite SKIP_DOMAINS conocidos (Google News / MarketWatch) para no gastar
+    el cupo de backfill en URLs que casi nunca rinden body.
+    """
+    from scraper.article_enrichment import _min_body_chars
+
+    min_chars = _min_body_chars()
     sql = f"""
         SELECT {_BODY_BACKFILL_COLUMNS}
         FROM signals
         WHERE source_type IN ('rss', 'marketaux', 'alpha_vantage')
           AND canonical_url IS NOT NULL
           AND length(trim(canonical_url)) > 0
+          AND canonical_url NOT ILIKE '%%news.google.com%%'
+          AND canonical_url NOT ILIKE '%%marketwatch.com%%'
           AND (
             body IS NULL
-            OR length(trim(body)) < 200
+            OR length(trim(body)) < %s
             OR body = summary
           )
         ORDER BY published_at DESC
@@ -330,7 +339,7 @@ def fetch_signals_needing_body(limit: int) -> list[dict[str, Any]]:
     """
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (limit,))
+            cur.execute(sql, (min_chars, limit))
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
 

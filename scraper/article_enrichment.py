@@ -42,11 +42,11 @@ def _article_body_enabled() -> bool:
 
 def _max_per_ingest() -> int:
     load_dotenv()
-    raw = os.getenv("ARTICLE_BODY_MAX_PER_INGEST", "50").strip()
+    raw = os.getenv("ARTICLE_BODY_MAX_PER_INGEST", "150").strip()
     try:
         return max(0, int(raw))
     except ValueError:
-        return 50
+        return 150
 
 
 def _min_body_chars() -> int:
@@ -65,6 +65,16 @@ def _fetch_delay_seconds() -> float:
         return max(0.0, float(raw))
     except ValueError:
         return 0.5
+
+
+def article_body_backfill_limit() -> int:
+    """Máximo de Signals a backfillear por ciclo post-ingest (F38)."""
+    load_dotenv()
+    raw = os.getenv("ARTICLE_BODY_BACKFILL_LIMIT", "100").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 100
 
 
 def _domain(url: str) -> str:
@@ -197,14 +207,15 @@ def enrich_article_bodies(
     return attempted, enriched
 
 
-def backfill_article_bodies(limit: int = 30) -> int:
+def backfill_article_bodies(limit: int | None = None) -> int:
     """Extrae Article Body para Signals de noticias guardados sin cuerpo completo."""
-    if not _article_body_enabled() or limit <= 0:
+    effective = article_body_backfill_limit() if limit is None else max(0, int(limit))
+    if not _article_body_enabled() or effective <= 0:
         return 0
 
     from scraper.store import fetch_signals_needing_body, update_signal_body
 
-    signals = fetch_signals_needing_body(limit)
+    signals = fetch_signals_needing_body(effective)
     if not signals:
         return 0
 

@@ -2,25 +2,25 @@
 
 ## Verified now
 
-- F50 local: leverage × size → qty; `symbol_already_open` no se escribe en `bot_events` (`verify_f47` OK).
-- F49 en prod; mark sanity en trader (redeploy previo).
+- F38 local: `verify_f38` OK (MAX=150, BACKFILL=100, SKIP_DOMAINS, docs).
+- Programa web: F51 → F52 → F53 (grill confirmado).
 
 ## Changed this session
 
-- `bot_venue.py` — notional = size_usd × leverage
-- `paper_bot.py` — silent `symbol_already_open` skips
-- `/bot` UI labels + notional hint in open table
-- CONTEXT + ADR-0015 size semantics
-- `feature_list` F50 passing
+- Article enrichment defaults + `ARTICLE_BODY_BACKFILL_LIMIT`
+- Backfill SQL omite Google News / MarketWatch
+- `docs/ops/article-body.md`, `verify_f38.py`
+- feature_list: F38 passing; F51–F53 pending
 
 ## Blockers
 
-- Redeploy trader (y frontend) para F50 en prod.
+- Redeploy Worker para caps en prod.
 
 ## Next
 
-Redeploy trader → smoke leverage/notional + Events limpios.
+F51 — Feed toggle Mis tickers (API multi-ticker).
 
 ## Do not touch
 
 - Root `package-lock.json`.
+- No empezar F52/F53 hasta cerrar F51.

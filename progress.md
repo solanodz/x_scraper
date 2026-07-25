@@ -2,20 +2,25 @@
 
 ## Estado actual
 
-**F50 `passing`.** Paper Bot: leverage real (`qty = size × lev / mark`) + skips `symbol_already_open` ya no se persisten.
+**F38 `passing`.** Article Body: caps 150/ingest + backfill 100 + docs/ops/article-body.md.
+
+Programa grill confirmado (alta→media, una a la vez):
+
+1. ~~F38~~ → **siguiente: F51** Feed Mis tickers  
+2. F52 Dossier Fundamentals snapshot  
+3. F53 Landing + empty states + Research chips  
 
 ## Próximo paso
 
-1. Redeploy **xscraper-trader** (+ Vercel frontend para labels).
-2. Smoke `/bot`: con lev 4 y size 50, notional ~200; Events sin spam de skips al tener posición open.
-3. Seguir operando o elegir F38.
+1. Redeploy **Worker** (y API si aplica) con env Article Body nuevos (o defaults del código).  
+2. Abrir **F51** in_progress: filtro Feed por Ticker Watch.
 
 ## Notas
 
-- 2026-07-25 — F50 desde soak (432 skips + leverage engañoso).
-- 2026-07-25 — Mark guardrail + soak; trader redeploy previo.
-- 2026-07-24 — F49 smoke prod OK.
+- 2026-07-25 — Grill alta/media → plan F38→F51→F52→F53; F38 shipped.  
+- 2026-07-25 — F50 leverage + quiet skips.  
 
 ## Roadmap
 
-- **F38** pending — Article Body
+- **F51** pending (next)  
+- **F52**, **F53** pending  
