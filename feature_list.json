@@ -1013,19 +1013,23 @@
       "id": "F51",
       "priority": 51,
       "title": "Feed: filtro Mis tickers (Ticker Watch)",
-      "user_visible_behavior": "En el Signal Feed, un toggle filtra Signals cuyos tickers estánán en el Ticker Watch del Operator (API multi-ticker). Watch vacío muestra empty state claro.",
-      "status": "pending",
+      "user_visible_behavior": "En el Signal Feed, un toggle filtra Signals cuyos tickers están en el Ticker Watch del Operator (API multi-ticker). Watch vacío muestra empty state claro.",
+      "status": "passing",
       "dependencies": [
         "F19",
         "F6"
       ],
-      "notes": "Grill 2026-07-25: API tickers= OR; sin persistir toggle aún. Una feature a la vez tras F38.",
+      "notes": "Grill 2026-07-25: API tickers= OR; sin persistir toggle aún.",
       "verification": [
-        "GET /signals?tickers=AAPL,MSFT filtra por cualquiera de esos tickers",
-        "Toggle Mis tickers en Feed usa la Watch del Operator",
+        "python -m backend.scripts.verify_f51 => OK",
+        "GET /signals?tickers=AAPL,MSFT construye OR multi-ticker",
+        "Toggle Mis tickers en Feed usa tickers= del Watch",
         "Watch vacío → empty state (no feed engañoso)"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f51 => OK (parse, empty→FALSE, OR AAPL|MSFT, route+UI)",
+        "2026-07-25: VERIFY_FEATURE=F51 ./scripts/verify_active.sh => OK"
+      ]
     },
     {
       "id": "F52",

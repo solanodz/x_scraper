@@ -5,9 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from backend.services.retrieval import normalize_ticker
-from backend.services.ticker_catalog import append_ticker_match_conditions
-
 VALID_SOURCE_TYPES = frozenset({"x", "rss", "marketaux", "alpha_vantage", "news"})
 VALID_SENTIMENTS = frozenset({"positive", "negative", "neutral", "bullish", "bearish"})
 
@@ -16,6 +13,8 @@ VALID_SENTIMENTS = frozenset({"positive", "negative", "neutral", "bullish", "bea
 class FeedFilters:
     q: str | None = None
     ticker: str | None = None
+    # None = sin filtro multi; () = explícitamente vacío (0 resultados)
+    tickers: tuple[str, ...] | None = None
     username: str | None = None
     source_type: str | None = None
     topic: str | None = None
@@ -40,6 +39,12 @@ def build_feed_filter_conditions(
     filters: FeedFilters,
 ) -> tuple[list[str], dict[str, Any]]:
     """Devuelve fragmentos SQL AND y parámetros para list_signals."""
+    # Lazy: evita ciclo feed_filters → backend.services → tools → signals_repo.
+    from backend.services.ticker_catalog import (
+        append_multi_ticker_match_conditions,
+        append_ticker_match_conditions,
+    )
+
     conditions: list[str] = []
     params: dict[str, Any] = {}
 
@@ -59,7 +64,14 @@ def build_feed_filter_conditions(
             f") ILIKE %({key})s"
         )
 
-    if filters.ticker:
+    if filters.tickers is not None:
+        raw_list = list(filters.tickers)
+        if filters.ticker:
+            raw_list.append(filters.ticker)
+        append_multi_ticker_match_conditions(
+            conditions, params, raw_tickers=raw_list
+        )
+    elif filters.ticker:
         append_ticker_match_conditions(conditions, params, raw_ticker=filters.ticker)
 
     username = _clean_text(filters.username)
@@ -102,10 +114,23 @@ def build_feed_filter_conditions(
     return conditions, params
 
 
+def parse_tickers_param(value: str | None) -> tuple[str, ...] | None:
+    """Parsea `tickers=AAPL,MSFT`. None si el param no vino; () si vino vacío."""
+    if value is None:
+        return None
+    parts = tuple(
+        part.strip().lstrip("$").upper()
+        for part in value.split(",")
+        if part.strip()
+    )
+    return parts
+
+
 def feed_filters_from_query(
     *,
     q: str | None = None,
     ticker: str | None = None,
+    tickers: str | None = None,
     username: str | None = None,
     source_type: str | None = None,
     topic: str | None = None,
@@ -115,6 +140,7 @@ def feed_filters_from_query(
     return FeedFilters(
         q=_clean_text(q),
         ticker=_clean_text(ticker),
+        tickers=parse_tickers_param(tickers),
         username=_clean_text(username),
         source_type=_clean_text(source_type),
         topic=_clean_text(topic),

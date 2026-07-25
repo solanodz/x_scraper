@@ -15,6 +15,7 @@ interface SignalFeedFiltersProps {
   onApply: (draft?: FeedFilterDraft) => void;
   onClear: () => void;
   hasActive: boolean;
+  watchCount: number | null;
 }
 
 function updateDraft(
@@ -30,7 +31,15 @@ export default function SignalFeedFilters({
   onApply,
   onClear,
   hasActive,
+  watchCount,
 }: SignalFeedFiltersProps) {
+  const watchLabel =
+    watchCount == null
+      ? "Mis tickers"
+      : watchCount === 0
+        ? "Mis tickers (0)"
+        : `Mis tickers (${watchCount})`;
+
   return (
     <div className="space-y-1.5 border-b border-zinc-800/80 px-3 py-1.5">
       <div className="flex items-center gap-2">
@@ -57,8 +66,8 @@ export default function SignalFeedFilters({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex min-w-0 flex-col gap-1">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-0 flex-1 basis-[40%] flex-col gap-1">
           <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">
             Fuente
           </span>
@@ -73,7 +82,7 @@ export default function SignalFeedFilters({
           />
         </label>
 
-        <label className="flex min-w-0 flex-col gap-1">
+        <label className="flex min-w-0 flex-1 basis-[40%] flex-col gap-1">
           <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-500">
             Período
           </span>
@@ -87,6 +96,25 @@ export default function SignalFeedFilters({
             }}
           />
         </label>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={draft.watchOnly}
+          title="Filtrar Signal Feed por el Ticker Watch"
+          onClick={() => {
+            const next = updateDraft(draft, { watchOnly: !draft.watchOnly });
+            onDraftChange(next);
+            onApply(next);
+          }}
+          className={`shrink-0 rounded border px-2 py-1 font-mono text-[10px] transition-colors ${
+            draft.watchOnly
+              ? "border-emerald-700 bg-emerald-950/40 text-emerald-400"
+              : "border-zinc-700 text-zinc-400 hover:border-amber-600 hover:text-amber-400"
+          }`}
+        >
+          {watchLabel}
+        </button>
       </div>
     </div>
   );

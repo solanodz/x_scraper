@@ -198,6 +198,7 @@ def _build_signal_query(
     merged = FeedFilters(
         q=(filters.q if filters else None),
         ticker=(filters.ticker if filters else None) or ticker,
+        tickers=(filters.tickers if filters else None),
         username=(filters.username if filters else None) or username,
         source_type=filters.source_type if filters else None,
         topic=filters.topic if filters else None,

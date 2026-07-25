@@ -183,7 +183,12 @@ function appendFeedFilterParams(
   options?: FeedFilterQuery,
 ): void {
   if (options?.q) params.set("q", options.q);
-  if (options?.ticker) {
+  if (options?.tickers !== undefined) {
+    params.set(
+      "tickers",
+      options.tickers.map((t) => t.replace(/^\$/, "")).join(","),
+    );
+  } else if (options?.ticker) {
     params.set("ticker", options.ticker.replace(/^\$/, ""));
   }
   if (options?.source_type) params.set("source_type", options.source_type);

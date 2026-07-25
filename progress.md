@@ -2,25 +2,21 @@
 
 ## Estado actual
 
-**F38 `passing`.** Article Body: caps 150/ingest + backfill 100 + docs/ops/article-body.md.
+**F51 `passing`.** Signal Feed: toggle Mis tickers (`tickers=` OR) + empty state si Watch vacío.
 
-Programa grill confirmado (alta→media, una a la vez):
-
-1. ~~F38~~ → **siguiente: F51** Feed Mis tickers  
-2. F52 Dossier Fundamentals snapshot  
-3. F53 Landing + empty states + Research chips  
+Programa grill: ~~F38~~ → ~~F51~~ → **siguiente: F52** Dossier Fundamentals → F53 polish.
 
 ## Próximo paso
 
-1. Redeploy **Worker** (y API si aplica) con env Article Body nuevos (o defaults del código).  
-2. Abrir **F51** in_progress: filtro Feed por Ticker Watch.
+Abrir **F52** in_progress: snapshot Fundamentals (Finnhub→yfinance) en Dossier.
 
 ## Notas
 
-- 2026-07-25 — Grill alta/media → plan F38→F51→F52→F53; F38 shipped.  
-- 2026-07-25 — F50 leverage + quiet skips.  
+- 2026-07-25 — F51: API `tickers=`, toggle Feed, empty Watch.  
+- 2026-07-25 — F38 Article Body caps.  
+- Redeploy **API + Web** para F51 en prod.
 
 ## Roadmap
 
-- **F51** pending (next)  
-- **F52**, **F53** pending  
+- **F52** pending (next)  
+- **F53** pending  

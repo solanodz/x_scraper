@@ -81,14 +81,13 @@ def build_ticker_match(raw: str | None) -> TickerMatch | None:
     return TickerMatch(symbol=symbol, patterns=tuple(unique))
 
 
-def append_ticker_match_conditions(
-    conditions: list[str],
+def ticker_match_sql_clause(
     params: dict[str, Any],
     *,
     raw_ticker: str | None,
     param_prefix: str = "ticker",
-) -> str | None:
-    """Agrega SQL OR para cashtags, tickers y texto (nombre de empresa). Devuelve símbolo."""
+) -> tuple[str, str] | None:
+    """Devuelve (símbolo, cláusula SQL OR) para cashtags/tickers/texto. None si no resuelve."""
     match = build_ticker_match(raw_ticker)
     if match is None:
         return None
@@ -112,8 +111,66 @@ def append_ticker_match_conditions(
             ")"
         )
 
-    conditions.append("(" + " OR ".join(parts) + ")")
-    return match.symbol
+    return match.symbol, "(" + " OR ".join(parts) + ")"
+
+
+def append_ticker_match_conditions(
+    conditions: list[str],
+    params: dict[str, Any],
+    *,
+    raw_ticker: str | None,
+    param_prefix: str = "ticker",
+) -> str | None:
+    """Agrega SQL OR para cashtags, tickers y texto (nombre de empresa). Devuelve símbolo."""
+    built = ticker_match_sql_clause(
+        params, raw_ticker=raw_ticker, param_prefix=param_prefix
+    )
+    if built is None:
+        return None
+    symbol, clause = built
+    conditions.append(clause)
+    return symbol
+
+
+def append_multi_ticker_match_conditions(
+    conditions: list[str],
+    params: dict[str, Any],
+    *,
+    raw_tickers: list[str],
+    param_prefix: str = "tk",
+) -> list[str]:
+    """OR entre varios Tickers. Lista vacía → FALSE (ningún match). Devuelve símbolos."""
+    if not raw_tickers:
+        conditions.append("FALSE")
+        return []
+
+    clauses: list[str] = []
+    symbols: list[str] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(raw_tickers):
+        built = ticker_match_sql_clause(
+            params,
+            raw_ticker=raw,
+            param_prefix=f"{param_prefix}_{index}",
+        )
+        if built is None:
+            continue
+        symbol, clause = built
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        symbols.append(symbol)
+        clauses.append(clause)
+
+    if not clauses:
+        conditions.append("FALSE")
+        return []
+
+    if len(clauses) == 1:
+        conditions.append(clauses[0])
+    else:
+        conditions.append("(" + " OR ".join(clauses) + ")")
+    return symbols
 
 
 def _distinct_tags_sql(where_extra: str = "") -> str:

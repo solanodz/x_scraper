@@ -7,11 +7,15 @@ export interface FeedFilterDraft {
   q: string;
   sourceType: FeedSourceFilter;
   sinceHours: number;
+  /** Filtra por Tickers del Ticker Watch (no se persiste). */
+  watchOnly: boolean;
 }
 
 export interface FeedFilterQuery {
   q?: string;
   ticker?: string;
+  /** Varios Tickers OR (p.ej. Ticker Watch). */
+  tickers?: string[];
   source_type?: string;
   since_hours?: number;
 }
@@ -20,6 +24,7 @@ export const EMPTY_FEED_FILTERS: FeedFilterDraft = {
   q: "",
   sourceType: "",
   sinceHours: 0,
+  watchOnly: false,
 };
 
 export const FEED_TIME_OPTIONS: { value: number; label: string }[] = [
@@ -116,10 +121,38 @@ function matchesSinceHours(signal: SignalSummary, sinceHours: number): boolean {
   return published >= Date.now() - sinceHours * 60 * 60 * 1000;
 }
 
-export function draftToQuery(draft: FeedFilterDraft): FeedFilterQuery {
+function matchesAnyTicker(signal: SignalSummary, tickers: string[]): boolean {
+  const wanted = tickers.map(normalizeTicker).filter(Boolean);
+  if (wanted.length === 0) return false;
+  const tags = new Set(
+    signal.cashtags.map((tag) => tag.replace(/^\$/, "").toUpperCase()),
+  );
+  if (wanted.some((symbol) => tags.has(symbol))) return true;
+  const text = searchableText(signal);
+  return wanted.some(
+    (symbol) =>
+      text.includes(`$${symbol.toLowerCase()}`) ||
+      text.includes(symbol.toLowerCase()),
+  );
+}
+
+export function draftToQuery(
+  draft: FeedFilterDraft,
+  watchSymbols: string[] = [],
+): FeedFilterQuery {
   const query: FeedFilterQuery = { ...parseSearchInput(draft.q) };
   if (draft.sourceType) query.source_type = draft.sourceType;
   if (draft.sinceHours > 0) query.since_hours = draft.sinceHours;
+  if (draft.watchOnly) {
+    // Mis tickers: OR sobre el Watch; el ticker de búsqueda queda absorbido en tickers.
+    const fromWatch = watchSymbols
+      .map(normalizeTicker)
+      .filter(Boolean);
+    query.tickers = fromWatch;
+    if (query.ticker) {
+      delete query.ticker;
+    }
+  }
   return query;
 }
 
@@ -129,6 +162,17 @@ export function hasActiveFilters(query: FeedFilterQuery): boolean {
 
 export function activeFilterLabels(query: FeedFilterQuery): string[] {
   const labels: string[] = [];
+  if (query.tickers && query.tickers.length > 0) {
+    const shown = query.tickers
+      .slice(0, 4)
+      .map((t) => `$${t}`)
+      .join(" ");
+    const more =
+      query.tickers.length > 4 ? ` +${query.tickers.length - 4}` : "";
+    labels.push(`Mis tickers: ${shown}${more}`);
+  } else if (query.tickers && query.tickers.length === 0) {
+    labels.push("Mis tickers: (vacío)");
+  }
   if (query.ticker) labels.push(`Ticker: $${query.ticker}`);
   if (query.q) labels.push(`Búsqueda: ${query.q}`);
   if (query.source_type) {
@@ -154,12 +198,11 @@ export function matchesFeedFilters(
     }
   }
 
-  if (query.ticker) {
-    const normalized = normalizeTicker(query.ticker);
-    const hasTicker = signal.cashtags.some(
-      (tag) => tag.replace(/^\$/, "").toUpperCase() === normalized,
-    );
-    if (!hasTicker) return false;
+  if (query.tickers) {
+    if (query.tickers.length === 0) return false;
+    if (!matchesAnyTicker(signal, query.tickers)) return false;
+  } else if (query.ticker) {
+    if (!matchesAnyTicker(signal, [query.ticker])) return false;
   }
 
   if (query.source_type) {

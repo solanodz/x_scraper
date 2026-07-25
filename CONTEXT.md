@@ -63,7 +63,7 @@ _Avoid_: Portfolio, favorites, bookmarks
 ## Terminal Layout
 
 **Signal Feed**:
-Panel izquierdo de la Terminal (`/terminal`). Muestra un representante por Story Cluster, ordenado por fecha de publicación (más reciente primero, sin importar la fuente), filtrable por fuente, ticker o tema. Indica las fuentes del cluster cuando la misma noticia llegó por varios canales. Aplica Signal Filter por reglas y umbral de Relevance Score (`RELEVANCE_SCORE_MIN`). Seleccionar un Signal actualiza la URL (`/terminal?signal=<id>`) y abre el Signal Detail.
+Panel izquierdo de la Terminal (`/terminal`). Muestra un representante por Story Cluster, ordenado por fecha de publicación (más reciente primero, sin importar la fuente), filtrable por fuente, ticker, tema o **Mis tickers** (OR sobre el Ticker Watch del Operator vía `tickers=`). Con Mis tickers activo y Watch vacío, muestra empty state (no el feed general). Indica las fuentes del cluster cuando la misma noticia llegó por varios canales. Aplica Signal Filter por reglas y umbral de Relevance Score (`RELEVANCE_SCORE_MIN`). Seleccionar un Signal actualiza la URL (`/terminal?signal=<id>`) y abre el Signal Detail.
 _Avoid_: Timeline, news list, stream
 
 **Signal Filter**:

@@ -2,25 +2,23 @@
 
 ## Verified now
 
-- F38 local: `verify_f38` OK (MAX=150, BACKFILL=100, SKIP_DOMAINS, docs).
-- Programa web: F51 → F52 → F53 (grill confirmado).
+- F51: `verify_f51` OK (multi-ticker OR, empty→FALSE, UI Mis tickers + empty Watch).
 
 ## Changed this session
 
-- Article enrichment defaults + `ARTICLE_BODY_BACKFILL_LIMIT`
-- Backfill SQL omite Google News / MarketWatch
-- `docs/ops/article-body.md`, `verify_f38.py`
-- feature_list: F38 passing; F51–F53 pending
+- `GET /signals?tickers=AAPL,MSFT` (+ count)
+- Feed toggle Mis tickers desde Ticker Watch
+- Empty Watch → empty state (no feed general)
+- CONTEXT Signal Feed actualizado
 
 ## Blockers
 
-- Redeploy Worker para caps en prod.
+- Redeploy API + frontend para ver F51 en prod.
 
 ## Next
 
-F51 — Feed toggle Mis tickers (API multi-ticker).
+F52 — Dossier Fundamentals snapshot (Finnhub→yfinance).
 
 ## Do not touch
 
 - Root `package-lock.json`.
-- No empezar F52/F53 hasta cerrar F51.

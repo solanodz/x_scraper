@@ -29,6 +29,10 @@ def get_signals(
     q: str | None = Query(None, description="Palabras clave (todas deben aparecer)"),
     username: str | None = Query(None, description="Fuente o cuenta (parcial)"),
     ticker: str | None = Query(None, description="Ticker, ej. NVDA"),
+    tickers: str | None = Query(
+        None,
+        description="Varios Tickers OR, ej. AAPL,MSFT (Ticker Watch)",
+    ),
     source_type: str | None = Query(
         None,
         description="x | news | rss | marketaux | alpha_vantage",
@@ -43,6 +47,7 @@ def get_signals(
     filters = feed_filters_from_query(
         q=q,
         ticker=ticker,
+        tickers=tickers,
         username=username,
         source_type=source_type,
         topic=topic,
@@ -57,6 +62,10 @@ def get_signals_count(
     q: str | None = Query(None, description="Palabras clave (todas deben aparecer)"),
     username: str | None = Query(None, description="Fuente o cuenta (parcial)"),
     ticker: str | None = Query(None, description="Ticker, ej. NVDA"),
+    tickers: str | None = Query(
+        None,
+        description="Varios Tickers OR, ej. AAPL,MSFT (Ticker Watch)",
+    ),
     source_type: str | None = Query(
         None,
         description="x | news | rss | marketaux | alpha_vantage",
@@ -71,6 +80,7 @@ def get_signals_count(
     filters = feed_filters_from_query(
         q=q,
         ticker=ticker,
+        tickers=tickers,
         username=username,
         source_type=source_type,
         topic=topic,
