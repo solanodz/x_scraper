@@ -2,26 +2,27 @@
 
 ## Estado actual
 
-**F49 `passing`.** Fast Path mixed-intent: noticia + precio / “conviene comprar” ya no usa el atajo news-only.
+**F49 en prod — smoke OK.** Mixed-intent Fast Path verificado en Railway tras redeploy.
 
-Harness audit follow-ups también aplicados: state fresco, `verify_active.sh`, `session-handoff.md`.
+Harness en buen estado (~84/100 post-audit). Sin feature `in_progress`.
 
 ## Próximo paso
 
-1. Deploy API (Railway) con F49 + harness.
-2. Smoke prod:
-   - `ultima noticia de msft? y como esta de precios? conviene comprar ahora?` → debe incluir precio
-   - `precio BTC` / `dólar blue hoy` / `última noticia de MSFT` (sola) siguen en fast path
-3. Confirmar Railway: `RESEARCH_ENGINE=langgraph`, `RESEARCH_PARALLEL_ENABLED=true`
+Elegir una línea (no las tres a la vez):
+
+1. **Paper Bot** — usarlo 2–3 días armado → anotar dolores → F50
+2. **F38** — más cobertura de Article Body
+3. Pausar features y solo operar (Terminal + Research + Bot)
 
 ## Notas
 
-- 2026-07-24 — Harness audit ~72/100; top3: state + verify_active + session-handoff.
-- 2026-07-24 — F49: bug Fast Path (MSFT noticia+precio → “precio no disponible”); fix + `verify_f48_fast_chat` casos mixtos.
-- 2026-07-24 — F48 shipped (`e2511ab`): fast paths, live parallel steps, bot live marks (`?fresh=true`).
-- 2026-07-23 — F47 Paper Bot passing; trader via `BOT_OPERATOR_ID` / `LOCAL_OPERATOR_ID`.
+- 2026-07-25 — Paper Bot: PnL falso por mark BTC@$28 (TP fantasma). Guardrail mark sane + borrado trade contaminado; leverage no multiplica notional en paper.
+- 2026-07-24 — Smoke prod OK tras redeploy Railway: precio BTC, dólar blue, última noticia MSFT, mixed MSFT+precio+conviene, precios plural, NVDA vs AMD; `/bot` marks live.
+- 2026-07-24 — F49 shipped + harness (`verify_active`, session-handoff); audit 72→84.
+- 2026-07-24 — F48: fast paths, live parallel steps, bot `?fresh=true`.
+- 2026-07-23 — F47 Paper Bot passing.
 
 ## Roadmap
 
-- **F38** pending — Article Body enrichment (después del smoke F49)
-- Paper Bot: usar 2–3 días → definir F50 desde dolor real
+- **F38** pending — Article Body enrichment
+- Paper Bot → F50 desde uso real

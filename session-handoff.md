@@ -4,27 +4,25 @@ Compact restart path for the next agent/session. Keep this current when work is 
 
 ## Verified now
 
-- F48 Research Chat Fast Path — `verify_f48_fast_chat` OK (incluye casos mixed-intent tras F49).
-- F49 mixed-intent Fast Path — `resolve_fast_path` no toma news-only cuando hay precio / conviene comprar; `precios` plural matchea.
-- Harness: `scripts/verify_active.sh` + `init.sh` lo invoca; `session-handoff.md` + `AGENTS.md` verification table.
-- Paper Bot `/bot`: marks live con `?fresh=true` cada ~3s (en `main` desde `e2511ab`).
+- F49 mixed-intent Fast Path **en prod** (Railway redeploy + smoke OK 2026-07-24).
+- Paper Bot: trade contaminado BTC mark@$28 borrado; `assert_sane_mark` + verify_f47 OK local.
+- Harness: `scripts/verify_active.sh`, `session-handoff.md`.
 
 ## Changed this session
 
-- Code: `backend/services/research_fast_path.py`, `backend/scripts/verify_f48_fast_chat.py`
-- Harness: `scripts/verify_active.sh`, `init.sh`, `AGENTS.md`, `feature_list.json` (rules + F49), `progress.md`
+- `backend/services/bot_venue.py` — mark sanity guard (floor BTC/ETH + max jump vs entry).
+- `backend/scripts/verify_f47_paper_bot.py` — regresión mark $28.
+- `/bot` UI labels: size notional; leverage display-only in paper.
+- Store: deleted position `9739ed80-…` (+fills).
 
 ## Blockers
 
-- Ninguno de código. Prod: redeploy API para que F49 se vea en Research Chat público.
+- Redeploy **xscraper-trader** (y API si sirve UI) para activar el guardrail en Railway.
 
 ## Next (una sola cosa)
 
-1. Push `main` (`3e458ad`) + deploy API (Railway).
-2. Smoke prod: `ultima noticia de msft? y como esta de precios? conviene comprar ahora?` debe traer precio (no “no disponible”).
-3. Confirmar vars: `RESEARCH_ENGINE=langgraph`, `RESEARCH_PARALLEL_ENABLED=true`.
+Redeploy trader en Railway; confirmar que un mark basura ya no cierra posiciones.
 
 ## Do not touch
 
 - Root `package-lock.json` (basura; no commitear).
-- No abrir F38 hasta cerrar smoke prod de F49.

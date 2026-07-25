@@ -981,7 +981,8 @@
         "python -m backend.scripts.verify_f48_fast_chat => OK"
       ],
       "evidence": [
-        "2026-07-24: repro local resolve_fast_path mixed query → None (antes recent_signals); verify_f48_fast_chat => OK (0.39s) con casos mixed-intent + precios plural"
+        "2026-07-24: repro local resolve_fast_path mixed query → None (antes recent_signals); verify_f48_fast_chat => OK (0.39s) con casos mixed-intent + precios plural",
+        "2026-07-24: smoke prod post-Railway redeploy — mixed MSFT+precios+conviene incluye precio; BTC/blue/noticia sola/NVDA vs AMD OK"
       ]
     }
   ]

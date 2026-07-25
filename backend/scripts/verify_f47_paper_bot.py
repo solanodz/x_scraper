@@ -383,12 +383,14 @@ def _patch_bot_repo(store: _MemStore):
 
 
 def test_paper_venue_open_tp() -> None:
-    from backend.services.bot_venue import PaperVenue
+    from backend.services.bot_venue import BadMarkError, PaperVenue
     from backend.services.paper_bot import run_tick
 
     operator_id = f"00000000-0000-4000-8000-{uuid.uuid4().hex[:12]}"
     store = _MemStore(operator_id)
-    marks = {"BTC": 100.0}
+    # Realistic BTC marks (floor rejects implausible ~$28 equity ticks).
+    entry = 65_000.0
+    marks = {"BTC": entry}
 
     patches = _patch_bot_repo(store)
     for p in patches:
@@ -407,17 +409,26 @@ def test_paper_venue_open_tp() -> None:
         )
         pos = opened["position"]
         assert pos["status"] == "open"
-        assert abs(pos["tp_price"] - 102.0) < 1e-6
-        assert abs(pos["sl_price"] - 99.0) < 1e-6
-        assert opened["fill"]["price"] == 100.0
+        assert abs(pos["tp_price"] - entry * 1.02) < 1e-6
+        assert abs(pos["sl_price"] - entry * 0.99) < 1e-6
+        assert opened["fill"]["price"] == entry
 
         # Mark-to-market without hitting TP/SL should refresh mark_price.
-        marks["BTC"] = 100.5
+        marks["BTC"] = entry * 1.005
         none_close = venue.check_tp_sl(operator_id=operator_id, position=pos)
         assert none_close is None
-        assert abs(float(store.positions[pos["id"]]["mark_price"]) - 100.5) < 1e-6
+        assert abs(float(store.positions[pos["id"]]["mark_price"]) - entry * 1.005) < 1e-6
 
-        marks["BTC"] = 103.0
+        # Implausible mark must NOT fake a TP (regression: BTC@$28 closed short).
+        marks["BTC"] = 28.37
+        try:
+            venue.check_tp_sl(operator_id=operator_id, position=pos)
+            raise AssertionError("expected BadMarkError for implausible mark")
+        except BadMarkError:
+            pass
+        assert store.positions[pos["id"]]["status"] == "open"
+
+        marks["BTC"] = entry * 1.03
         closed = venue.check_tp_sl(operator_id=operator_id, position=pos)
         assert closed is not None
         assert closed["position"]["status"] == "closed"
@@ -425,7 +436,7 @@ def test_paper_venue_open_tp() -> None:
         assert closed["position"]["realized_pnl"] > 0
 
         candles = _synthetic_breakout_up(period=20)
-        marks["BTC"] = 108.0
+        marks["BTC"] = entry * 1.08
         summary = run_tick(
             operator_id,
             candles_by_symbol={"BTC": candles},
@@ -435,7 +446,7 @@ def test_paper_venue_open_tp() -> None:
         assert len(summary.get("opened") or []) >= 1, summary
 
         store.config["armed"] = False
-        marks["BTC"] = 120.0
+        marks["BTC"] = entry * 1.20
         summary2 = run_tick(
             operator_id,
             candles_by_symbol={"BTC": candles},

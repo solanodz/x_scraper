@@ -945,7 +945,7 @@ function BotPageContent() {
                   />
                 </label>
                 <label>
-                  <span className={LABEL}>Size USD</span>
+                  <span className={LABEL}>Size USD (notional)</span>
                   <input
                     type="number"
                     min={1}
@@ -961,7 +961,7 @@ function BotPageContent() {
                   />
                 </label>
                 <label>
-                  <span className={LABEL}>Leverage</span>
+                  <span className={LABEL}>Leverage (display)</span>
                   <input
                     type="number"
                     min={1}
@@ -974,6 +974,7 @@ function BotPageContent() {
                         leverage: Number(e.target.value) || 1,
                       })
                     }
+                    title="Paper MVP: size is notional USD; leverage does not multiply qty/PnL yet"
                   />
                 </label>
                 <label>

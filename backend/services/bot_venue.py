@@ -7,9 +7,21 @@ from typing import Any, Callable, Protocol
 
 from backend.app.services import bot_repo
 
+# Absolute floors — catch wrong-symbol quotes (e.g. equity "BTC" ~$28).
+_CRYPTO_MARK_FLOOR: dict[str, float] = {
+    "BTC": 1_000.0,
+    "ETH": 50.0,
+}
+# Reject single-observation marks that jump > this vs entry (bad tick / wrong feed).
+_MAX_MARK_MOVE_VS_ENTRY = 0.35
+
 
 class VenueNotEnabled(Exception):
     """Venue no habilitado / sin credenciales (fail-closed)."""
+
+
+class BadMarkError(VenueNotEnabled):
+    """Mark implausible — no abrir/cerrar/TP-SL con ese precio."""
 
 
 class ExecutionVenue(Protocol):
@@ -65,6 +77,31 @@ def _realized_pnl(
     return (entry - exit_price) * qty
 
 
+def assert_sane_mark(
+    symbol: str,
+    mark: float,
+    *,
+    ref_price: float | None = None,
+) -> None:
+    """Fail-closed si el mark no es usable para paper risk."""
+    if not isinstance(mark, (int, float)) or mark <= 0:
+        raise BadMarkError(f"invalid mark for {symbol}: {mark}")
+
+    floor = _CRYPTO_MARK_FLOOR.get(symbol.strip().upper())
+    if floor is not None and mark < floor:
+        raise BadMarkError(
+            f"implausible mark {symbol}={mark} (floor {floor}) — refusing trade action"
+        )
+
+    if ref_price is not None and ref_price > 0:
+        move = abs(mark - ref_price) / ref_price
+        if move > _MAX_MARK_MOVE_VS_ENTRY:
+            raise BadMarkError(
+                f"mark jump {symbol}: {ref_price} → {mark} "
+                f"({move:.1%} > {_MAX_MARK_MOVE_VS_ENTRY:.0%}) — refusing trade action"
+            )
+
+
 def _default_mark_fn(symbol: str) -> Decimal:
     from backend.services.market_data import fetch_quotes
 
@@ -74,12 +111,18 @@ def _default_mark_fn(symbol: str) -> Decimal:
         if price is None and isinstance(q, dict):
             price = q.get("price")
         if price is not None:
-            return Decimal(str(price))
+            mark = float(price)
+            assert_sane_mark(symbol, mark)
+            return Decimal(str(mark))
     raise VenueNotEnabled(f"no mark price for {symbol}")
 
 
 class PaperVenue:
-    """Fills al mark; persiste Position/Fill vía bot_repo."""
+    """Fills al mark; persiste Position/Fill vía bot_repo.
+
+    size_usd = notional USD (ADR-0015). leverage se guarda para Risk Policy /
+    Hyperliquid futuro; en paper MVP no multiplica qty ni PnL.
+    """
 
     def __init__(
         self,
@@ -91,7 +134,9 @@ class PaperVenue:
         self.venue_name = venue_name
 
     def get_mark_price(self, symbol: str) -> Decimal:
-        return self._mark_fn(symbol)
+        mark = self._mark_fn(symbol)
+        assert_sane_mark(symbol, float(mark))
+        return mark
 
     def open(
         self,
@@ -108,6 +153,7 @@ class PaperVenue:
         mark = float(self.get_mark_price(symbol))
         if mark <= 0:
             raise bot_repo.BotRepoError(f"invalid mark for {symbol}")
+        # Notional USD → qty. Leverage is NOT applied to qty in paper MVP.
         qty = float(size_usd) / mark
         tp_price, sl_price = _tp_sl_prices(
             side=side,
@@ -154,6 +200,11 @@ class PaperVenue:
         if pos is None or pos["status"] != "open":
             raise bot_repo.BotRepoError("open position not found")
         mark = float(self.get_mark_price(pos["symbol"]))
+        assert_sane_mark(
+            pos["symbol"],
+            mark,
+            ref_price=float(pos["entry_price"]),
+        )
         pnl = _realized_pnl(
             side=pos["side"],
             entry=float(pos["entry_price"]),
@@ -189,6 +240,11 @@ class PaperVenue:
     ) -> dict[str, Any] | None:
         """Si mark toca TP/SL, cierra y retorna resultado; si no, None."""
         mark = float(self.get_mark_price(position["symbol"]))
+        assert_sane_mark(
+            position["symbol"],
+            mark,
+            ref_price=float(position["entry_price"]),
+        )
         side = position["side"]
         tp = float(position["tp_price"])
         sl = float(position["sl_price"])
@@ -252,10 +308,10 @@ def get_venue(
     name: str,
     *,
     mark_fn: Callable[[str], Decimal] | None = None,
-) -> ExecutionVenue:
-    key = (name or "paper").strip().lower()
-    if key == "paper":
+) -> PaperVenue | HyperliquidVenue:
+    normalized = (name or "paper").strip().lower()
+    if normalized == "paper":
         return PaperVenue(mark_fn=mark_fn)
-    if key == "hyperliquid":
+    if normalized == "hyperliquid":
         return HyperliquidVenue()
     raise VenueNotEnabled(f"unknown venue: {name}")
