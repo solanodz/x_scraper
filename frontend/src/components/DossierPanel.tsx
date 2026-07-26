@@ -1,15 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ChatMarkdown from "@/components/ChatMarkdown";
+import ProvenanceChip from "@/components/ProvenanceChip";
+import ResearchStepLoader from "@/components/ResearchStepLoader";
+import { DossierBlockSkeleton } from "@/components/TerminalSkeleton";
 import TickerLogo from "@/components/TickerLogo";
 import {
   fetchDossier,
   fetchDossierVersions,
   fetchTickerLogos,
-  refreshDossier,
+  streamDossierRefresh,
 } from "@/lib/api";
-import type { DossierFundamentalsSnapshot, DossierVersion } from "@/lib/types";
+import type {
+  DossierFundamentalsSnapshot,
+  DossierVersion,
+  ResearchStep,
+} from "@/lib/types";
 
 const DOSSIER_BLOCKS = [
   { key: "panorama_mercado", label: "Panorama de mercado" },
@@ -30,11 +37,13 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
   const [dossierVersions, setDossierVersions] = useState<DossierVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshSteps, setRefreshSteps] = useState<ResearchStep[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
     null,
   );
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const refreshAbortRef = useRef<AbortController | null>(null);
 
   const loadDossier = useCallback(async (ticker: string) => {
     setLoading(true);
@@ -78,18 +87,41 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
 
   async function handleRefresh() {
     if (refreshing) return;
+    refreshAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    refreshAbortRef.current = ctrl;
     setRefreshing(true);
+    setRefreshSteps([]);
     setError(null);
     try {
-      const updated = await refreshDossier(symbol);
-      setDossier(updated);
-      setSelectedVersionId(updated.id);
+      await streamDossierRefresh(
+        symbol,
+        {
+          onStep: (step) => {
+            setRefreshSteps((prev) => {
+              const next = [...prev];
+              const idx = next.findIndex((s) => s.tool === step.tool);
+              if (idx >= 0) next[idx] = step;
+              else next.push(step);
+              return next;
+            });
+          },
+          onVersion: (updated) => {
+            setDossier(updated);
+            setSelectedVersionId(updated.id);
+          },
+          onError: (message) => setError(message),
+        },
+        ctrl.signal,
+      );
       const versions = await fetchDossierVersions(symbol);
       setDossierVersions(versions);
     } catch {
       setError("No se pudo refrescar el Dossier");
     } finally {
       setRefreshing(false);
+      setRefreshSteps([]);
+      if (refreshAbortRef.current === ctrl) refreshAbortRef.current = null;
     }
   }
 
@@ -152,6 +184,7 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
           dossier={displayedDossier}
           loading={loading}
           refreshing={refreshing}
+          refreshSteps={refreshSteps}
           error={error}
         />
       </div>
@@ -164,19 +197,21 @@ function DossierContent({
   dossier,
   loading,
   refreshing,
+  refreshSteps,
   error,
 }: {
   symbol: string;
   dossier: DossierVersion | null;
   loading: boolean;
   refreshing: boolean;
+  refreshSteps: ResearchStep[];
   error: string | null;
 }) {
   if (loading && !dossier) {
-    return <p className="font-mono text-xs text-zinc-500">Cargando Dossier…</p>;
+    return <DossierBlockSkeleton blocks={4} />;
   }
 
-  if (error) {
+  if (error && !dossier) {
     return <p className="font-mono text-xs text-red-400">{error}</p>;
   }
 
@@ -188,7 +223,7 @@ function DossierContent({
           integral.
         </p>
         {refreshing && (
-          <p className="font-mono text-xs text-zinc-400">Generando…</p>
+          <ResearchStepLoader steps={refreshSteps} active />
         )}
       </div>
     );
@@ -201,6 +236,10 @@ function DossierContent({
 
   return (
     <div className="space-y-6 px-1">
+      {refreshing && <ResearchStepLoader steps={refreshSteps} active />}
+      {error && (
+        <p className="font-mono text-xs text-red-400">{error}</p>
+      )}
       {!hasBlocks && (
         <p className="font-mono text-xs text-zinc-500">
           El Dossier no tiene bloques renderizables. Probá Refresh de nuevo.
@@ -275,17 +314,28 @@ function FundamentalsSnapshotPanel({
     },
   ];
 
+  const provenance =
+    snapshot.provenance ??
+    (snapshot.source
+      ? {
+          kind: "fundamentals" as const,
+          source: snapshot.source,
+          as_of: snapshot.as_of,
+          note:
+            snapshot.asset_kind === "crypto"
+              ? "ratios equity no aplican"
+              : undefined,
+        }
+      : null);
+
   return (
     <div className="mb-2 space-y-2 border border-zinc-800 bg-zinc-950 px-2 py-1.5">
-      <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
-        <span>snapshot</span>
-        <span className="text-zinc-600">·</span>
-        <span className="text-zinc-400">{snapshot.source || "none"}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <ProvenanceChip provenance={provenance} />
         {snapshot.asset_kind === "crypto" && (
-          <>
-            <span className="text-zinc-600">·</span>
-            <span className="text-zinc-500">crypto</span>
-          </>
+          <span className="font-mono text-[9px] uppercase tracking-wide text-zinc-600">
+            crypto
+          </span>
         )}
       </div>
       <div className="flex flex-wrap gap-2">

@@ -40,7 +40,33 @@ class FundamentalsSnapshot:
     as_of: str
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        from backend.services.provenance import fundamentals_provenance
+
+        payload = asdict(self)
+        notes: list[str] = []
+        if self.asset_kind == "crypto":
+            notes.append("ratios equity no aplican")
+        elif self.source == "none":
+            notes.append("sin fundamentals de proveedor")
+        else:
+            missing = [
+                label
+                for label, value in (
+                    ("PE", self.pe),
+                    ("EPS", self.eps),
+                    ("market cap", self.market_cap),
+                )
+                if value is None
+            ]
+            if missing:
+                notes.append(f"{', '.join(missing)} no disponible")
+        prov = fundamentals_provenance(
+            source=self.source,
+            as_of=self.as_of,
+            note="; ".join(notes) if notes else None,
+        )
+        payload["provenance"] = prov.to_dict()
+        return payload
 
 
 def _now_iso() -> str:

@@ -13,6 +13,7 @@ from backend.services.llm import (
     hits_to_citations,
     stream_answer,
 )
+from backend.services.provenance import collect_provenances
 from backend.services.research_steps import (
     ChatArtifact,
     GatherResult,
@@ -126,10 +127,10 @@ def ask_stream(
     context = ""
     hits: list = []
     artifacts: list[dict] = []
+    gather_provenances: list[dict] = []
     direct_answer: str | None = None
     answer_path = "research"
     summary_only = False
-    meta_emitted = False
 
     for item in _iter_gather(query, history=history, operator_id=operator_id):
         if isinstance(item, ResearchStepEvent):
@@ -137,21 +138,20 @@ def ask_stream(
         elif isinstance(item, GatherResult):
             context, hits = item.context, item.hits
             artifacts = list(item.artifacts or [])
+            gather_provenances = list(item.provenances or [])
             direct_answer = item.direct_answer
             answer_path = item.path or "research"
             summary_only = bool(item.summary_only) or context_mentions_summary_only(
                 context
             )
-            if not meta_emitted:
-                yield ResearchAnswerMeta(
-                    path=answer_path, summary_only=summary_only
-                )
-                meta_emitted = True
-
-    if not meta_emitted:
-        yield ResearchAnswerMeta(path=answer_path, summary_only=summary_only)
 
     if direct_answer:
+        provenances = collect_provenances(gather_provenances)
+        yield ResearchAnswerMeta(
+            path=answer_path,
+            summary_only=summary_only,
+            provenances=tuple(provenances),
+        )
         yield ResearchStepEvent(
             tool="synthesis",
             label="Redactando respuesta…",
@@ -168,6 +168,7 @@ def ask_stream(
         return
 
     if not hits and "Sin datos" in context:
+        yield ResearchAnswerMeta(path=answer_path, summary_only=summary_only)
         for token in _iter_text_tokens(
             "No encontré Signals ni Market Data relevantes para esta Query."
         ):
@@ -175,10 +176,18 @@ def ask_stream(
         yield []
         return
 
-    # Chart cards: no depender solo de que el LLM llame get_price_history.
-    artifacts = ensure_price_chart_artifacts(query, artifacts)
+    # Charts en paralelo con la síntesis: no bloquear time-to-first-token.
+    from concurrent.futures import ThreadPoolExecutor
 
-    for artifact_data in artifacts:
+    seed_artifacts = list(artifacts)
+    provenances = collect_provenances(gather_provenances, *seed_artifacts)
+    yield ResearchAnswerMeta(
+        path=answer_path,
+        summary_only=summary_only,
+        provenances=tuple(provenances),
+    )
+
+    for artifact_data in seed_artifacts:
         art_type = str(artifact_data.get("type") or "unknown")
         payload = {k: v for k, v in artifact_data.items() if k != "type"}
         yield ChatArtifact(type=art_type, data=payload)
@@ -190,8 +199,59 @@ def ask_stream(
     )
 
     citations = hits_to_citations(hits)
-    for token in stream_answer(context, query, history=prior):
-        yield token
+    emitted_keys = {
+        (
+            str(a.get("type") or ""),
+            str(a.get("symbol") or "").upper(),
+            str(a.get("period") or ""),
+        )
+        for a in seed_artifacts
+    }
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        chart_future = pool.submit(ensure_price_chart_artifacts, query, seed_artifacts)
+        charts_emitted = False
+
+        def _emit_pending_charts():
+            nonlocal charts_emitted
+            if charts_emitted or not chart_future.done():
+                return
+            charts_emitted = True
+            for artifact_data in chart_future.result():
+                key = (
+                    str(artifact_data.get("type") or ""),
+                    str(artifact_data.get("symbol") or "").upper(),
+                    str(artifact_data.get("period") or ""),
+                )
+                if key in emitted_keys:
+                    continue
+                emitted_keys.add(key)
+                art_type = str(artifact_data.get("type") or "unknown")
+                payload = {
+                    k: v for k, v in artifact_data.items() if k != "type"
+                }
+                yield ChatArtifact(type=art_type, data=payload)
+
+        for token in stream_answer(context, query, history=prior):
+            yield from _emit_pending_charts()
+            yield token
+
+        yield from _emit_pending_charts()
+        if not charts_emitted:
+            for artifact_data in chart_future.result():
+                key = (
+                    str(artifact_data.get("type") or ""),
+                    str(artifact_data.get("symbol") or "").upper(),
+                    str(artifact_data.get("period") or ""),
+                )
+                if key in emitted_keys:
+                    continue
+                emitted_keys.add(key)
+                art_type = str(artifact_data.get("type") or "unknown")
+                payload = {
+                    k: v for k, v in artifact_data.items() if k != "type"
+                }
+                yield ChatArtifact(type=art_type, data=payload)
 
     yield ResearchStepEvent(
         tool="synthesis",

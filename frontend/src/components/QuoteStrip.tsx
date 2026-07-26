@@ -1,10 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ProvenanceChip from "@/components/ProvenanceChip";
+import { QuoteStripSkeleton } from "@/components/TerminalSkeleton";
 import TickerChartModal from "@/components/TickerChartModal";
 import TickerLogo from "@/components/TickerLogo";
 import { fetchWatchlistQuotes } from "@/lib/api";
 import { MARKET_QUOTE_POLL_MS } from "@/lib/marketRefresh";
+import {
+  readCachedWatchlistQuotes,
+  writeCachedWatchlistQuotes,
+} from "@/lib/quoteCache";
 import type { Quote } from "@/lib/types";
 
 const POLL_INTERVAL_MS = MARKET_QUOTE_POLL_MS;
@@ -22,9 +28,13 @@ function formatChangePercent(pct: number): string {
 }
 
 export default function QuoteStrip() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>(
+    () => readCachedWatchlistQuotes() ?? [],
+  );
   const [unavailable, setUnavailable] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => (readCachedWatchlistQuotes() ?? []).length === 0,
+  );
   const [chartSymbol, setChartSymbol] = useState<string | null>(null);
 
   const loadQuotes = useCallback(async () => {
@@ -32,17 +42,23 @@ export default function QuoteStrip() {
       const data = await fetchWatchlistQuotes();
       setQuotes(data);
       setUnavailable(data.length === 0);
+      if (data.length > 0) writeCachedWatchlistQuotes(data);
     } catch {
-      setQuotes([]);
-      setUnavailable(true);
+      // Keep stale cache on network blip; only mark unavailable if empty.
+      setQuotes((prev) => {
+        if (prev.length === 0) {
+          queueMicrotask(() => setUnavailable(true));
+        }
+        return prev;
+      });
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadQuotes();
-    const interval = setInterval(loadQuotes, POLL_INTERVAL_MS);
+    void loadQuotes();
+    const interval = setInterval(() => void loadQuotes(), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [loadQuotes]);
 
@@ -61,16 +77,20 @@ export default function QuoteStrip() {
       <div className="border-b border-zinc-800 bg-zinc-950">
         <div className="flex items-center gap-3 px-4 py-1.5">
           {!loading && !unavailable && quotes.length > 0 && (
-            <span className="shrink-0 border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
-              15m delayed
-            </span>
+            <ProvenanceChip
+              provenance={
+                quotes.find((q) => q.provenance)?.provenance ?? {
+                  kind: "market_data",
+                  source:
+                    quotes.find((q) => q.source)?.source || "unknown",
+                  delay_label: "~15m",
+                }
+              }
+              className="shrink-0"
+            />
           )}
 
-          {loading && (
-            <span className="font-mono text-[11px] text-zinc-500">
-              Loading quotes…
-            </span>
-          )}
+          {loading && <QuoteStripSkeleton />}
 
           {!loading && unavailable && (
             <span className="font-mono text-[11px] text-zinc-500">

@@ -1,7 +1,7 @@
 "use client";
 
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   authHeaders,
   createSignalStreamUrl,
@@ -31,8 +31,10 @@ import {
 } from "@/lib/signalSource";
 import type { SignalSummary } from "@/lib/types";
 import SignalFeedFilters from "@/components/SignalFeedFilters";
+import { FeedRowSkeleton } from "@/components/TerminalSkeleton";
 
-const FEED_PAGE_SIZE = 200;
+/** Primera página chica para TTFP; el resto llega al scrollear (keyset `before`). */
+const FEED_PAGE_SIZE = 20;
 
 interface SignalFeedProps {
   selectedId: string | null;
@@ -87,13 +89,41 @@ function displayHeadline(signal: SignalSummary): string {
   return signal.title?.trim() || signal.raw_content;
 }
 
+function newestPublishedAt(signals: SignalSummary[]): string | null {
+  if (signals.length === 0) return null;
+  let best = signals[0].published_at;
+  let bestMs = new Date(best).getTime();
+  for (const signal of signals) {
+    const ms = new Date(signal.published_at).getTime();
+    if (ms > bestMs) {
+      best = signal.published_at;
+      bestMs = ms;
+    }
+  }
+  return best;
+}
+
+function oldestPublishedAt(signals: SignalSummary[]): string | null {
+  if (signals.length === 0) return null;
+  let oldest = signals[0].published_at;
+  let oldestMs = new Date(oldest).getTime();
+  for (const signal of signals) {
+    const ms = new Date(signal.published_at).getTime();
+    if (ms < oldestMs) {
+      oldest = signal.published_at;
+      oldestMs = ms;
+    }
+  }
+  return oldest;
+}
+
 export default function SignalFeed({
   selectedId,
   onSelectSignal,
 }: SignalFeedProps) {
   const [signals, setSignals] = useState<SignalSummary[]>([]);
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
-  const [loadedOffset, setLoadedOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +133,14 @@ export default function SignalFeed({
   const [activeFilters, setActiveFilters] = useState<FeedFilterQuery>({});
   const [watchSymbols, setWatchSymbols] = useState<string[]>([]);
   const [watchLoaded, setWatchLoaded] = useState(false);
+  const [streamSince, setStreamSince] = useState<string | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(false);
+  const oldestCursorRef = useRef<string | null>(null);
+  const signalsRef = useRef<SignalSummary[]>([]);
 
   const watchEmptyActive =
     Boolean(activeFilters.tickers) &&
@@ -111,31 +149,96 @@ export default function SignalFeed({
   const loadSignals = useCallback(async (filters: FeedFilterQuery) => {
     if (filters.tickers !== undefined && filters.tickers.length === 0) {
       setSignals([]);
-      setLoadedOffset(0);
+      signalsRef.current = [];
       setTotalAvailable(0);
+      setHasMore(false);
+      hasMoreRef.current = false;
+      oldestCursorRef.current = null;
+      setStreamSince(null);
       setError(null);
       setLoading(false);
       setLoadingMore(false);
       return;
     }
+    setStreamSince(null);
+    setTotalAvailable(null);
     try {
-      const [data, total] = await Promise.all([
-        fetchSignals(FEED_PAGE_SIZE, filters, 0),
-        fetchSignalCount(filters),
-      ]);
+      // Primer paint: solo la lista (count va en background — era el otro cuello).
+      const data = await fetchSignals(FEED_PAGE_SIZE, filters, 0, {
+        includeClusterSources: false,
+      });
       setSignals(data);
-      setLoadedOffset(data.length);
-      setTotalAvailable(total);
+      signalsRef.current = data;
+      oldestCursorRef.current = oldestPublishedAt(data);
+      const more = data.length >= FEED_PAGE_SIZE;
+      setHasMore(more);
+      hasMoreRef.current = more;
       setError(null);
+      setStreamSince(newestPublishedAt(data) ?? new Date().toISOString());
+      setLoading(false);
+
+      void fetchSignalCount(filters)
+        .then((total) => {
+          setTotalAvailable(total);
+          const stillMore = data.length < total;
+          setHasMore(stillMore);
+          hasMoreRef.current = stillMore;
+        })
+        .catch(() => {
+          /* el hasMore por tamaño de página alcanza */
+        });
     } catch {
       setError("Failed to load signals");
       setTotalAvailable(null);
-      setLoadedOffset(0);
-    } finally {
+      setHasMore(false);
+      hasMoreRef.current = false;
+      oldestCursorRef.current = null;
+      setStreamSince(null);
       setLoading(false);
+    } finally {
       setLoadingMore(false);
     }
   }, []);
+
+  const loadMoreSignals = useCallback(async () => {
+    if (
+      loadingMoreRef.current ||
+      !hasMoreRef.current ||
+      watchEmptyActive ||
+      !oldestCursorRef.current
+    ) {
+      return;
+    }
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const data = await fetchSignals(FEED_PAGE_SIZE, activeFilters, 0, {
+        before: oldestCursorRef.current,
+        includeClusterSources: false,
+      });
+      if (data.length === 0) {
+        setHasMore(false);
+        hasMoreRef.current = false;
+        return;
+      }
+      const merged = mergeSignalLists(signalsRef.current, data);
+      signalsRef.current = merged;
+      setSignals(merged);
+      oldestCursorRef.current = oldestPublishedAt(merged);
+      const more = data.length >= FEED_PAGE_SIZE;
+      setHasMore(more);
+      hasMoreRef.current = more;
+      if (totalAvailable != null && merged.length >= totalAvailable) {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
+    } catch {
+      setError("Failed to load signals");
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [activeFilters, totalAvailable, watchEmptyActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +258,6 @@ export default function SignalFeed({
     };
   }, []);
 
-  // Hydrate Mis tickers (watchOnly) from Operator Settings.
   useEffect(() => {
     let cancelled = false;
     void fetchOperatorSettings()
@@ -175,72 +277,33 @@ export default function SignalFeed({
     };
   }, []);
 
-  const loadMoreSignals = useCallback(async () => {
-    if (
-      loadingMore ||
-      totalAvailable == null ||
-      loadedOffset >= totalAvailable
-    ) {
-      return;
-    }
-    setLoadingMore(true);
-    try {
-      const data = await fetchSignals(
-        FEED_PAGE_SIZE,
-        activeFilters,
-        loadedOffset,
-      );
-      if (data.length > 0) {
-        setSignals((prev) => mergeSignalLists(prev, data));
-        setLoadedOffset((prev) => prev + data.length);
-      }
-    } catch {
-      setError("Failed to load signals");
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [activeFilters, loadedOffset, loadingMore, totalAvailable]);
-
-  const loadAllSignals = useCallback(async () => {
-    if (
-      loadingMore ||
-      totalAvailable == null ||
-      loadedOffset >= totalAvailable
-    ) {
-      return;
-    }
-    setLoadingMore(true);
-    try {
-      let offset = loadedOffset;
-      const batches: SignalSummary[][] = [];
-      while (offset < totalAvailable) {
-        const data = await fetchSignals(FEED_PAGE_SIZE, activeFilters, offset);
-        if (data.length === 0) break;
-        batches.push(data);
-        offset += data.length;
-      }
-      if (batches.length > 0) {
-        setSignals((prev) => {
-          let merged = prev;
-          for (const batch of batches) {
-            merged = mergeSignalLists(merged, batch);
-          }
-          return merged;
-        });
-        setLoadedOffset(offset);
-      }
-    } catch {
-      setError("Failed to load signals");
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [activeFilters, loadedOffset, loadingMore, totalAvailable]);
-
   useEffect(() => {
     loadSignals(activeFilters);
   }, [loadSignals, activeFilters]);
 
   useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel || loading || watchEmptyActive) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void loadMoreSignals();
+        }
+      },
+      { root, rootMargin: "320px 0px", threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMoreSignals, loading, watchEmptyActive, signals.length, streamSince]);
+
+  useEffect(() => {
+    if (!streamSince || watchEmptyActive) {
+      setConnected(false);
+      return;
+    }
+
     const ctrl = new AbortController();
     let cancelled = false;
 
@@ -255,7 +318,7 @@ export default function SignalFeed({
 
       const headers = await authHeaders();
 
-      await fetchEventSource(createSignalStreamUrl(), {
+      await fetchEventSource(createSignalStreamUrl(streamSince), {
         headers,
         signal: ctrl.signal,
         onopen: async (res) => {
@@ -267,7 +330,11 @@ export default function SignalFeed({
           try {
             const signal = JSON.parse(ev.data) as SignalSummary;
             if (!matchesFeedFilters(signal, activeFilters)) return;
-            setSignals((prev) => mergeSignal(prev, signal));
+            setSignals((prev) => {
+              const next = mergeSignal(prev, signal);
+              signalsRef.current = next;
+              return next;
+            });
           } catch {
             // ignore malformed events
           }
@@ -287,14 +354,14 @@ export default function SignalFeed({
       cancelled = true;
       ctrl.abort();
     };
-  }, [activeFilters]);
+  }, [activeFilters, streamSince, watchEmptyActive]);
 
   function applyFilters(override?: FeedFilterDraft) {
     const next = override ?? filterDraft;
     const prevWatchOnly = filterDraft.watchOnly;
     if (override) setFilterDraft(next);
     setActiveFilters(draftToQuery(next, watchSymbols));
-    setLoadedOffset(0);
+    setStreamSince(null);
     setLoading(true);
     if (next.watchOnly !== prevWatchOnly) {
       void patchOperatorSettings({
@@ -309,7 +376,7 @@ export default function SignalFeed({
     const wasWatchOnly = filterDraft.watchOnly;
     setFilterDraft(EMPTY_FEED_FILTERS);
     setActiveFilters({});
-    setLoadedOffset(0);
+    setStreamSince(null);
     setLoading(true);
     if (wasWatchOnly) {
       void patchOperatorSettings({
@@ -320,20 +387,14 @@ export default function SignalFeed({
     }
   }
 
-  // Si el Watch cambia con Mis tickers activo, re-aplicar el filtro.
-  // También aplica tras hidratar watchOnly desde Operator Settings.
   useEffect(() => {
     if (!watchLoaded || !filterDraft.watchOnly) return;
     setActiveFilters(draftToQuery(filterDraft, watchSymbols));
-    setLoadedOffset(0);
+    setStreamSince(null);
     setLoading(true);
   }, [watchSymbols, watchLoaded, filterDraft.watchOnly]); // eslint-disable-line react-hooks/exhaustive-deps -- Watch + hydrate
 
   const filterLabels = activeFilterLabels(activeFilters);
-  const hasMoreFromApi =
-    totalAvailable != null &&
-    loadedOffset < totalAvailable &&
-    !watchEmptyActive;
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
@@ -342,10 +403,13 @@ export default function SignalFeed({
           <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-zinc-400">
             Signal Feed
           </h2>
-          {!loading && totalAvailable != null && !error && (
+          {!loading && !error && (
             <span className="truncate font-mono text-[10px] text-zinc-500">
-              {signals.length.toLocaleString("es-AR")} de{""}
-              {totalAvailable.toLocaleString("es-AR")} en pantalla
+              {signals.length.toLocaleString("es-AR")}
+              {totalAvailable != null
+                ? ` de ${totalAvailable.toLocaleString("es-AR")}`
+                : ""}{" "}
+              en pantalla
             </span>
           )}
         </div>
@@ -378,10 +442,8 @@ export default function SignalFeed({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading && !watchEmptyActive && (
-          <p className="px-3 py-4 font-mono text-xs text-zinc-500">Loading…</p>
-        )}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        {loading && !watchEmptyActive && <FeedRowSkeleton rows={8} />}
         {error && (
           <p className="px-3 py-4 font-mono text-xs text-red-400">{error}</p>
         )}
@@ -404,7 +466,9 @@ export default function SignalFeed({
               : "No signals yet. Run Refresh to ingest."}
           </p>
         )}
-        {!watchEmptyActive &&
+        {!loading &&
+          !error &&
+          !watchEmptyActive &&
           signals.map((signal) => (
             <button
               key={signal.id_str}
@@ -452,7 +516,7 @@ export default function SignalFeed({
                 <span className="ml-auto font-mono text-[10px] text-zinc-600">
                   {isXSignal(signal.source_type) ? (
                     <>
-                      ♥ {formatEngagement(signal.engagement.like_count)} · ↻{""}
+                      ♥ {formatEngagement(signal.engagement.like_count)} · ↻{" "}
                       {formatEngagement(signal.engagement.retweet_count)}
                     </>
                   ) : (
@@ -462,33 +526,32 @@ export default function SignalFeed({
               </div>
             </button>
           ))}
-        {!loading && !error && !watchEmptyActive && hasMoreFromApi && (
-          <div className="flex flex-col gap-2 border-t border-zinc-800/60 px-3 py-3">
-            <button
-              type="button"
-              onClick={() => void loadMoreSignals()}
-              disabled={loadingMore}
-              className="border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-300 disabled:opacity-50"
-            >
-              {loadingMore
-                ? "Cargando…"
-                : `Cargar más (${Math.min(
-                    FEED_PAGE_SIZE,
-                    totalAvailable! - loadedOffset,
-                  )} de ${(totalAvailable! - loadedOffset).toLocaleString("es-AR")} restantes)`}
-            </button>
-            {totalAvailable! - loadedOffset > FEED_PAGE_SIZE && (
-              <button
-                type="button"
-                onClick={() => void loadAllSignals()}
-                disabled={loadingMore}
-                className="font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-zinc-400 hover:underline disabled:opacity-50"
-              >
-                Cargar todas ({totalAvailable!.toLocaleString("es-AR")})
-              </button>
+        {!loading && !error && !watchEmptyActive && hasMore && (
+          <div
+            ref={sentinelRef}
+            className="flex items-center justify-center px-3 py-3"
+            aria-hidden
+          >
+            {loadingMore ? (
+              <span className="font-mono text-[10px] text-zinc-500">
+                Cargando más…
+              </span>
+            ) : (
+              <span className="font-mono text-[10px] text-zinc-600">
+                Scroll para cargar más
+              </span>
             )}
           </div>
         )}
+        {!loading &&
+          !error &&
+          !watchEmptyActive &&
+          !hasMore &&
+          signals.length > 0 && (
+            <p className="px-3 py-3 text-center font-mono text-[10px] text-zinc-600">
+              Fin del feed
+            </p>
+          )}
       </div>
     </section>
   );

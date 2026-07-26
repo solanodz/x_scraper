@@ -1128,7 +1128,7 @@
       "priority": 32,
       "title": "Provenance para datos no-Signal",
       "user_visible_behavior": "Quotes, FX, fundamentals y stats no-Corpus muestran Provenance legible (fuente, as_of/delay, N/A); Citations de Signals no cambian. Visible en Dossier, quote cards y Research cuando afirma Market Data/FX/fundamentals.",
-      "status": "pending",
+      "status": "passing",
       "dependencies": [
         "F7",
         "F30",
@@ -1142,7 +1142,11 @@
         "UI: Dossier fundamentals + quote card muestran chip/línea",
         "Regresión: Citation Corpus sigue abriendo Signal Detail"
       ],
-      "evidence": []
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f32_provenance => OK (helpers, Quote/FX/fundamentals/Chart Plan/price_chart contracts, UI wire, Citation intact, ask_stream provenances)",
+        "2026-07-25: frontend tsc --noEmit => OK",
+        "Surfaces: QuoteStrip chip, Dossier FundamentalsSnapshotPanel, Research meta provenances + PriceChartCard, Chart Plan header"
+      ]
     }
   ]
 }

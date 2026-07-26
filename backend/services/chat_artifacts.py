@@ -75,13 +75,23 @@ def ensure_price_chart_artifacts(
         if not is_fx_currency_code(t) and t.upper() not in already
     ][: max(0, max_charts - len(already))]
 
-    for symbol in tickers:
+    if not tickers:
+        return artifacts
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _one(symbol: str) -> dict[str, Any] | None:
         raw, _hits = execute_tool(
             "get_price_history",
             {"symbol": symbol, "period": period},
         )
-        artifact = build_price_chart_artifact(raw)
-        if artifact:
-            artifacts.append(artifact)
+        return build_price_chart_artifact(raw)
+
+    with ThreadPoolExecutor(max_workers=min(2, len(tickers))) as pool:
+        futures = {pool.submit(_one, symbol): symbol for symbol in tickers}
+        for fut in as_completed(futures):
+            artifact = fut.result()
+            if artifact:
+                artifacts.append(artifact)
 
     return artifacts

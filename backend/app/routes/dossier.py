@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator, Iterator
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from dataclasses import asdict, is_dataclass
-
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from backend.app.auth import get_current_user, operator_id_from_user
 from backend.app.schemas import (
@@ -23,7 +25,12 @@ from backend.app.services.dossier_repo import (
     tables_ready,
 )
 from backend.app.services.ticker_watch_repo import list_watch
-from backend.services.dossier import dossier_content_payload, generate_dossier
+from backend.services.dossier import (
+    dossier_content_payload,
+    generate_dossier,
+    iter_dossier_refresh_stream,
+)
+from backend.services.research_steps import ResearchStepEvent
 from backend.services.ticker_catalog import resolve_ticker_input
 
 router = APIRouter(prefix="/dossier", tags=["dossier"])
@@ -160,6 +167,7 @@ def post_dossier_refresh(
     symbol: str,
     user: dict | None = Depends(get_current_user),
 ) -> DossierRefreshResponse:
+    """Refresh síncrono (compat). Preferí `/refresh/stream` para UX con steps."""
     _require_dossier_tables()
     operator_id = operator_id_from_user(user)
     canonical = _require_watched_symbol(user_id=operator_id, symbol=symbol)
@@ -179,3 +187,87 @@ def post_dossier_refresh(
     except DossierRepoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DossierRefreshResponse(version=_version_to_schema(row))
+
+
+def _sse_dossier_refresh(
+    *,
+    operator_id: str,
+    symbol: str,
+    thesis: str | None,
+) -> Iterator[str]:
+    content: dict[str, Any] | None = None
+    citations: list = []
+    try:
+        for item in iter_dossier_refresh_stream(
+            user_id=operator_id,
+            symbol=symbol,
+            thesis=thesis,
+        ):
+            if isinstance(item, ResearchStepEvent):
+                yield (
+                    f"event: step\ndata: "
+                    f"{json.dumps(item.to_dict(), ensure_ascii=False)}\n\n"
+                )
+            elif isinstance(item, str):
+                # Tokens de síntesis — omitidos en UI del Dossier (no markdown live).
+                continue
+            elif isinstance(item, dict):
+                content = item
+            elif isinstance(item, list):
+                citations = item
+
+        if content is None:
+            yield (
+                'event: error\ndata: {"detail":"dossier generation produced no content"}\n\n'
+            )
+            return
+
+        row = save_version(
+            user_id=operator_id,
+            symbol=symbol,
+            content=dossier_content_payload(content),
+            citations=_citations_to_json(citations),
+        )
+        version = _version_to_schema(row)
+        yield (
+            f"event: dossier\ndata: "
+            f"{json.dumps(version.model_dump(mode='json'), ensure_ascii=False)}\n\n"
+        )
+    except DossierRepoError as exc:
+        payload = json.dumps({"detail": str(exc)}, ensure_ascii=False)
+        yield f"event: error\ndata: {payload}\n\n"
+    except Exception as exc:  # noqa: BLE001
+        detail = str(exc).strip() or type(exc).__name__
+        if len(detail) > 400:
+            detail = detail[:397] + "…"
+        payload = json.dumps({"detail": detail}, ensure_ascii=False)
+        yield f"event: error\ndata: {payload}\n\n"
+
+
+@router.post("/{symbol}/refresh/stream")
+async def post_dossier_refresh_stream(
+    symbol: str,
+    user: dict | None = Depends(get_current_user),
+) -> StreamingResponse:
+    _require_dossier_tables()
+    operator_id = operator_id_from_user(user)
+    canonical = _require_watched_symbol(user_id=operator_id, symbol=symbol)
+    thesis = _watch_thesis(user_id=operator_id, symbol=canonical)
+
+    async def _stream() -> AsyncIterator[str]:
+        for event in _sse_dossier_refresh(
+            operator_id=operator_id,
+            symbol=canonical,
+            thesis=thesis,
+        ):
+            yield event
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

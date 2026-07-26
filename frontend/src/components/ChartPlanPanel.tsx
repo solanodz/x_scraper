@@ -12,7 +12,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import ProvenanceChip from "@/components/ProvenanceChip";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
+import { ChartPaneSkeleton } from "@/components/TerminalSkeleton";
 import TickerChartModal from "@/components/TickerChartModal";
 import { TickerChartStack } from "@/components/TickerChartStack";
 import { TickerChartToolbar } from "@/components/TickerChartToolbar";
@@ -313,16 +315,25 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
               </span>
             )}
           </h2>
-          <p className="font-mono text-[10px] text-zinc-500">
-            Ticker Chart Operator-first · delay ~15m{""}
+          <div className="flex flex-wrap items-center gap-2">
+            <ProvenanceChip
+              provenance={
+                content?.provenance ?? {
+                  kind: "chart_plan",
+                  source: "yfinance",
+                  delay_label: "~15m",
+                  note: "lecturas ancladas a Market Data",
+                }
+              }
+            />
             {quoteUpdatedAt != null && (
-              <span className="text-zinc-600">
-                · precio {formatRefreshAge(quoteUpdatedAt)}
+              <span className="font-mono text-[10px] text-zinc-600">
+                precio {formatRefreshAge(quoteUpdatedAt)}
                 {candlesUpdatedAt != null &&
                   ` · velas ${formatRefreshAge(candlesUpdatedAt)}`}
               </span>
             )}
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {versions.length > 0 && (
@@ -359,9 +370,10 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {loading && !displayed && (
-          <p className="font-mono text-xs text-zinc-500">
-            Cargando Chart Plan…
-          </p>
+          <div className="space-y-3">
+            <ChartPaneSkeleton className="h-56" />
+            <ChartPaneSkeleton className="h-24" />
+          </div>
         )}
 
         {error && <p className="font-mono text-xs text-red-400">{error}</p>}
@@ -405,9 +417,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             onExpand={() => setChartExpanded(true)}
           />
           {candlesLoading && candles.length === 0 ? (
-            <p className="py-16 text-center font-mono text-xs text-zinc-500">
-              Cargando velas…
-            </p>
+            <ChartPaneSkeleton className="h-56" />
           ) : candlesError ? (
             <p className="py-8 text-center font-mono text-xs text-red-400">
               {candlesError}

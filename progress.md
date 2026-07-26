@@ -2,23 +2,19 @@
 
 ## Estado actual
 
-**F55** Operator Settings — `passing`. Branding producto: **MyTerm**.
-
-Próxima feature grill: **F32** Provenance no-Signal (`pending`).
+Feed perf: SQL slice + keyset `before`, sin `body`, count diferido, page 20. Encima de SSE/scroll fix + F32/latency/skeletons (sin commit conjunto).
 
 ## Próximo paso
 
-1. Redeploy API (Railway) + web (Vercel) para MyTerm + `/operator/settings` + `/settings`.
-2. En Store local existente: aplicar `015_operator_settings.sql` si el volumen no se recreó.
-3. Arrancar **F32** Provenance cuando quieras.
+1. Commit + push + redeploy API/web.
+2. Smoke: primer paint del Feed en <~1s (red local/prod).
 
 ## Notas
 
-- 2026-07-25 — F55 done: GET/PATCH `/operator/settings`, UI `/settings`, wire Daily PnL + Feed `watchOnly` + soft sync chart; rename → MyTerm.
-- Verify: `python -m backend.scripts.verify_f55_operator_settings => OK`.
-- F54 Paper Bot en soak.
+- 2026-07-25 — `list_signals` overfetch sobre idx `published_at` (no window full-table); FE no espera `/count`; scroll con `before`.
+- Skeletons / Research history + latency + F32 + feed SSE fix en working tree.
 
 ## Roadmap
 
-- F32 Provenance
+- Commit/redeploy
 - Soak Paper Bot

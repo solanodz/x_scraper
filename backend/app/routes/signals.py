@@ -26,6 +26,10 @@ router = APIRouter(prefix="/signals", tags=["signals"])
 def get_signals(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    before: datetime | None = Query(
+        None,
+        description="Keyset: solo Signals con published_at estrictamente anterior (ISO)",
+    ),
     q: str | None = Query(None, description="Palabras clave (todas deben aparecer)"),
     username: str | None = Query(None, description="Fuente o cuenta (parcial)"),
     ticker: str | None = Query(None, description="Ticker, ej. NVDA"),
@@ -43,6 +47,10 @@ def get_signals(
         None,
         description="positive | negative | neutral | bullish | bearish",
     ),
+    include_cluster_sources: bool = Query(
+        True,
+        description="Si false, omite el join de miembros de Story Cluster (más rápido)",
+    ),
 ) -> list[SignalSummary]:
     filters = feed_filters_from_query(
         q=q,
@@ -54,7 +62,13 @@ def get_signals(
         since_hours=since_hours,
         sentiment=sentiment,
     )
-    return list_signals(limit=limit, offset=offset, filters=filters)
+    return list_signals(
+        limit=limit,
+        offset=offset,
+        before=before,
+        filters=filters,
+        include_cluster_sources=include_cluster_sources,
+    )
 
 
 @router.get("/count", response_model=SignalCountResponse)

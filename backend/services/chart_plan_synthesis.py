@@ -356,6 +356,8 @@ def synthesize_chart_plan_json(
         parsed.get("tradingview_studies"), indicator_readings
     )
 
+    from backend.services.provenance import chart_plan_provenance
+
     return {
         "timeframes": timeframes,
         "views": views,
@@ -365,4 +367,5 @@ def synthesize_chart_plan_json(
         "tradingview_studies": tradingview_studies,
         "assessment": assessment,
         "chart_data": _inject_chart_data(deterministic_stats),
+        "provenance": chart_plan_provenance(source="yfinance").to_dict(),
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import { SessionListSkeleton } from "@/components/TerminalSkeleton";
 import { timeAgo, truncate } from "@/lib/format";
 import type { ChatSessionSummary } from "@/lib/types";
 
@@ -61,9 +62,7 @@ export default function ChatSessionSidebar({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
-          <p className="px-3 py-4 font-mono text-[10px] text-zinc-500">
-            Cargando sesiones…
-          </p>
+          <SessionListSkeleton />
         ) : sessions.length === 0 ? (
           <p className="px-3 py-4 font-mono text-[10px] leading-relaxed text-zinc-600">
             Sin sesiones. Empezá un Research Chat con Nueva o Briefing.

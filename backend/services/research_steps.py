@@ -51,9 +51,16 @@ class ResearchAnswerMeta:
 
     path: str  # fast | research
     summary_only: bool = False
+    provenances: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"path": self.path, "summary_only": self.summary_only}
+        payload: dict[str, Any] = {
+            "path": self.path,
+            "summary_only": self.summary_only,
+        }
+        if self.provenances:
+            payload["provenances"] = list(self.provenances)
+        return payload
 
 
 def context_mentions_summary_only(context: str | None) -> bool:
@@ -82,6 +89,7 @@ class GatherResult:
     direct_answer: str | None = None
     path: str = "research"  # fast | research
     summary_only: bool = False
+    provenances: list[dict[str, Any]] | None = None
 
 
 def format_tool_step_label(tool_name: str, arguments: dict[str, Any]) -> str:

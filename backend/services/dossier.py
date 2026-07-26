@@ -191,19 +191,40 @@ def _fetch_macro_hits(symbol: str) -> list[SignalHit]:
 
 
 def _gather_bundle(*, symbol: str, thesis: str | None = None) -> _GatherBundle:
+    """Recolecta capas en paralelo (quote primero; fundamentals depende del quote)."""
+    from concurrent.futures import ThreadPoolExecutor
+
     normalized = _normalize_symbol(symbol)
     quotes = fetch_quotes([normalized])
     quote = quotes[0] if quotes else None
 
-    hits_7d = get_recent_signals(ticker=normalized, hours=URGENT_HOURS, limit=15)
-    hits_30d = get_recent_signals(ticker=normalized, hours=CONTEXT_HOURS, limit=20)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        fut_7d = pool.submit(
+            get_recent_signals, ticker=normalized, hours=URGENT_HOURS, limit=15
+        )
+        fut_30d = pool.submit(
+            get_recent_signals, ticker=normalized, hours=CONTEXT_HOURS, limit=20
+        )
+        fut_sent = pool.submit(
+            _sentiment_stats_for_ticker, normalized, hours=URGENT_HOURS
+        )
+        fut_stats = pool.submit(
+            get_corpus_stats, hours=CONTEXT_HOURS, ticker=normalized
+        )
+        fut_macro = pool.submit(_fetch_macro_hits, normalized)
+        fut_fund = pool.submit(
+            fetch_fundamentals_snapshot, normalized, quote=quote
+        )
+
+        hits_7d = fut_7d.result()
+        hits_30d = fut_30d.result()
+        sentiment_stats = fut_sent.result()
+        corpus_stats_30d = fut_stats.result()
+        macro_hits = fut_macro.result()
+        fundamentals = fut_fund.result()
+
     hits_7d_ids = {hit.id_str for hit in hits_7d}
     hits_7_30d = _split_hits_7_30d(hits_30d, hits_7d_ids=hits_7d_ids)
-
-    sentiment_stats = _sentiment_stats_for_ticker(normalized, hours=URGENT_HOURS)
-    corpus_stats_30d = get_corpus_stats(hours=CONTEXT_HOURS, ticker=normalized)
-    macro_hits = _fetch_macro_hits(normalized)
-    fundamentals = fetch_fundamentals_snapshot(normalized, quote=quote)
 
     gather = DossierGather(
         symbol=normalized,

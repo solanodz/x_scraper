@@ -258,6 +258,11 @@ def gather_chart_context(*, user_id: str, symbol: str) -> ChartPlanGather:
 
 def chart_plan_content_payload(content: dict[str, Any]) -> dict[str, Any]:
     """Normaliza salida del Chart Plan para persistencia/API."""
+    from backend.services.provenance import (
+        chart_plan_provenance,
+        normalize_provenance,
+    )
+
     payload: dict[str, Any] = {
         "timeframes": content.get("timeframes") or [],
         "views": content.get("views") or [],
@@ -275,6 +280,8 @@ def chart_plan_content_payload(content: dict[str, Any]) -> dict[str, Any]:
         payload["mock"] = True
     if content.get("vision_used"):
         payload["vision_used"] = True
+    existing = normalize_provenance(content.get("provenance"))
+    payload["provenance"] = existing or chart_plan_provenance().to_dict()
     return payload
 
 

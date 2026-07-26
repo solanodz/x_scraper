@@ -355,21 +355,32 @@ def _format_quotes_for_tool(quotes: list) -> str:
             {"quotes": [], "message": "No se obtuvieron cotizaciones."},
             ensure_ascii=False,
         )
-    return json.dumps(
-        {
-            "quotes": [
-                {
-                    "symbol": quote.symbol,
-                    "price": round(quote.price, 2),
-                    "change": round(quote.change, 2),
-                    "change_percent": round(quote.change_percent, 2),
-                    "delayed": quote.delayed,
-                }
-                for quote in quotes
-            ]
-        },
-        ensure_ascii=False,
-    )
+    from backend.services.provenance import market_data_provenance
+
+    rows = []
+    for quote in quotes:
+        as_of = (
+            quote.timestamp.isoformat()
+            if getattr(quote, "timestamp", None) is not None
+            else None
+        )
+        prov = market_data_provenance(
+            source=getattr(quote, "source", None) or "unknown",
+            as_of=as_of,
+            delayed=bool(getattr(quote, "delayed", True)),
+        )
+        rows.append(
+            {
+                "symbol": quote.symbol,
+                "price": round(quote.price, 2),
+                "change": round(quote.change, 2),
+                "change_percent": round(quote.change_percent, 2),
+                "delayed": quote.delayed,
+                "source": prov.source,
+                "provenance": prov.to_dict(),
+            }
+        )
+    return json.dumps({"quotes": rows}, ensure_ascii=False)
 
 
 def _tickers_from_detail(detail: SignalDetail) -> list[str]:
@@ -514,6 +525,13 @@ def _price_chart_artifact(result: dict[str, Any]) -> dict[str, Any] | None:
         closes = [float(c["close"]) for c in candles]
     if not candles and not closes:
         return None
+    from backend.services.provenance import market_data_provenance
+
+    prov = market_data_provenance(
+        source="yfinance",
+        delayed=True,
+        note=f"historial {result.get('period') or ''}".strip(),
+    )
     return {
         "type": "price_chart",
         "symbol": result.get("symbol"),
@@ -524,6 +542,7 @@ def _price_chart_artifact(result: dict[str, Any]) -> dict[str, Any] | None:
         "start_price": result.get("start_price"),
         "end_price": result.get("end_price"),
         "change_percent": result.get("change_percent"),
+        "provenance": prov.to_dict(),
     }
 
 

@@ -6,11 +6,13 @@ from fastapi import APIRouter, Query
 
 from backend.app.schemas import (
     PriceCandlesResponse,
+    Provenance as ProvenanceSchema,
     Quote,
     TickerLogo,
     TickerSuggestion,
 )
 from backend.services import market_data
+from backend.services.provenance import market_data_provenance
 from backend.services.ticker_logos import fetch_ticker_logos
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
@@ -27,6 +29,12 @@ def _attach_logos(quotes: list[Quote]) -> list[Quote]:
 
 
 def _to_schema(quote: market_data.Quote, logo: str | None = None) -> Quote:
+    as_of = quote.timestamp.isoformat() if quote.timestamp else None
+    prov = market_data_provenance(
+        source=getattr(quote, "source", None) or "unknown",
+        as_of=as_of,
+        delayed=quote.delayed,
+    )
     return Quote(
         symbol=quote.symbol,
         price=quote.price,
@@ -36,10 +44,17 @@ def _to_schema(quote: market_data.Quote, logo: str | None = None) -> Quote:
         delayed=quote.delayed,
         available=True,
         logo=logo,
+        source=prov.source,
+        provenance=ProvenanceSchema(**prov.to_dict()),
     )
 
 
 def _placeholder(symbol: str, logo: str | None = None) -> Quote:
+    prov = market_data_provenance(
+        source="none",
+        delayed=True,
+        note="cotización no disponible",
+    )
     return Quote(
         symbol=symbol,
         price=None,
@@ -49,6 +64,8 @@ def _placeholder(symbol: str, logo: str | None = None) -> Quote:
         delayed=True,
         available=False,
         logo=logo,
+        source=prov.source,
+        provenance=ProvenanceSchema(**prov.to_dict()),
     )
 
 

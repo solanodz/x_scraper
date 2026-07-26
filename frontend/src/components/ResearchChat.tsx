@@ -7,6 +7,8 @@ import ChatMarkdown, {
 } from "@/components/ChatMarkdown";
 import ChatSessionSidebar from "@/components/ChatSessionSidebar";
 import PriceChartCard from "@/components/chat/PriceChartCard";
+import { ProvenanceList } from "@/components/ProvenanceChip";
+import { ChatHistorySkeleton } from "@/components/TerminalSkeleton";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
 import {
   createChatSession,
@@ -105,7 +107,8 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [watchEmpty, setWatchEmpty] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
@@ -121,7 +124,7 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
       behavior: streaming ? "auto" : "smooth",
       block: "end",
     });
-  }, [messages, streaming, loading]);
+  }, [messages, streaming, messagesLoading]);
 
   const persistActiveSession = useCallback((sessionId: string | null) => {
     sessionIdRef.current = sessionId;
@@ -134,8 +137,13 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   }, []);
 
   const loadSessionMessages = useCallback(async (sessionId: string) => {
-    const records = await fetchChatMessages(sessionId);
-    setMessages(recordsToMessages(records));
+    setMessagesLoading(true);
+    try {
+      const records = await fetchChatMessages(sessionId);
+      setMessages(recordsToMessages(records));
+    } finally {
+      setMessagesLoading(false);
+    }
   }, []);
 
   const refreshSessions = useCallback(async () => {
@@ -154,17 +162,18 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
     let cancelled = false;
 
     async function init() {
-      setLoading(true);
+      setSessionsLoading(true);
       setHistoryError(null);
       try {
         const list = await refreshSessions();
+        if (cancelled) return;
+        setSessionsLoading(false);
+
         const stored = sessionStorage.getItem(ACTIVE_SESSION_KEY);
         const initialId =
           stored && list.some((s) => s.id === stored)
             ? stored
             : (list[0]?.id ?? null);
-
-        if (cancelled) return;
 
         if (initialId) {
           persistActiveSession(initialId);
@@ -179,13 +188,13 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
             "Historial no disponible (¿migración chat aplicada?)",
           );
           setMessages([]);
+          setSessionsLoading(false);
+          setMessagesLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     }
 
-    init();
+    void init();
     return () => {
       cancelled = true;
     };
@@ -205,9 +214,10 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   }
 
   async function handleSelectSession(sessionId: string) {
-    if (streaming || sessionId === activeSessionId) return;
+    if (streaming || sessionId === activeSessionId || messagesLoading) return;
     try {
       persistActiveSession(sessionId);
+      setMessages([]);
       await loadSessionMessages(sessionId);
       setHistoryError(null);
     } catch {
@@ -510,8 +520,8 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
         onSelect={handleSelectSession}
         onNewChat={handleNewChat}
         onBriefing={handleBriefing}
-        disabled={streaming}
-        loading={loading}
+        disabled={streaming || messagesLoading}
+        loading={sessionsLoading}
         watchEmpty={watchEmpty}
         streaming={streaming}
       />
@@ -525,17 +535,16 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            {loading && (
-              <p className="text-center font-mono text-xs text-zinc-500">
-                Cargando historial…
-              </p>
-            )}
-            {historyError && (
+            {messagesLoading && <ChatHistorySkeleton />}
+            {historyError && !messagesLoading && (
               <p className="text-center font-mono text-xs text-zinc-400">
                 {historyError}
               </p>
             )}
-            {!loading && messages.length === 0 && !historyError && (
+            {!messagesLoading &&
+              !sessionsLoading &&
+              messages.length === 0 &&
+              !historyError && (
               <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
                 <p className="max-w-sm font-mono text-xs leading-relaxed text-zinc-500">
                   Preguntá por tickers, precios, noticias o análisis cruzado —
@@ -543,52 +552,57 @@ export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
                 </p>
               </div>
             )}
-            {messages.map((msg, i) =>
-              msg.role === "user" ? (
-                <div
-                  key={i}
-                  className="ml-auto max-w-[85%] bg-zinc-800 px-4 py-2.5"
-                >
-                  <p className="font-mono text-xs leading-relaxed text-zinc-100">
-                    {msg.content}
-                  </p>
-                </div>
-              ) : (
-                <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
-                  {msg.meta && <ResearchPathChips meta={msg.meta} />}
-                  {streaming && i === messages.length - 1 && !msg.content && (
-                    <ResearchStepLoader steps={msg.steps ?? []} active />
-                  )}
-                  {(msg.content ||
-                    !(streaming && i === messages.length - 1)) && (
-                    <ChatMarkdown
-                      content={msg.content}
-                      streaming={streaming && i === messages.length - 1}
-                      citations={msg.citations}
-                      onCitationClick={onCitationClick}
-                      onDossierClick={handleDossierClick}
-                      variant={
-                        isBriefingAssistantMessage(messages, i)
-                          ? "briefing"
-                          : "default"
-                      }
-                    />
-                  )}
-                  {msg.artifacts && msg.artifacts.length > 0 && (
-                    <div className="flex flex-col gap-2 pt-1">
-                      {msg.artifacts.map((artifact, ai) =>
-                        artifact.type === "price_chart" ? (
-                          <PriceChartCard
-                            key={`${artifact.symbol}-${artifact.period}-${ai}`}
-                            artifact={artifact}
-                          />
-                        ) : null,
+            {!messagesLoading &&
+              messages.map((msg, i) =>
+                msg.role === "user" ? (
+                  <div
+                    key={i}
+                    className="ml-auto max-w-[85%] bg-zinc-800 px-4 py-2.5"
+                  >
+                    <p className="font-mono text-xs leading-relaxed text-zinc-100">
+                      {msg.content}
+                    </p>
+                  </div>
+                ) : (
+                  <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
+                    {msg.meta && <ResearchPathChips meta={msg.meta} />}
+                    {streaming && i === messages.length - 1 && !msg.content && (
+                      <ResearchStepLoader steps={msg.steps ?? []} active />
+                    )}
+                    {(msg.content ||
+                      !(streaming && i === messages.length - 1)) && (
+                      <ChatMarkdown
+                        content={msg.content}
+                        streaming={streaming && i === messages.length - 1}
+                        citations={msg.citations}
+                        onCitationClick={onCitationClick}
+                        onDossierClick={handleDossierClick}
+                        variant={
+                          isBriefingAssistantMessage(messages, i)
+                            ? "briefing"
+                            : "default"
+                        }
+                      />
+                    )}
+                    {msg.meta?.provenances &&
+                      msg.meta.provenances.length > 0 && (
+                        <ProvenanceList items={msg.meta.provenances} />
                       )}
-                    </div>
-                  )}
-                </div>
-              ),
-            )}
+                    {msg.artifacts && msg.artifacts.length > 0 && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        {msg.artifacts.map((artifact, ai) =>
+                          artifact.type === "price_chart" ? (
+                            <PriceChartCard
+                              key={`${artifact.symbol}-${artifact.period}-${ai}`}
+                              artifact={artifact}
+                            />
+                          ) : null,
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ),
+              )}
             <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
           </div>
         </div>

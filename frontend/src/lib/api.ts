@@ -105,6 +105,20 @@ export function parseChatArtifact(raw: unknown): ChatArtifact | null {
     end_price: asFiniteNumber(obj.end_price),
     change_percent: asFiniteNumber(obj.change_percent),
   };
+  if (obj.provenance && typeof obj.provenance === "object") {
+    const p = obj.provenance as Record<string, unknown>;
+    const kind = typeof p.kind === "string" ? p.kind : "";
+    const source = typeof p.source === "string" ? p.source : "";
+    if (kind && source) {
+      artifact.provenance = {
+        kind,
+        source,
+        as_of: typeof p.as_of === "string" ? p.as_of : null,
+        delay_label: typeof p.delay_label === "string" ? p.delay_label : null,
+        note: typeof p.note === "string" ? p.note : null,
+      };
+    }
+  }
   return artifact;
 }
 
@@ -165,11 +179,22 @@ export async function fetchSignals(
   limit = 50,
   options?: FeedFilterQuery,
   offset = 0,
+  extras?: {
+    before?: string | null;
+    includeClusterSources?: boolean;
+  },
 ): Promise<SignalSummary[]> {
   const params = new URLSearchParams({
     limit: String(limit),
-    offset: String(offset),
   });
+  if (extras?.before) {
+    params.set("before", extras.before);
+  } else if (offset > 0) {
+    params.set("offset", String(offset));
+  }
+  if (extras?.includeClusterSources === false) {
+    params.set("include_cluster_sources", "false");
+  }
   appendFeedFilterParams(params, options);
   const res = await fetch(`${API_URL}/signals?${params}`, {
     headers: await authHeaders(),
@@ -311,8 +336,10 @@ export async function refreshIngest(): Promise<void> {
   }
 }
 
-export function createSignalStreamUrl(): string {
-  return `${API_URL}/signals/stream`;
+export function createSignalStreamUrl(since?: string | null): string {
+  if (!since) return `${API_URL}/signals/stream`;
+  const params = new URLSearchParams({ since });
+  return `${API_URL}/signals/stream?${params}`;
 }
 
 export async function fetchWatchlistQuotes(): Promise<Quote[]> {
@@ -613,7 +640,73 @@ export async function fetchDossierVersions(
   return res.json();
 }
 
+export type StreamDossierRefreshCallbacks = {
+  onStep?: (step: ResearchStep) => void;
+  onVersion: (version: DossierVersion) => void;
+  onError?: (message: string) => void;
+};
+
+/** Refresh con SSE (steps). Fallback síncrono si el stream no entrega version. */
+export async function streamDossierRefresh(
+  symbol: string,
+  callbacks: StreamDossierRefreshCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const normalized = normalizeDossierSymbol(symbol);
+  const headers = await authHeaders();
+  let gotVersion = false;
+  let streamError: string | null = null;
+  try {
+    await fetchEventSource(
+      `${API_URL}/dossier/${encodeURIComponent(normalized)}/refresh/stream`,
+      {
+        method: "POST",
+        headers: { ...headers },
+        signal,
+        async onopen(res) {
+          if (res.status === 404) {
+            throw new Error("Ticker no está en el Watch o Dossier no disponible");
+          }
+          if (!res.ok) {
+            throw new Error(`Dossier refresh failed: ${res.status}`);
+          }
+        },
+        onmessage(ev) {
+          if (ev.event === "step" && ev.data) {
+            callbacks.onStep?.(JSON.parse(ev.data) as ResearchStep);
+            return;
+          }
+          if (ev.event === "dossier" && ev.data) {
+            gotVersion = true;
+            callbacks.onVersion(JSON.parse(ev.data) as DossierVersion);
+            return;
+          }
+          if (ev.event === "error" && ev.data) {
+            const payload = JSON.parse(ev.data) as { detail?: string };
+            streamError = payload.detail || "Dossier refresh error";
+            callbacks.onError?.(streamError);
+          }
+        },
+      },
+    );
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    if (gotVersion) return;
+    if (streamError) throw new Error(streamError);
+    // Fallback sync endpoint (compat / proxies sin SSE).
+    const version = await refreshDossierSync(normalized);
+    callbacks.onVersion(version);
+  }
+  if (!gotVersion && streamError) {
+    throw new Error(streamError);
+  }
+}
+
 export async function refreshDossier(symbol: string): Promise<DossierVersion> {
+  return refreshDossierSync(symbol);
+}
+
+async function refreshDossierSync(symbol: string): Promise<DossierVersion> {
   const normalized = normalizeDossierSymbol(symbol);
   const res = await fetch(
     `${API_URL}/dossier/${encodeURIComponent(normalized)}/refresh`,

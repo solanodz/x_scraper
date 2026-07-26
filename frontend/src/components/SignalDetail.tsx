@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DetailSkeleton } from "@/components/TerminalSkeleton";
 import TickerLogo from "@/components/TickerLogo";
 import { fetchQuotes, fetchSignal } from "@/lib/api";
 import { formatEngagement, timeAgo } from "@/lib/format";
@@ -137,7 +138,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
             </p>
           </div>
         )}
-        {loading && <p className="font-mono text-xs text-zinc-500">Loading…</p>}
+        {loading && <DetailSkeleton />}
         {error && <p className="font-mono text-xs text-red-400">{error}</p>}
         {signal && (
           <div className="space-y-3">

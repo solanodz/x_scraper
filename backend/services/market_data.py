@@ -50,6 +50,7 @@ class Quote:
     change_percent: float
     timestamp: datetime
     delayed: bool = True
+    source: str = "unknown"
 
 
 def _load_env() -> None:
@@ -241,6 +242,7 @@ def _fetch_quote_finnhub(symbol: str) -> Quote | None:
         change_percent=change_percent,
         timestamp=timestamp,
         delayed=True,
+        source="finnhub",
     )
 
 
@@ -298,6 +300,7 @@ def _fetch_quote_alpha_vantage(symbol: str) -> Quote | None:
         change_percent=change_percent,
         timestamp=timestamp,
         delayed=True,
+        source="alpha_vantage",
     )
 
 
@@ -374,6 +377,7 @@ def _quote_from_yfinance_ticker(symbol: str, ticker) -> Quote | None:
             change_percent=change_percent,
             timestamp=datetime.now(tz=timezone.utc),
             delayed=True,
+            source="yfinance",
         )
     except Exception:
         return None

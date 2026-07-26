@@ -56,6 +56,15 @@ export interface PriceChartCandle {
   close: number;
 }
 
+/** Origen de un hecho no-Signal (hermano de Citation). F32. */
+export interface Provenance {
+  kind: "market_data" | "fundamentals" | "fx" | "corpus_stats" | "chart_plan" | string;
+  source: string;
+  as_of?: string | null;
+  delay_label?: string | null;
+  note?: string | null;
+}
+
 /** Compact price chart card from Market Data (get_price_history). */
 export interface PriceChartArtifact {
   type: "price_chart";
@@ -66,6 +75,7 @@ export interface PriceChartArtifact {
   start_price?: number | null;
   end_price?: number | null;
   change_percent?: number | null;
+  provenance?: Provenance | null;
 }
 
 /** Structured chat artifacts (extensible). Unknown types are ignored by the UI. */
@@ -76,6 +86,8 @@ export interface ResearchAnswerMeta {
   path: "fast" | "research" | string;
   /** True si el gather vio content_depth summary_only. */
   summary_only?: boolean;
+  /** Provenance de Market Data / FX / charts usados en la respuesta. */
+  provenances?: Provenance[];
 }
 
 export interface ChatMessage {
@@ -123,6 +135,8 @@ export interface Quote {
   delayed?: boolean;
   available?: boolean;
   logo?: string | null;
+  source?: string | null;
+  provenance?: Provenance | null;
 }
 
 export interface TickerLogoEntry {
@@ -154,6 +168,7 @@ export interface DossierFundamentalsSnapshot {
   industry: string | null;
   source: string;
   as_of?: string;
+  provenance?: Provenance | null;
 }
 
 export interface DossierBlockContent {
@@ -248,6 +263,7 @@ export interface ChartPlanContent {
   tradingview_studies?: ChartPlanTradingViewStudy[];
   assessment: ChartPlanAssessment;
   summary?: string | null;
+  provenance?: Provenance | null;
 }
 
 export interface ChartPlanVersion {

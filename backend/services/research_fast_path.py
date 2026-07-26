@@ -306,6 +306,7 @@ def build_fast_path_context(
     )
 
     direct_answer: str | None = None
+    provenances: list[dict] = []
     if path.kind == "fx":
         try:
             payload = json.loads(result)
@@ -315,6 +316,18 @@ def build_fast_path_context(
             payload = filter_fx_payload_for_query(query, payload)
             result = json.dumps(payload, ensure_ascii=False)
             direct_answer = format_fx_direct_answer(query, payload)
+            from backend.services.provenance import collect_provenances
+
+            provenances = collect_provenances(payload)
+    elif path.kind == "quote":
+        try:
+            payload = json.loads(result)
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            from backend.services.provenance import collect_provenances
+
+            provenances = collect_provenances(*(payload.get("quotes") or []))
 
     record_tool_result(context, path.tool, path.arguments, result, hits)
 
@@ -336,6 +349,7 @@ def build_fast_path_context(
         direct_answer=direct_answer,
         path="fast",
         summary_only=False,
+        provenances=provenances or None,
     )
 
 

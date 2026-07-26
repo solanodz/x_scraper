@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChartPaneSkeleton } from "@/components/TerminalSkeleton";
 import { TickerChartStack } from "@/components/TickerChartStack";
 import { TickerChartToolbar } from "@/components/TickerChartToolbar";
 import TickerLogo from "@/components/TickerLogo";
@@ -118,9 +119,9 @@ export default function TickerChartModal({
           />
           <div className="min-h-0 flex-1 p-3">
             {candlesLoading && candles.length === 0 ? (
-              <p className="flex h-full items-center justify-center font-mono text-xs text-zinc-500">
-                Cargando velas…
-              </p>
+              <div className="flex h-full items-center p-2">
+                <ChartPaneSkeleton className="h-full w-full min-h-[240px]" />
+              </div>
             ) : candlesError ? (
               <p className="flex h-full items-center justify-center font-mono text-xs text-red-400">
                 {candlesError}

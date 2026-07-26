@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterator
 
 from backend.app.db import connect
@@ -27,6 +27,17 @@ _SIGNAL_SELECT_COLUMNS = """
     cashtags, reply_count, retweet_count, like_count,
     quote_count, bookmarked_count, payload,
     source_type, title, summary, body, canonical_url, relevance_score, topic,
+    sentiment,
+    cluster_id,
+    image_url
+"""
+
+# Feed list: sin `body` (TOAST pesado); el Detail lo trae aparte.
+_FEED_SELECT_COLUMNS = """
+    id_str, published_at, username, raw_content, source,
+    cashtags, reply_count, retweet_count, like_count,
+    quote_count, bookmarked_count, payload,
+    source_type, title, summary, canonical_url, relevance_score, topic,
     sentiment,
     cluster_id,
     image_url
@@ -152,28 +163,40 @@ def _attach_cluster_sources(signals: list[SignalSummary]) -> list[SignalSummary]
 
 
 def _clustered_list_sql(where_clause: str) -> str:
+    """Lista rápida: ventana solo sobre un slice reciente (usa idx published_at).
+
+    Evita ROW_NUMBER() sobre todo el Corpus filtrado (el path lento histórico).
+    `before` = keyset (published_at estricto menor) para infinite scroll.
+    """
     return f"""
-        WITH filtered AS (
-            SELECT {_SIGNAL_SELECT_COLUMNS}
+        WITH recent AS (
+            SELECT {_FEED_SELECT_COLUMNS}
             FROM signals
-            WHERE {where_clause}
+            WHERE ({where_clause})
+              AND (
+                %(before)s::timestamptz IS NULL
+                OR published_at < %(before)s::timestamptz
+              )
+            ORDER BY published_at DESC
+            LIMIT %(fetch_limit)s
         ),
         ranked AS (
             SELECT
-                filtered.*,
+                recent.*,
                 ROW_NUMBER() OVER (
                     PARTITION BY COALESCE(cluster_id, id_str)
                     ORDER BY published_at DESC
                 ) AS cluster_rn
-            FROM filtered
+            FROM recent
         )
         SELECT
             id_str, published_at, username, raw_content, source,
             cashtags, reply_count, retweet_count, like_count,
             quote_count, bookmarked_count, payload,
-            source_type, title, summary, body, canonical_url, relevance_score, topic,
-    sentiment,
-            cluster_id
+            source_type, title, summary, canonical_url, relevance_score, topic,
+            sentiment,
+            cluster_id,
+            image_url
         FROM ranked
         WHERE cluster_rn = 1
         ORDER BY published_at DESC
@@ -213,25 +236,14 @@ def _build_signal_query(
 
 
 def _clustered_count_sql(where_clause: str) -> str:
+    # DISTINCT suele ser más barato que ROW_NUMBER sobre todo el Corpus.
     return f"""
-        WITH filtered AS (
-            SELECT cluster_id, id_str, published_at
+        SELECT COUNT(*)::int
+        FROM (
+            SELECT DISTINCT COALESCE(cluster_id, id_str)
             FROM signals
             WHERE {where_clause}
-        ),
-        ranked AS (
-            SELECT
-                cluster_id,
-                id_str,
-                ROW_NUMBER() OVER (
-                    PARTITION BY COALESCE(cluster_id, id_str)
-                    ORDER BY published_at DESC
-                ) AS cluster_rn
-            FROM filtered
-        )
-        SELECT COUNT(*)::int
-        FROM ranked
-        WHERE cluster_rn = 1
+        ) AS clusters
     """
 
 
@@ -260,18 +272,26 @@ def list_signals(
     *,
     limit: int = 50,
     offset: int = 0,
+    before: datetime | None = None,
     filters: FeedFilters | None = None,
     username: str | None = None,
     ticker: str | None = None,
+    include_cluster_sources: bool = True,
 ) -> list[SignalSummary]:
     """Lista representantes de Story Cluster ordenados por fecha (más reciente primero)."""
+    clamped_limit = max(1, min(int(limit), 200))
+    clamped_offset = max(0, int(offset))
     where_clause, params = _build_signal_query(
         filters=filters,
         username=username,
         ticker=ticker,
     )
-    params["limit"] = limit
-    params["offset"] = offset
+    # Overfetch para absorber colapso de clusters sin escanear todo el Store.
+    fetch_limit = min(max((clamped_offset + clamped_limit) * 5, clamped_limit * 5), 800)
+    params["limit"] = clamped_limit
+    params["offset"] = 0 if before is not None else clamped_offset
+    params["before"] = before
+    params["fetch_limit"] = fetch_limit
     sql = _clustered_list_sql(where_clause)
 
     with connect() as conn:
@@ -280,7 +300,9 @@ def list_signals(
             rows = _fetchall_as_dicts(cur)
 
     summaries = [_row_to_summary(row) for row in rows]
-    return _attach_cluster_sources(summaries)
+    if include_cluster_sources:
+        return _attach_cluster_sources(summaries)
+    return summaries
 
 
 def list_recent_signals(
@@ -290,19 +312,12 @@ def list_recent_signals(
     filters: FeedFilters | None = None,
 ) -> list[SignalSummary]:
     """Lista Signals recientes por published_at DESC (misma lógica que el Signal Feed)."""
-    clamped_limit = max(1, min(limit, 50))
-    where_clause, params = _build_signal_query(filters=filters)
-    params["limit"] = clamped_limit
-    params["offset"] = offset
-    sql = _clustered_list_sql(where_clause)
-
-    with connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            rows = _fetchall_as_dicts(cur)
-
-    summaries = [_row_to_summary(row) for row in rows]
-    return _attach_cluster_sources(summaries)
+    return list_signals(
+        limit=max(1, min(limit, 50)),
+        offset=offset,
+        filters=filters,
+        include_cluster_sources=True,
+    )
 
 
 def get_signal(id_str: str) -> SignalDetail | None:
@@ -396,20 +411,34 @@ def iter_poll_new_signals(
     since_ts: datetime | None = None,
     poll_interval: float = 2.0,
 ) -> Iterator[list[SignalSummary]]:
-    """Generador infinito que emite lotes de Signals nuevos cada poll_interval."""
+    """Generador infinito que emite lotes de Signals nuevos cada poll_interval.
+
+    Sin cursor (`since` / `since_id_str`), ancla en *ahora* para no reemitir
+    el Corpus histórico (el Feed pide recientes vía REST + offset).
+    """
     import time
 
     seen: set[str] = set()
     if since_id_str:
         seen.add(since_id_str)
 
+    # Defensa: stream sin cursor = solo futuros, nunca los más viejos del Store.
+    cursor_ts = since_ts
+    if cursor_ts is None and not since_id_str:
+        cursor_ts = datetime.now(timezone.utc)
+
     while True:
         batch = poll_new_signals(
             since_id_str=since_id_str,
-            since_ts=since_ts,
+            since_ts=cursor_ts,
             seen_ids=seen,
         )
         for signal in batch:
             seen.add(signal.id_str)
+            published = signal.published_at
+            if getattr(published, "tzinfo", None) is None:
+                published = published.replace(tzinfo=timezone.utc)
+            if cursor_ts is None or published > cursor_ts:
+                cursor_ts = published
         yield batch
         time.sleep(poll_interval)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import ProvenanceChip from "@/components/ProvenanceChip";
 import { dossierPath } from "@/lib/dossierNav";
 import { formatQuoteChangePercent } from "@/lib/marketRefresh";
 import type { PriceChartArtifact } from "@/lib/types";
@@ -122,7 +123,7 @@ export default function PriceChartCard({ artifact }: PriceChartCardProps) {
           </span>
         </div>
         <div className="shrink-0 text-right font-mono text-[11px]">
-          {Number.isFinite(endPrice) && (
+          {endPrice != null && Number.isFinite(endPrice) && (
             <span className="mr-2 text-zinc-300">${endPrice.toFixed(2)}</span>
           )}
           {changePct != null && (
@@ -156,9 +157,20 @@ export default function PriceChartCard({ artifact }: PriceChartCardProps) {
         </div>
       )}
 
-      <p className="mt-1 font-mono text-[10px] text-zinc-600 group-hover:text-zinc-500">
-        Ver en dossier →
-      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+        <ProvenanceChip
+          provenance={
+            artifact.provenance ?? {
+              kind: "market_data",
+              source: "yfinance",
+              delay_label: "~15m",
+            }
+          }
+        />
+        <p className="font-mono text-[10px] text-zinc-600 group-hover:text-zinc-500">
+          Ver en dossier →
+        </p>
+      </div>
     </button>
   );
 }

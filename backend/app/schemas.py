@@ -95,6 +95,16 @@ class IngestRefreshResponse(BaseModel):
     status: str = "started"
 
 
+class Provenance(BaseModel):
+    """Origen de un hecho no-Signal (hermano de Citation)."""
+
+    kind: str
+    source: str
+    as_of: str | None = None
+    delay_label: str | None = None
+    note: str | None = None
+
+
 class Quote(BaseModel):
     symbol: str
     price: float | None = None
@@ -104,6 +114,8 @@ class Quote(BaseModel):
     delayed: bool = True
     available: bool = True
     logo: str | None = None
+    source: str | None = None
+    provenance: Provenance | None = None
 
 
 class TickerLogo(BaseModel):

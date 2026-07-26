@@ -149,11 +149,19 @@ def fetch_ars_usd_quotes(*, use_cache: bool = True) -> dict[str, Any]:
             ) as casa_exc:
                 errors.append(f"dolarapi {casa}: {casa_exc}")
 
+    from backend.services.provenance import fx_provenance
+
+    fetched_at = _now_iso()
     result: dict[str, Any] = {
         "scope": "ars_usd",
         "quotes": quotes,
-        "fetched_at": _now_iso(),
+        "fetched_at": fetched_at,
         "source": "dolarapi.com",
+        "provenance": fx_provenance(
+            source="dolarapi.com",
+            as_of=fetched_at,
+            note="oficial/blue/MEP/CCL" if quotes else "sin cotizaciones",
+        ).to_dict(),
     }
     if not quotes:
         result["error"] = "No se obtuvieron cotizaciones USD/ARS"
@@ -179,14 +187,22 @@ def fetch_frankfurter_pair(
     if not base_c or not quote_c:
         return {"error": "base y quote requeridos", "source": "frankfurter.app"}
     if base_c == quote_c:
+        from backend.services.provenance import fx_provenance
+
+        fetched_at = _now_iso()
         return {
             "scope": "pair",
             "base": base_c,
             "quote": quote_c,
             "rate": 1.0,
             "date": None,
-            "fetched_at": _now_iso(),
+            "fetched_at": fetched_at,
             "source": "frankfurter.app",
+            "provenance": fx_provenance(
+                source="frankfurter.app",
+                as_of=fetched_at,
+                note=f"{base_c}/{quote_c}",
+            ).to_dict(),
         }
 
     cache_key = f"pair:{base_c}:{quote_c}"
@@ -219,14 +235,23 @@ def fetch_frankfurter_pair(
             "raw_keys": list(rates.keys()) if isinstance(rates, dict) else [],
         }
 
+    from backend.services.provenance import fx_provenance
+
+    fetched_at = _now_iso()
+    as_of = payload.get("date") or fetched_at
     result = {
         "scope": "pair",
         "base": base_c,
         "quote": quote_c,
         "rate": float(rates[quote_c]),
         "date": payload.get("date"),
-        "fetched_at": _now_iso(),
+        "fetched_at": fetched_at,
         "source": "frankfurter.app",
+        "provenance": fx_provenance(
+            source="frankfurter.app",
+            as_of=str(as_of) if as_of else fetched_at,
+            note=f"{base_c}/{quote_c}",
+        ).to_dict(),
     }
     _cache_set(cache_key, result)
     return result

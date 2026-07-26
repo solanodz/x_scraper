@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { SessionListSkeleton } from "@/components/TerminalSkeleton";
 import TickerLogo from "@/components/TickerLogo";
 import { fetchTickerLogos, fetchTickerWatch } from "@/lib/api";
 import { dossierPath } from "@/lib/dossierNav";
@@ -119,12 +120,9 @@ export default function DossierWatchSidebar() {
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading && (
-          <p
-            className={`py-2 font-mono text-[10px] text-zinc-500 ${
-              collapsed ? "px-1 text-center" : "px-3"
-            }`}
-          >
+        {loading && !collapsed && <SessionListSkeleton rows={4} />}
+        {loading && collapsed && (
+          <p className="px-1 py-2 text-center font-mono text-[10px] text-zinc-500">
             …
           </p>
         )}
