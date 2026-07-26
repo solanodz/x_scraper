@@ -51,7 +51,7 @@ export default function SignalFeedFilters({
         <button
           type="button"
           onClick={() => onApply()}
-          className="rounded border border-zinc-700 px-2 py-1 font-mono text-[10px] text-zinc-400 hover:border-amber-600 hover:text-amber-400"
+          className="border border-zinc-700 px-2 py-1 font-mono text-[10px] text-zinc-400 hover:border-zinc-500 hover:text-zinc-300"
         >
           Buscar
         </button>
@@ -59,7 +59,7 @@ export default function SignalFeedFilters({
           <button
             type="button"
             onClick={onClear}
-            className="rounded border border-zinc-700 px-2 py-1 font-mono text-[10px] text-zinc-500 hover:text-zinc-300"
+            className="border border-zinc-700 px-2 py-1 font-mono text-[10px] text-zinc-500 hover:text-zinc-300"
           >
             Limpiar
           </button>
@@ -107,10 +107,10 @@ export default function SignalFeedFilters({
             onDraftChange(next);
             onApply(next);
           }}
-          className={`shrink-0 rounded border px-2 py-1 font-mono text-[10px] transition-colors ${
+          className={`shrink-0 border px-2 py-1 font-mono text-[10px] transition-colors ${
             draft.watchOnly
-              ? "border-emerald-700 bg-emerald-950/40 text-emerald-400"
-              : "border-zinc-700 text-zinc-400 hover:border-amber-600 hover:text-amber-400"
+              ? "border-zinc-400 bg-zinc-800 text-zinc-100"
+              : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300"
           }`}
         >
           {watchLabel}

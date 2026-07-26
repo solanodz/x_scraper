@@ -13,6 +13,7 @@ import {
   DONCHIAN_PERIOD_MAX,
   DONCHIAN_PERIOD_MIN,
   indicatorsSummary,
+  hydrateTickerChartPrefsFromServer,
   loadTickerChartPrefs,
   matchPresetId,
   normalizeTickerChartPrefs,
@@ -69,6 +70,13 @@ export function TickerChartToolbar({
   useEffect(() => {
     if (!controlled && defaultValue === undefined) {
       setInternal(loadTickerChartPrefs());
+      let cancelled = false;
+      void hydrateTickerChartPrefsFromServer().then((prefs) => {
+        if (!cancelled) setInternal(prefs);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [controlled, defaultValue]);
 
@@ -125,17 +133,17 @@ export function TickerChartToolbar({
   };
 
   const chipClass = (active: boolean) =>
-    `rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors ${
+    `border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors ${
       active
-        ? "border-amber-600 bg-amber-950/40 text-amber-400"
+        ? "border-zinc-500 bg-zinc-800 text-zinc-300"
         : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
     }`;
 
   const selectClass =
-    "rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 focus:border-amber-600 focus:outline-none";
+    "border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 focus:border-zinc-500 focus:outline-none";
 
   const inputClass =
-    "w-14 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 focus:border-amber-600 focus:outline-none disabled:opacity-40";
+    "w-14 border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 focus:border-zinc-500 focus:outline-none disabled:opacity-40";
 
   const summary = indicatorsSummary(prefs);
   const hasIndicators = summary !== "None";
@@ -205,9 +213,9 @@ export function TickerChartToolbar({
         <button
           type="button"
           onClick={() => setIndicatorsOpen((open) => !open)}
-          className={`flex max-w-[220px] items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+          className={`flex max-w-[220px] items-center gap-1.5 border px-2 py-0.5 font-mono text-[10px] transition-colors ${
             hasIndicators
-              ? "border-amber-700/70 bg-amber-950/30 text-amber-400"
+              ? "border-zinc-600 bg-zinc-900 text-zinc-300"
               : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
           }`}
           aria-expanded={indicatorsOpen}
@@ -222,7 +230,7 @@ export function TickerChartToolbar({
 
         {indicatorsOpen && (
           <div
-            className="absolute left-0 top-full z-30 mt-1 w-72 rounded border border-zinc-700 bg-zinc-950 p-2 shadow-xl"
+            className="absolute left-0 top-full z-30 mt-1 w-72 border border-zinc-700 bg-zinc-950 p-2 shadow-xl"
             role="dialog"
             aria-label="Indicadores del Ticker Chart"
           >
@@ -232,7 +240,7 @@ export function TickerChartToolbar({
             <div className="space-y-2">
               <IndicatorRow
                 label="SMA A"
-                accent="accent-amber-500"
+                accent="accent-zinc-400"
                 enabled={prefs.smaA.enabled}
                 onToggle={(enabled) =>
                   setPrefs({
@@ -265,7 +273,7 @@ export function TickerChartToolbar({
 
               <IndicatorRow
                 label="SMA B"
-                accent="accent-sky-400"
+                accent="accent-zinc-300"
                 enabled={prefs.smaB.enabled}
                 onToggle={(enabled) =>
                   setPrefs({
@@ -298,7 +306,7 @@ export function TickerChartToolbar({
 
               <IndicatorRow
                 label="Donchian"
-                accent="accent-violet-400"
+                accent="accent-zinc-500"
                 enabled={prefs.donchian.enabled}
                 onToggle={(enabled) =>
                   setPrefs({
@@ -338,14 +346,14 @@ export function TickerChartToolbar({
 
               <IndicatorRow
                 label="Volume"
-                accent="accent-emerald-400"
+                accent="accent-zinc-200"
                 enabled={prefs.volume}
                 onToggle={(enabled) => setPrefs({ ...prefs, volume: enabled })}
               />
 
               <IndicatorRow
                 label="RSI"
-                accent="accent-amber-400"
+                accent="accent-zinc-400"
                 enabled={prefs.oscillator.enabled}
                 onToggle={(enabled) =>
                   setPrefs({
@@ -378,7 +386,7 @@ export function TickerChartToolbar({
 
               <IndicatorRow
                 label="Oracle"
-                accent="accent-sky-400"
+                accent="accent-zinc-300"
                 enabled={prefs.oracle.enabled}
                 onToggle={(enabled) =>
                   setPrefs({
@@ -401,7 +409,9 @@ export function TickerChartToolbar({
                           ...prefs,
                           oracle: {
                             ...prefs.oracle,
-                            period: clampOscillatorPeriod(Number(e.target.value)),
+                            period: clampOscillatorPeriod(
+                              Number(e.target.value),
+                            ),
                           },
                         })
                       }
@@ -443,7 +453,7 @@ export function TickerChartToolbar({
           <button
             type="button"
             onClick={onExpand}
-            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-amber-700 hover:text-amber-400"
+            className="border border-zinc-700 bg-zinc-900 px-2 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
             title="Ampliar gráfico"
             aria-label="Ampliar gráfico"
           >
@@ -469,7 +479,7 @@ function IndicatorRow({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded border border-zinc-800/80 px-2 py-1.5">
+    <div className="flex items-center justify-between gap-2 border border-zinc-800/80 px-2 py-1.5">
       <label className="flex min-w-0 items-center gap-1.5 font-mono text-[10px] text-zinc-300">
         <input
           type="checkbox"

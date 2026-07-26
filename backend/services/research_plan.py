@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 from backend.services.chat_history import prepare_chat_history
 from backend.services.ticker_catalog import resolve_ticker_input
 
-RESEARCH_PLAN_SYSTEM_PROMPT = """Sos el planificador de contexto del Research Chat de X Scraper Terminal.
+RESEARCH_PLAN_SYSTEM_PROMPT = """Sos el planificador de contexto del Research Chat de MyTerm.
 
 Tu única tarea es resolver follow-ups conversacionales: dado el historial del hilo y la consulta actual del Operator, identificá qué Tickers son relevantes para investigar ahora.
 

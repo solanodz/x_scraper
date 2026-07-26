@@ -111,9 +111,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
 
   const isX = signal ? isXSignal(signal.source_type) : true;
   const hasFullBody =
-    !isX && signal
-      ? hasFullArticleBody(signal.body, signal.summary)
-      : false;
+    !isX && signal ? hasFullArticleBody(signal.body, signal.summary) : false;
   const newsReadingText = !isX
     ? hasFullBody
       ? (signal?.body?.trim() ?? "")
@@ -126,7 +124,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
   return (
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
       <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-1.5">
-        <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
+        <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-zinc-400">
           Signal Detail
         </h2>
       </div>
@@ -139,16 +137,12 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
             </p>
           </div>
         )}
-        {loading && (
-          <p className="font-mono text-xs text-zinc-500">Loading…</p>
-        )}
-        {error && (
-          <p className="font-mono text-xs text-red-400">{error}</p>
-        )}
+        {loading && <p className="font-mono text-xs text-zinc-500">Loading…</p>}
+        {error && <p className="font-mono text-xs text-red-400">{error}</p>}
         {signal && (
           <div className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-mono text-sm font-semibold text-amber-400">
+              <span className="font-mono text-sm font-semibold text-zinc-300">
                 {displayAuthor(signal.username, signal.source_type)}
               </span>
               <span className="font-mono text-[10px] text-zinc-500">
@@ -163,11 +157,11 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                     {signal.title.trim()}
                   </h3>
                   {hasFullBody ? (
-                    <span className="shrink-0 rounded border border-emerald-800/40 bg-emerald-950/25 px-1.5 py-0.5 font-sans text-[10px] font-medium text-emerald-400/90">
+                    <span className="shrink-0 border border-zinc-600 bg-zinc-900 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-300">
                       Artículo completo
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-400">
+                    <span className="shrink-0 border border-amber-800/50 bg-amber-950/20 px-1.5 py-0.5 font-sans text-[10px] font-medium text-amber-500/90">
                       Solo summary
                     </span>
                   )}
@@ -178,11 +172,11 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
             {!isX && !signal.title?.trim() && (
               <div>
                 {hasFullBody ? (
-                  <span className="inline-block rounded border border-emerald-800/40 bg-emerald-950/25 px-1.5 py-0.5 font-sans text-[10px] font-medium text-emerald-400/90">
+                  <span className="inline-block border border-zinc-600 bg-zinc-900 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-300">
                     Artículo completo
                   </span>
                 ) : (
-                  <span className="inline-block rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-sans text-[10px] font-medium text-zinc-400">
+                  <span className="inline-block border border-amber-800/50 bg-amber-950/20 px-1.5 py-0.5 font-sans text-[10px] font-medium text-amber-500/90">
                     Solo summary
                   </span>
                 )}
@@ -197,13 +191,13 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                 loading="lazy"
                 decoding="async"
                 onError={() => setHeroBroken(true)}
-                className="max-h-56 w-full rounded-md object-cover"
+                className="max-h-56 w-full object-cover"
               />
             )}
 
             {signal.cluster_sources && signal.cluster_sources.length > 1 && (
-              <div className="rounded border border-amber-900/40 bg-amber-950/20 px-2 py-1.5">
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+              <div className="border border-zinc-700 bg-zinc-900/60 px-2 py-1.5">
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                   Story Cluster
                 </p>
                 <p className="mt-1 font-mono text-[11px] text-zinc-300">
@@ -215,7 +209,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                       key={member.id_str}
                       className="font-mono text-[10px] text-zinc-500"
                     >
-                      {sourceBadgeLabel(member.source_type)} ·{" "}
+                      {sourceBadgeLabel(member.source_type)} ·{""}
                       {displayAuthor(member.username, member.source_type)}
                     </li>
                   ))}
@@ -239,7 +233,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                     href={externalLinkHref(signal)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center font-sans text-sm font-medium text-amber-500 hover:text-amber-400"
+                    className="inline-flex items-center font-sans text-sm font-medium text-zinc-400 hover:text-zinc-300"
                   >
                     Leer en la fuente →
                   </a>
@@ -253,7 +247,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                   {signal.cashtags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded border border-emerald-800/50 bg-emerald-950/30 px-1.5 py-0.5 font-mono text-[10px] text-emerald-400"
+                      className="border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300"
                     >
                       {tag}
                     </span>
@@ -274,9 +268,9 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                 href={articleUrl ?? signal.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded border border-zinc-700 bg-zinc-950 p-3 transition-colors hover:border-amber-700"
+                className="block border border-zinc-700 bg-zinc-950 p-3 transition-colors hover:border-zinc-600"
               >
-                <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                   {linkedArticleLabel()}
                 </p>
                 <p className="mt-1 font-sans text-xs font-semibold text-zinc-200">
@@ -306,7 +300,7 @@ export default function SignalDetail({ idStr }: SignalDetailProps) {
                 href={externalLinkHref(signal)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block font-mono text-[11px] text-amber-600 hover:text-amber-400"
+                className="inline-block font-mono text-[11px] text-zinc-400 hover:text-zinc-300"
               >
                 {externalLinkLabel(signal.source_type)} →
               </a>
@@ -325,7 +319,7 @@ function CashtagQuoteCard({ quote }: { quote: Quote }) {
   const colorClass = positive ? "text-emerald-400" : "text-red-400";
 
   return (
-    <div className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
+    <div className="flex items-center gap-1.5 border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px]">
       <TickerLogo symbol={quote.symbol} logoUrl={quote.logo} size="xs" />
       <span className="font-semibold text-zinc-300">{quote.symbol}</span>
       <span className="text-zinc-100">${quote.price.toFixed(2)}</span>

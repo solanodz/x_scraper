@@ -5,7 +5,7 @@ import LoginHero from "@/components/LoginHero";
 import { createClient } from "@/lib/supabase/client";
 
 const inputClass =
-  "w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2.5 font-mono text-xs text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-600";
+  "w-full border border-zinc-700 bg-zinc-950 px-3 py-2.5 font-mono text-xs text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-500";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -39,12 +39,14 @@ export default function LoginPage() {
       <div className="flex flex-col justify-center bg-zinc-950 px-6 py-12 sm:px-12 lg:px-16">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2">
-            <span className="font-mono text-lg text-amber-500">▮</span>
+            <span className="font-mono text-lg text-zinc-400">▮</span>
             <div>
               <h1 className="font-sans text-base font-semibold tracking-wide text-zinc-100">
-                X Scraper Terminal
+                MyTerm
               </h1>
-              <p className="font-mono text-[10px] text-zinc-600">Operator access</p>
+              <p className="font-mono text-[10px] text-zinc-600">
+                Operator access
+              </p>
             </div>
           </div>
 
@@ -87,14 +89,12 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && (
-              <p className="font-mono text-xs text-red-400">{error}</p>
-            )}
+            {error && <p className="font-mono text-xs text-red-400">{error}</p>}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded border border-zinc-700 bg-zinc-900 py-2.5 font-sans text-xs font-medium text-zinc-200 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
+              className="w-full border border-zinc-700 bg-zinc-900 py-2.5 font-sans text-xs font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:text-zinc-300 disabled:opacity-50"
             >
               {loading ? "Signing in…" : "Enter Terminal"}
             </button>

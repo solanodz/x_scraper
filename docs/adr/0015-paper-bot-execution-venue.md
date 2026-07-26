@@ -16,7 +16,7 @@ El Terminal necesita un **Paper Bot** always-on que abra/cierre long y short en 
 ## Decisiones asociadas
 
 - **Universe MVP**: BTC + ETH únicamente.
-- **Concurrency**: máximo **10** posiciones abiertas; Operator configura `max_positions` ∈ [1, 10]; **una sola posición open por símbolo**.
+- **Concurrency**: máximo **10** posiciones abiertas; Operator configura `max_positions` ∈ [1, 10]. **Pyramid same-side**: puede haber varias Positions open del mismo símbolo y lado (p. ej. 2× long BTC) hasta el tope. **Opposite side blocked**: con long open en un símbolo no se abre short (y viceversa).
 - **Size**: `size_usd` es la base del Operator; **notional efectivo = size_usd × leverage**; `qty = notional / mark` (F50). TP/SL en percent → precios absolutos persistidos en la Position al abrir.
 - **Donchian**: defaults period `20`, interval `30m`.
 - **Paused/disarmed**: no nuevas entradas; **sí** se siguen gestionando TP/SL de posiciones open.

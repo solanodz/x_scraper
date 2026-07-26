@@ -35,7 +35,7 @@ export default function TradingViewAdvancedChart({
   interval,
   studies,
   compact = true,
-  className = "h-[360px] w-full rounded border border-zinc-800",
+  className = "h-[360px] w-full border border-zinc-800",
 }: TradingViewAdvancedChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const studiesKey = useMemo(
@@ -55,7 +55,8 @@ export default function TradingViewAdvancedChart({
     widgetHost.style.width = "100%";
 
     const widgetSurface = document.createElement("div");
-    widgetSurface.className = "tradingview-widget-container__widget h-full w-full";
+    widgetSurface.className =
+      "tradingview-widget-container__widget h-full w-full";
     widgetSurface.style.height = "100%";
     widgetSurface.style.width = "100%";
     widgetHost.appendChild(widgetSurface);

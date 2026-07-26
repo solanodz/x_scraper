@@ -98,17 +98,20 @@ export default function TickerWatchPopover() {
     setSuggestionsOpen(true);
     setHighlight(0);
     const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setSuggestionsLoading(true);
-      try {
-        const data = await fetchTickerSuggestions(prefix, 50);
-        if (!controller.signal.aborted) setSuggestions(data);
-      } catch {
-        if (!controller.signal.aborted) setSuggestions([]);
-      } finally {
-        if (!controller.signal.aborted) setSuggestionsLoading(false);
-      }
-    }, prefix.length === 0 ? 0 : 180);
+    const timer = window.setTimeout(
+      async () => {
+        setSuggestionsLoading(true);
+        try {
+          const data = await fetchTickerSuggestions(prefix, 50);
+          if (!controller.signal.aborted) setSuggestions(data);
+        } catch {
+          if (!controller.signal.aborted) setSuggestions([]);
+        } finally {
+          if (!controller.signal.aborted) setSuggestionsLoading(false);
+        }
+      },
+      prefix.length === 0 ? 0 : 180,
+    );
 
     return () => {
       controller.abort();
@@ -240,19 +243,19 @@ export default function TickerWatchPopover() {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`rounded border px-3 py-1 font-sans text-xs transition-colors ${
+        className={` border px-3 py-1 font-sans text-xs transition-colors ${
           open
-            ? "border-amber-600 bg-zinc-900 text-amber-400"
-            : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-amber-600 hover:text-amber-400"
+            ? "border-zinc-500 bg-zinc-900 text-zinc-300"
+            : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-zinc-300"
         }`}
       >
         Watch
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+4px)] z-40 w-72 rounded border border-zinc-700 bg-zinc-900 shadow-lg shadow-black/40">
+        <div className="absolute right-0 top-[calc(100%+4px)] z-40 w-72 border border-zinc-700 bg-zinc-900 shadow-lg shadow-black/40">
           <div className="border-b border-zinc-800 px-3 py-2">
-            <span className="font-mono text-[10px] uppercase tracking-wide text-amber-500">
+            <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-400">
               Ticker Watch
             </span>
           </div>
@@ -282,7 +285,7 @@ export default function TickerWatchPopover() {
                     <button
                       type="button"
                       onClick={() => openDossier(entry.symbol)}
-                      className="flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors hover:text-amber-300"
+                      className="flex min-w-0 flex-1 items-center gap-1.5 text-left transition-colors hover:text-zinc-200"
                       title={`Abrir Dossier de ${entry.symbol}`}
                     >
                       <TickerLogo
@@ -290,12 +293,12 @@ export default function TickerWatchPopover() {
                         logoUrl={logos[entry.symbol]}
                         size="xs"
                       />
-                      <span className="font-mono text-[10px] font-semibold text-amber-400">
+                      <span className="font-mono text-[10px] font-semibold text-zinc-300">
                         ${entry.symbol}
                       </span>
                       {hasThesis && (
                         <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                          className="h-1.5 w-1.5 shrink-0 bg-zinc-400"
                           aria-label="Thesis saved"
                         />
                       )}
@@ -304,7 +307,7 @@ export default function TickerWatchPopover() {
                       <button
                         type="button"
                         onClick={() => openDossier(entry.symbol)}
-                        className="rounded border border-zinc-700 px-1 py-0.5 font-mono text-[9px] text-zinc-400 transition-colors hover:border-amber-600 hover:text-amber-400"
+                        className="border border-zinc-700 px-1 py-0.5 font-mono text-[9px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-300"
                       >
                         Dossier
                       </button>
@@ -312,7 +315,7 @@ export default function TickerWatchPopover() {
                         type="button"
                         onClick={() => toggleThesisEditor(entry)}
                         aria-label={`Edit thesis for ${entry.symbol}`}
-                        className="font-mono text-[10px] text-zinc-500 transition-colors hover:text-amber-400"
+                        className="font-mono text-[10px] text-zinc-500 transition-colors hover:text-zinc-300"
                       >
                         ✎
                       </button>
@@ -341,7 +344,7 @@ export default function TickerWatchPopover() {
                         rows={3}
                         placeholder="¿Por qué sigo este ticker? ¿Qué riesgo me preocupa?"
                         disabled={savingThesis === entry.symbol}
-                        className="w-full resize-none rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+                        className="w-full resize-none border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
                       />
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[9px] text-zinc-600">
@@ -351,7 +354,7 @@ export default function TickerWatchPopover() {
                           type="button"
                           onClick={() => void saveThesis(entry.symbol)}
                           disabled={savingThesis === entry.symbol}
-                          className="rounded border border-amber-800/60 px-1.5 py-0.5 font-mono text-[10px] text-amber-400 transition-colors hover:border-amber-600 hover:text-amber-300 disabled:opacity-50"
+                          className="border border-zinc-600 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
                         >
                           ✓
                         </button>
@@ -377,7 +380,7 @@ export default function TickerWatchPopover() {
                   setOpen(false);
                   window.dispatchEvent(new CustomEvent("xscraper:briefing"));
                 }}
-                className="w-full rounded border border-amber-800/60 bg-amber-950/30 px-2 py-1 font-mono text-xs text-amber-400 transition-colors hover:border-amber-600 hover:text-amber-300"
+                className="w-full border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-200"
               >
                 Briefing
               </button>
@@ -401,13 +404,13 @@ export default function TickerWatchPopover() {
               aria-expanded={suggestionsOpen}
               aria-autocomplete="list"
               role="combobox"
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+              className="w-full border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
             />
 
             {suggestionsOpen && (
               <ul
                 role="listbox"
-                className="absolute bottom-[calc(100%+4px)] left-2 right-2 max-h-40 overflow-y-auto rounded border border-zinc-700 bg-zinc-950 py-1 shadow-lg shadow-black/40"
+                className="absolute bottom-[calc(100%+4px)] left-2 right-2 max-h-40 overflow-y-auto border border-zinc-700 bg-zinc-950 py-1 shadow-lg shadow-black/40"
               >
                 {suggestionsLoading && suggestions.length === 0 && (
                   <li className="px-2 py-1.5 font-mono text-[10px] text-zinc-500">
@@ -440,7 +443,7 @@ export default function TickerWatchPopover() {
                         <span
                           className={`font-mono text-[10px] ${
                             selected
-                              ? "font-semibold text-amber-400"
+                              ? "font-semibold text-zinc-300"
                               : "text-zinc-200"
                           }`}
                         >

@@ -15,6 +15,7 @@ from backend.app.routes.chart_plan import router as chart_plan_router
 from backend.app.routes.chat import router as chat_router
 from backend.app.routes.dossier import router as dossier_router
 from backend.app.routes.ingest import router as ingest_router
+from backend.app.routes.operator_settings import router as operator_settings_router
 from backend.app.routes.quotes import router as quotes_router
 from backend.app.routes.signals import router as signals_router
 from backend.app.routes.watch import router as watch_router
@@ -28,7 +29,7 @@ def _cors_origins() -> list[str]:
 
 
 app = FastAPI(
-    title="X Scraper Terminal API",
+    title="MyTerm API",
     description="REST + Feed Stream SSE + Research Chat Stream",
     version="0.1.0",
 )
@@ -79,6 +80,7 @@ app.include_router(ingest_router)
 app.include_router(quotes_router)
 app.include_router(watch_router)
 app.include_router(bot_router)
+app.include_router(operator_settings_router)
 
 
 @app.get("/health")

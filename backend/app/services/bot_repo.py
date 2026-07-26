@@ -269,13 +269,18 @@ def list_positions(
             raise BotRepoError("status must be open or closed")
         clauses.append("status = %(status)s")
         params["status"] = status
+    order_by = (
+        "closed_at DESC NULLS LAST, opened_at DESC"
+        if status == "closed"
+        else "opened_at DESC"
+    )
     sql = f"""
         SELECT id, operator_id, symbol, side, size_usd, qty, leverage,
                entry_price, tp_price, sl_price, status, opened_at, closed_at,
                close_reason, realized_pnl, venue, external_id, mark_price
         FROM bot_positions
         WHERE {" AND ".join(clauses)}
-        ORDER BY opened_at DESC
+        ORDER BY {order_by}
         LIMIT %(limit)s
     """
     with connect() as conn:

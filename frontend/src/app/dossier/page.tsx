@@ -45,7 +45,9 @@ function DossierPageContent() {
               minSecond={320}
               defaultSecond={480}
               first={<DossierPanel key={`dossier-${symbol}`} symbol={symbol} />}
-              second={<ChartPlanPanel key={`chart-${symbol}`} symbol={symbol} />}
+              second={
+                <ChartPlanPanel key={`chart-${symbol}`} symbol={symbol} />
+              }
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6">

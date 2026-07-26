@@ -33,7 +33,7 @@ from backend.services.tools import (
     set_research_operator_id,
 )
 
-RESEARCH_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de X Scraper Terminal.
+RESEARCH_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de MyTerm.
 
 Tenés herramientas para:
 - search_corpus: búsqueda semántica en el Corpus (narrativa, temas, contexto; filtros ticker, since_hours, source_type, min_relevance)

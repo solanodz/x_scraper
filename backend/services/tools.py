@@ -21,7 +21,9 @@ _operator_id_var: ContextVar[str | None] = ContextVar(
     default=None,
 )
 
-PRICE_CHART_MAX_CANDLES = 90
+# ~1y de velas diarias; el hard-cap viejo (90) cortaba 6mo/1y y
+# desalineaba el sparkline vs change_percent del período completo.
+PRICE_CHART_MAX_CANDLES = 260
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {

@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { IChartApi } from "lightweight-charts";
-import { TickerChart, type TickerChartIndicators } from "@/components/TickerChart";
+import {
+  TickerChart,
+  type TickerChartIndicators,
+} from "@/components/TickerChart";
 import { TickerOscillatorPane } from "@/components/TickerOscillatorPane";
 import { bindSyncedTimeScaleGroup } from "@/lib/chartTimeSync";
 import type { PriceCandle } from "@/lib/types";

@@ -60,7 +60,10 @@ const SENTIMENT_COLORS: Record<string, string> = {
   sin_etiqueta: "#71717a",
 };
 
-function viewEnabled(views: ChartPlanView[], type: string): ChartPlanView | null {
+function viewEnabled(
+  views: ChartPlanView[],
+  type: string,
+): ChartPlanView | null {
   const match = views.find((view) => view.type === type);
   if (!match?.enabled) return null;
   return match;
@@ -69,11 +72,16 @@ function viewEnabled(views: ChartPlanView[], type: string): ChartPlanView | null
 function normalizeDimension(raw: ChartPlanContent["assessment"]["visual"]) {
   if (!raw || typeof raw !== "object") return null;
   const findings = Array.isArray(raw.findings)
-    ? raw.findings.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    ? raw.findings.filter(
+        (item): item is string =>
+          typeof item === "string" && item.trim().length > 0,
+      )
     : [];
   const summary = typeof raw.summary === "string" ? raw.summary : "";
   const stance =
-    typeof raw.stance === "string" && raw.stance.trim() ? raw.stance.trim() : null;
+    typeof raw.stance === "string" && raw.stance.trim()
+      ? raw.stance.trim()
+      : null;
   if (!summary && findings.length === 0 && !stance) return null;
   return { summary, stance, findings };
 }
@@ -127,7 +135,9 @@ function viewsMatch(
 export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
   const [chartPlan, setChartPlan] = useState<ChartPlanVersion | null>(null);
   const [versions, setVersions] = useState<ChartPlanVersion[]>([]);
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [steps, setSteps] = useState<ResearchStep[]>([]);
@@ -283,8 +293,8 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
           <h2 className="flex flex-wrap items-center gap-2 font-sans text-sm font-semibold text-zinc-100">
             <TickerLogo symbol={symbol} logoUrl={quote?.logo} size="sm" />
             <span>
-              Chart Plan ·{" "}
-              <span className="font-mono text-amber-400">${symbol}</span>
+              Chart Plan ·{""}
+              <span className="font-mono text-zinc-300">${symbol}</span>
             </span>
             {quote?.available && quote.price != null && (
               <span className="ml-2 font-mono text-sm text-zinc-200">
@@ -294,7 +304,9 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             {quote?.available && quote.change_percent != null && (
               <span
                 className={`ml-2 font-mono text-xs ${
-                  quote.change_percent >= 0 ? "text-emerald-400" : "text-red-400"
+                  quote.change_percent >= 0
+                    ? "text-emerald-400"
+                    : "text-red-400"
                 }`}
               >
                 {formatQuoteChangePercent(quote.change_percent)}
@@ -302,7 +314,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             )}
           </h2>
           <p className="font-mono text-[10px] text-zinc-500">
-            Ticker Chart Operator-first · delay ~15m{" "}
+            Ticker Chart Operator-first · delay ~15m{""}
             {quoteUpdatedAt != null && (
               <span className="text-zinc-600">
                 · precio {formatRefreshAge(quoteUpdatedAt)}
@@ -318,12 +330,12 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
               value={selectedVersionId ?? ""}
               onChange={(e) => setSelectedVersionId(e.target.value)}
               disabled={loading || analyzing}
-              className="max-w-[160px] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+              className="max-w-[160px] border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
               aria-label="Versión del Chart Plan"
             >
               {versions.map((version, index) => (
                 <option key={version.id} value={version.id}>
-                  {index === 0 ? "Actual · " : ""}
+                  {index === 0 ? "Actual ·" : ""}
                   {new Date(version.created_at).toLocaleString("es-AR", {
                     day: "2-digit",
                     month: "2-digit",
@@ -338,7 +350,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             type="button"
             onClick={() => void handleAnalyze()}
             disabled={loading || analyzing || disabled}
-            className="rounded border border-sky-800/60 bg-sky-950/30 px-3 py-1 font-mono text-[10px] text-sky-400 transition-colors hover:border-sky-600 hover:text-sky-300 disabled:opacity-50"
+            className="border border-zinc-700 bg-zinc-900 px-3 py-1 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
           >
             {analyzing ? "Analizando…" : "Analizar gráficos"}
           </button>
@@ -347,15 +359,15 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {loading && !displayed && (
-          <p className="font-mono text-xs text-zinc-500">Cargando Chart Plan…</p>
+          <p className="font-mono text-xs text-zinc-500">
+            Cargando Chart Plan…
+          </p>
         )}
 
-        {error && (
-          <p className="font-mono text-xs text-red-400">{error}</p>
-        )}
+        {error && <p className="font-mono text-xs text-red-400">{error}</p>}
 
         {disabled && (
-          <div className="space-y-1 rounded border border-dashed border-zinc-700 bg-zinc-950/60 px-3 py-3">
+          <div className="space-y-1 border border-dashed border-zinc-700 bg-zinc-950/60 px-3 py-3">
             <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
               Deshabilitado
             </p>
@@ -366,11 +378,9 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
           </div>
         )}
 
-        {analyzing && (
-          <ResearchStepLoader steps={steps} active />
-        )}
+        {analyzing && <ResearchStepLoader steps={steps} active />}
 
-        <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/40 p-3">
+        <section className="space-y-2 border border-zinc-800/80 bg-zinc-900/40 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Ticker Chart
@@ -382,7 +392,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
                   handlePrefsChange(suggestedViewToPrefs(suggestedView));
                   setSoftApplyAvailable(false);
                 }}
-                className="rounded border border-sky-800/60 bg-sky-950/30 px-2 py-0.5 font-mono text-[10px] text-sky-400 hover:border-sky-600"
+                className="border border-zinc-700 bg-zinc-900 px-2 py-0.5 font-mono text-[10px] text-zinc-300 hover:border-zinc-500"
               >
                 Aplicar vista del Chart Plan
               </button>
@@ -440,7 +450,10 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
         </section>
 
         {!loading && !displayed && !analyzing && (
-          <EmptyState needsDossier={needsDossier} onAnalyze={() => void handleAnalyze()} />
+          <EmptyState
+            needsDossier={needsDossier}
+            onAnalyze={() => void handleAnalyze()}
+          />
         )}
 
         {content && assessment && (
@@ -448,7 +461,7 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             <AssessmentSection assessment={assessment} />
 
             {sentimentEnabled && (
-              <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/40 p-3">
+              <section className="space-y-2 border border-zinc-800/80 bg-zinc-900/40 p-3">
                 <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
                   Sentimiento
                 </h3>
@@ -457,11 +470,13 @@ export default function ChartPlanPanel({ symbol }: ChartPlanPanelProps) {
             )}
 
             {timelineEnabled && (
-              <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/40 p-3">
+              <section className="space-y-2 border border-zinc-800/80 bg-zinc-900/40 p-3">
                 <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
                   Timeline señales
                 </h3>
-                <SignalsTimelineChart data={chartData?.signals_timeline ?? []} />
+                <SignalsTimelineChart
+                  data={chartData?.signals_timeline ?? []}
+                />
               </section>
             )}
           </div>
@@ -479,7 +494,7 @@ function EmptyState({
   onAnalyze: () => void;
 }) {
   return (
-    <div className="space-y-3 rounded border border-dashed border-zinc-700 bg-zinc-950/40 px-4 py-6 text-center">
+    <div className="space-y-3 border border-dashed border-zinc-700 bg-zinc-950/40 px-4 py-6 text-center">
       <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
         Empty
       </p>
@@ -492,7 +507,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onAnalyze}
-          className="rounded border border-sky-800/60 bg-sky-950/30 px-3 py-1 font-mono text-[10px] text-sky-400 transition-colors hover:border-sky-600 hover:text-sky-300"
+          className="border border-zinc-700 bg-zinc-900 px-3 py-1 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100"
         >
           Analizar gráficos
         </button>
@@ -575,13 +590,13 @@ function AssessmentSection({
 }) {
   const hasDimensions = Boolean(
     assessment.visual ||
-      assessment.narrative ||
-      assessment.sentiment_vs_price ||
-      assessment.multi_tf,
+    assessment.narrative ||
+    assessment.sentiment_vs_price ||
+    assessment.multi_tf,
   );
 
   return (
-    <section className="space-y-2 rounded border border-zinc-800/80 bg-zinc-900/30 p-3">
+    <section className="space-y-2 border border-zinc-800/80 bg-zinc-900/30 p-3">
       <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
         Lectura objetiva
       </h3>
@@ -634,7 +649,9 @@ function AssessmentSection({
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-zinc-500">Cobertura suficiente en ventana.</p>
+            <p className="mt-1 text-zinc-500">
+              Cobertura suficiente en ventana.
+            </p>
           )}
         </div>
         <div>
@@ -660,7 +677,7 @@ function IndicatorReadingsSection({
   const stanceStyles: Record<string, string> = {
     alcista: "border-emerald-800/60 bg-emerald-950/20 text-emerald-300",
     bajista: "border-red-800/60 bg-red-950/20 text-red-300",
-    neutral: "border-zinc-700 bg-zinc-900/50 text-zinc-300",
+    neutral: "border-amber-800/50 bg-amber-950/20 text-amber-500/90",
   };
 
   return (
@@ -671,14 +688,14 @@ function IndicatorReadingsSection({
         </h4>
         {stale && (
           <div className="flex items-center gap-2">
-            <span className="rounded border border-amber-800/50 bg-amber-950/30 px-1.5 py-0.5 font-mono text-[9px] uppercase text-amber-400">
+            <span className="border border-amber-800/50 bg-amber-950/20 px-1.5 py-0.5 font-mono text-[9px] uppercase text-amber-500/90">
               Desactualizado
             </span>
             {onApplySuggested && (
               <button
                 type="button"
                 onClick={onApplySuggested}
-                className="font-mono text-[9px] text-sky-400 hover:underline"
+                className="font-mono text-[9px] text-zinc-300 hover:underline"
               >
                 Aplicar vista del Plan
               </button>
@@ -692,12 +709,14 @@ function IndicatorReadingsSection({
           return (
             <article
               key={item.name}
-              className={`rounded border px-3 py-2 ${
+              className={` border px-3 py-2 ${
                 stanceStyles[stance] ?? stanceStyles.neutral
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="font-mono text-[11px] font-semibold">{item.name}</p>
+                <p className="font-mono text-[11px] font-semibold">
+                  {item.name}
+                </p>
                 <span className="font-mono text-[9px] uppercase tracking-wide opacity-80">
                   {stance}
                 </span>
@@ -734,7 +753,10 @@ function SentimentBarsChart({
   return (
     <div className="h-48 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={colored} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <BarChart
+          data={colored}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+        >
           <CartesianGrid stroke="#27272a" strokeDasharray="3 3" />
           <XAxis
             dataKey="label"
@@ -779,7 +801,10 @@ function SignalsTimelineChart({
     <div className="h-48 w-full">
       <ResponsiveContainer width="100%" height="100%">
         {useLine ? (
-          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <LineChart
+            data={data}
+            margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          >
             <CartesianGrid stroke="#27272a" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
@@ -807,7 +832,10 @@ function SignalsTimelineChart({
             />
           </LineChart>
         ) : (
-          <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <BarChart
+            data={data}
+            margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          >
             <CartesianGrid stroke="#27272a" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
@@ -833,4 +861,3 @@ function SignalsTimelineChart({
     </div>
   );
 }
-

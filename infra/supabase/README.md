@@ -1,4 +1,4 @@
-# Supabase — X Scraper Terminal
+# Supabase — MyTerm
 
 ## Schema setup
 

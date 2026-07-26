@@ -7,7 +7,7 @@ export interface FeedFilterDraft {
   q: string;
   sourceType: FeedSourceFilter;
   sinceHours: number;
-  /** Filtra por Tickers del Ticker Watch (no se persiste). */
+  /** Filtra por Tickers del Ticker Watch (persiste en Operator Settings). */
   watchOnly: boolean;
 }
 
@@ -34,11 +34,12 @@ export const FEED_TIME_OPTIONS: { value: number; label: string }[] = [
   { value: 720, label: "Últimos 30 días" },
 ];
 
-export const FEED_SOURCE_OPTIONS: { value: FeedSourceFilter; label: string }[] = [
-  { value: "", label: "Todas las fuentes" },
-  { value: "news", label: "Noticias" },
-  { value: "x", label: "X / tweets" },
-];
+export const FEED_SOURCE_OPTIONS: { value: FeedSourceFilter; label: string }[] =
+  [
+    { value: "", label: "Todas las fuentes" },
+    { value: "news", label: "Noticias" },
+    { value: "x", label: "X / tweets" },
+  ];
 
 function normalizeTicker(value: string): string {
   return value.trim().replace(/^\$/, "").toUpperCase();
@@ -99,7 +100,7 @@ function searchableText(signal: SignalSummary): string {
     ...signal.cashtags,
   ]
     .filter(Boolean)
-    .join(" ")
+    .join("")
     .toLowerCase();
 }
 
@@ -145,9 +146,7 @@ export function draftToQuery(
   if (draft.sinceHours > 0) query.since_hours = draft.sinceHours;
   if (draft.watchOnly) {
     // Mis tickers: OR sobre el Watch; el ticker de búsqueda queda absorbido en tickers.
-    const fromWatch = watchSymbols
-      .map(normalizeTicker)
-      .filter(Boolean);
+    const fromWatch = watchSymbols.map(normalizeTicker).filter(Boolean);
     query.tickers = fromWatch;
     if (query.ticker) {
       delete query.ticker;
@@ -166,7 +165,7 @@ export function activeFilterLabels(query: FeedFilterQuery): string[] {
     const shown = query.tickers
       .slice(0, 4)
       .map((t) => `$${t}`)
-      .join(" ");
+      .join("");
     const more =
       query.tickers.length > 4 ? ` +${query.tickers.length - 4}` : "";
     labels.push(`Mis tickers: ${shown}${more}`);
@@ -176,7 +175,9 @@ export function activeFilterLabels(query: FeedFilterQuery): string[] {
   if (query.ticker) labels.push(`Ticker: $${query.ticker}`);
   if (query.q) labels.push(`Búsqueda: ${query.q}`);
   if (query.source_type) {
-    const option = FEED_SOURCE_OPTIONS.find((o) => o.value === query.source_type);
+    const option = FEED_SOURCE_OPTIONS.find(
+      (o) => o.value === query.source_type,
+    );
     labels.push(`Fuente: ${option?.label ?? query.source_type}`);
   }
   if (query.since_hours) {
@@ -206,9 +207,7 @@ export function matchesFeedFilters(
   }
 
   if (query.source_type) {
-    if (
-      !matchesSourceType(signal, query.source_type as FeedSourceFilter)
-    ) {
+    if (!matchesSourceType(signal, query.source_type as FeedSourceFilter)) {
       return false;
     }
   }

@@ -81,7 +81,9 @@ export function useLiveTickerMarket(
       if (symbolRef.current !== ticker) return;
       setBaseCandles([]);
       const message =
-        err instanceof Error ? err.message : "No se pudieron cargar las velas de precio";
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar las velas de precio";
       setCandlesError(message);
     } finally {
       if (!silent && symbolRef.current === ticker) {

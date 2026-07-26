@@ -26,7 +26,7 @@ from backend.services.tools import (
 )
 from backend.services.types import SignalHit
 
-AGENT_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de X Scraper Terminal.
+AGENT_SYSTEM_PROMPT = """Sos el recolector de datos del Research Chat de MyTerm.
 
 Tenés herramientas para:
 - search_corpus: búsqueda semántica en el Corpus (narrativa, temas, contexto)

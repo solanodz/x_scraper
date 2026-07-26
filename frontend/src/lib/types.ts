@@ -278,6 +278,27 @@ export interface PriceCandlesResponse {
   error?: string | null;
 }
 
+/** Operator Settings (GET/PATCH /operator/settings). */
+export interface OperatorBotPnlSettings {
+  timeZone: string;
+  lookbackDays: number;
+}
+
+export interface OperatorFeedFilterSettings {
+  watchOnly: boolean;
+}
+
+export interface OperatorSettings {
+  bot_pnl: OperatorBotPnlSettings;
+  feed_filters: OperatorFeedFilterSettings;
+  ticker_chart: Record<string, unknown>;
+}
+
+export interface OperatorSettingsResponse {
+  settings: OperatorSettings;
+  updated_at?: string | null;
+}
+
 /** Paper Bot operator config (GET/PATCH /bot/config). */
 export interface BotConfig {
   operator_id: string;

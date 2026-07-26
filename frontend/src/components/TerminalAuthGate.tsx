@@ -3,7 +3,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getAccessToken, isSupabaseConfigured } from "@/lib/api";
 
-export default function TerminalAuthGate({ children }: { children: ReactNode }) {
+export default function TerminalAuthGate({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [authFailed, setAuthFailed] = useState(false);
 
@@ -27,8 +31,8 @@ export default function TerminalAuthGate({ children }: { children: ReactNode }) 
   if (authFailed) {
     return (
       <div className="flex h-full items-center justify-center font-mono text-xs text-zinc-400">
-        Session expired.{" "}
-        <a href="/login" className="ml-1 text-amber-500 hover:underline">
+        Session expired.{""}
+        <a href="/login" className="ml-1 text-zinc-400 hover:underline">
           Sign in again
         </a>
       </div>

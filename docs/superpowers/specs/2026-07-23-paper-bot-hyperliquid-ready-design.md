@@ -53,7 +53,7 @@ Avoid: “algo trading tip”, “signal tip” as synonyms for Trade Signal; do
 **Donchian Breakout** (per symbol):
 
 - Compute Donchian upper/lower over configurable period on a configurable OHLC interval (defaults aligned with chart: e.g. period 20, interval `1h` or `4h` — exact defaults in plan).
-- **Long entry:** close (or high) breaks above upper band; no duplicate open for same symbol+side while one exists (policy: at most one open position per symbol+side unless config says otherwise — **MVP: at most one open position per symbol** to keep risk simple, while total open across BTC+ETH ≤ max_positions).
+- **Long entry:** close (or high) breaks above upper band. **Pyramid same-side** up to `max_positions` (e.g. another long BTC while one long is open). **Opposite side blocked** (long open → no short on that symbol). Total open across universe ≤ max_positions.
 - **Short entry:** close (or low) breaks below lower band.
 - **Filters:** cooldown after close for that symbol; skip if at `max_positions`; skip if bot paused/disarmed; skip duplicate bar signal (idempotent on `symbol+side+bar_ts`).
 - **Exit:** TP or SL hit on mark (PaperVenue mark = Market Data last/close); optional Operator forced close via API.

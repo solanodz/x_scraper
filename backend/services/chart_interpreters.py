@@ -16,7 +16,7 @@ from backend.services.research_steps import ResearchStepEvent
 
 _VALID_STANCES = frozenset({"alcista", "bajista", "neutral"})
 
-_INTERPRETER_SYSTEM = """Sos un Chart Interpreter del X Scraper Terminal.
+_INTERPRETER_SYSTEM = """Sos un Chart Interpreter del MyTerm.
 Analizás UNA dimensión del Chart Plan. Respondé SOLO JSON válido con este schema:
 {
   "summary": "string breve en español",

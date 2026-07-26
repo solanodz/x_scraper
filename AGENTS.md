@@ -1,6 +1,6 @@
-# AGENTS.md — X Scraper Terminal
+# AGENTS.md — MyTerm
 
-Terminal de inteligencia de noticias financieras (Corpus de X) + Research Chat (RAG).
+Terminal de inteligencia de noticias financieras (Corpus de X) + Research Chat (RAG). Producto: **MyTerm**.
 Dominio y lenguaje canónico en `CONTEXT.md`. Decisiones en `docs/adr/`.
 
 ## Startup flow (hacer al iniciar cada sesión)

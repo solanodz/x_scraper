@@ -81,5 +81,5 @@ export function clusterSourcesLabel(
 ): string | null {
   if (!sources || sources.length <= 1) return null;
   const labels = sources.map((s) => sourceBadgeLabel(s.source_type));
-  return Array.from(new Set(labels)).join(" · ");
+  return Array.from(new Set(labels)).join(" ·");
 }

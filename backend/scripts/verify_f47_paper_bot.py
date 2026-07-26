@@ -62,6 +62,7 @@ def _synthetic_breakout_down(*, period: int = 20) -> list[dict]:
 def test_donchian_and_strategy() -> None:
     from backend.services.bot_strategy import (
         StrategyContext,
+        TradeSignal,
         collect_signals,
         evaluate_donchian_breakout,
         filter_trade_signal,
@@ -85,7 +86,7 @@ def test_donchian_and_strategy() -> None:
         armed=True,
         max_positions=2,
         open_count=0,
-        open_symbols=set(),
+        open_sides={},
         cooldown_seconds=0,
         last_closed_at={},
         seen_keys=set(),
@@ -105,7 +106,7 @@ def test_donchian_and_strategy() -> None:
             armed=False,
             max_positions=2,
             open_count=0,
-            open_symbols=set(),
+            open_sides={},
             cooldown_seconds=0,
             last_closed_at={},
             seen_keys=set(),
@@ -113,19 +114,55 @@ def test_donchian_and_strategy() -> None:
     )
     assert not ok and reason == "not_armed"
 
+    # Same-side pyramid allowed while under max_positions.
     ok, reason = filter_trade_signal(
         sig,
         StrategyContext(
             armed=True,
             max_positions=2,
             open_count=1,
-            open_symbols={"BTC"},
+            open_sides={"BTC": {"long"}},
             cooldown_seconds=0,
             last_closed_at={},
             seen_keys=set(),
         ),
     )
-    assert not ok and reason == "symbol_already_open"
+    assert ok and reason == "", (ok, reason)
+
+    # Opposite side blocked while long is open.
+    ok, reason = filter_trade_signal(
+        TradeSignal(
+            symbol="BTC",
+            side="short",
+            reason="donchian_breakout_down",
+            bar_ts="t-short",
+        ),
+        StrategyContext(
+            armed=True,
+            max_positions=2,
+            open_count=1,
+            open_sides={"BTC": {"long"}},
+            cooldown_seconds=0,
+            last_closed_at={},
+            seen_keys=set(),
+        ),
+    )
+    assert not ok and reason == "opposite_side_open"
+
+    # Cap still enforced across pyramid.
+    ok, reason = filter_trade_signal(
+        sig,
+        StrategyContext(
+            armed=True,
+            max_positions=2,
+            open_count=2,
+            open_sides={"BTC": {"long"}},
+            cooldown_seconds=0,
+            last_closed_at={},
+            seen_keys=set(),
+        ),
+    )
+    assert not ok and reason == "max_positions"
 
     ok, reason = filter_trade_signal(
         sig,
@@ -133,7 +170,7 @@ def test_donchian_and_strategy() -> None:
             armed=True,
             max_positions=2,
             open_count=0,
-            open_symbols=set(),
+            open_sides={},
             cooldown_seconds=0,
             last_closed_at={},
             seen_keys={("BTC", "long", sig.bar_ts)},
@@ -480,13 +517,14 @@ def test_paper_venue_open_tp() -> None:
     print("  PaperVenue open + TP close (injected marks, no network) OK")
 
 
-def test_skip_symbol_already_open_not_persisted() -> None:
-    """Holding a position must not flood bot_events with symbol_already_open (F50)."""
+def test_pyramid_same_side_and_block_opposite() -> None:
+    """Same-side can pyramid up to max_positions; opposite side is blocked (silent)."""
     from backend.services.bot_venue import PaperVenue
     from backend.services.paper_bot import run_tick
 
     operator_id = f"00000000-0000-4000-8000-{uuid.uuid4().hex[:12]}"
     store = _MemStore(operator_id)
+    store.config["max_positions"] = 2
     entry = 65_000.0
     marks = {"BTC": entry}
     patches = _patch_bot_repo(store)
@@ -494,7 +532,7 @@ def test_skip_symbol_already_open_not_persisted() -> None:
         p.start()
     try:
         venue = PaperVenue(mark_fn=lambda s: Decimal(str(marks[s])))
-        opened = venue.open(
+        venue.open(
             operator_id=operator_id,
             symbol="BTC",
             side="long",
@@ -504,28 +542,51 @@ def test_skip_symbol_already_open_not_persisted() -> None:
             sl_pct=1,
         )
         store.config["armed"] = True
-        candles = _synthetic_breakout_up(period=20)
-        # Same breakout while long is open → filter symbol_already_open every tick.
+
+        # New bar breakout (different bar_ts) → second long allowed.
+        up2 = _synthetic_breakout_up(period=20)
+        up2[-1] = {**up2[-1], "date": "2099-01-02T00:00:00+00:00", "close": float(up2[-1]["close"]) + 50}
         summary = run_tick(
             operator_id,
-            candles_by_symbol={"BTC": candles},
+            candles_by_symbol={"BTC": up2},
+            mark_prices=marks,
+        )
+        open_longs = [
+            p
+            for p in store.positions.values()
+            if p["status"] == "open" and p["symbol"] == "BTC" and p["side"] == "long"
+        ]
+        assert len(open_longs) == 2, (summary, open_longs)
+        assert len(summary.get("opened") or []) == 1, summary
+
+        # Short breakout while longs open → opposite_side_open (not persisted).
+        down = _synthetic_breakout_down(period=20)
+        summary2 = run_tick(
+            operator_id,
+            candles_by_symbol={"BTC": down},
             mark_prices=marks,
         )
         assert any(
-            s.get("reason") == "symbol_already_open" for s in (summary.get("skipped") or [])
-        ), summary
-        skip_events = [
+            s.get("reason") == "opposite_side_open"
+            for s in (summary2.get("skipped") or [])
+        ), summary2
+        opp_events = [
             e
             for e in store.events
             if e.get("kind") == "skip"
-            and (e.get("payload") or {}).get("reason") == "symbol_already_open"
+            and (e.get("payload") or {}).get("reason") == "opposite_side_open"
         ]
-        assert skip_events == [], skip_events
-        assert store.positions[opened["position"]["id"]]["status"] == "open"
+        assert opp_events == [], opp_events
+        shorts = [
+            p
+            for p in store.positions.values()
+            if p["status"] == "open" and p["side"] == "short"
+        ]
+        assert shorts == [], shorts
     finally:
         for p in patches:
             p.stop()
-    print("  symbol_already_open skips not persisted OK")
+    print("  same-side pyramid + opposite blocked OK")
 
 
 def test_api_venue_reject_hyperliquid() -> None:
@@ -581,7 +642,7 @@ def main() -> int:
     test_donchian_and_strategy()
     test_hyperliquid_stub()
     test_paper_venue_open_tp()
-    test_skip_symbol_already_open_not_persisted()
+    test_pyramid_same_side_and_block_opposite()
     test_api_venue_reject_hyperliquid()
     print("OK")
     return 0

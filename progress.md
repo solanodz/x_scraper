@@ -2,21 +2,23 @@
 
 ## Estado actual
 
-**Programa grill cerrado.** F38 → F51 → F52 → **F53 `passing`**.
+**F55** Operator Settings — `passing`. Branding producto: **MyTerm**.
 
-F53: landing honesta (sin forecast/institutional flow inventados) + Briefing/Bot; empty/disabled Chart Plan & quotes; chips Research `Rápido`/`Research` + `Solo summary`.
+Próxima feature grill: **F32** Provenance no-Signal (`pending`).
 
 ## Próximo paso
 
-1. Redeploy **API + Web** (F51–F53) y Worker (F38).  
-2. Smoke manual: landing, Mis tickers, Refresh Dossier fundamentals, chat con chip Rápido.  
-3. Elegir siguiente feature fuera del grill (o soak Paper Bot).
+1. Redeploy API (Railway) + web (Vercel) para MyTerm + `/operator/settings` + `/settings`.
+2. En Store local existente: aplicar `015_operator_settings.sql` si el volumen no se recreó.
+3. Arrancar **F32** Provenance cuando quieras.
 
 ## Notas
 
-- 2026-07-25 — F53 polish confianza shipped.  
-- Chips meta no se persisten en historial de chat (solo sesión live vía SSE).  
+- 2026-07-25 — F55 done: GET/PATCH `/operator/settings`, UI `/settings`, wire Daily PnL + Feed `watchOnly` + soft sync chart; rename → MyTerm.
+- Verify: `python -m backend.scripts.verify_f55_operator_settings => OK`.
+- F54 Paper Bot en soak.
 
 ## Roadmap
 
-- Grill alta/media: done  
+- F32 Provenance
+- Soak Paper Bot

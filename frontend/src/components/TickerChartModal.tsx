@@ -69,7 +69,7 @@ export default function TickerChartModal({
       role="presentation"
     >
       <div
-        className="flex h-[min(92vh,960px)] w-full max-w-7xl flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-950 shadow-2xl"
+        className="flex h-[min(92vh,960px)] w-full max-w-7xl flex-col overflow-hidden border border-zinc-700 bg-zinc-950 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -78,7 +78,7 @@ export default function TickerChartModal({
         <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-2">
           <div className="flex items-center gap-2">
             <TickerLogo symbol={symbol} logoUrl={quote?.logo} size="md" />
-            <span className="font-mono text-sm font-semibold text-amber-400">
+            <span className="font-mono text-sm font-semibold text-zinc-300">
               ${symbol}
             </span>
             {quote?.available && quote.price != null && (
@@ -89,7 +89,9 @@ export default function TickerChartModal({
             {quote?.available && quote.change_percent != null && (
               <span
                 className={`font-mono text-xs ${
-                  quote.change_percent >= 0 ? "text-emerald-400" : "text-red-400"
+                  quote.change_percent >= 0
+                    ? "text-emerald-400"
+                    : "text-red-400"
                 }`}
               >
                 {formatQuoteChangePercent(quote.change_percent)}
@@ -102,7 +104,7 @@ export default function TickerChartModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
+            className="border border-zinc-700 px-2 py-0.5 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
           >
             Esc
           </button>

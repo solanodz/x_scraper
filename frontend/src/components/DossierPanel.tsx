@@ -9,10 +9,7 @@ import {
   fetchTickerLogos,
   refreshDossier,
 } from "@/lib/api";
-import type {
-  DossierFundamentalsSnapshot,
-  DossierVersion,
-} from "@/lib/types";
+import type { DossierFundamentalsSnapshot, DossierVersion } from "@/lib/types";
 
 const DOSSIER_BLOCKS = [
   { key: "panorama_mercado", label: "Panorama de mercado" },
@@ -34,7 +31,9 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
+    null,
+  );
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   const loadDossier = useCallback(async (ticker: string) => {
@@ -106,8 +105,8 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
           <h2 className="flex items-center gap-2 font-sans text-sm font-semibold text-zinc-100">
             <TickerLogo symbol={symbol} logoUrl={logoUrl} size="sm" />
             <span>
-              Dossier ·{" "}
-              <span className="font-mono text-amber-400">${symbol}</span>
+              Dossier ·{""}
+              <span className="font-mono text-zinc-300">${symbol}</span>
             </span>
           </h2>
           <p className="font-mono text-[10px] text-zinc-500">
@@ -120,12 +119,12 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
               value={selectedVersionId ?? ""}
               onChange={(e) => setSelectedVersionId(e.target.value)}
               disabled={loading || refreshing}
-              className="max-w-[160px] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+              className="max-w-[160px] border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[10px] text-zinc-300 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
               aria-label="Versión del Dossier"
             >
               {dossierVersions.map((version, index) => (
                 <option key={version.id} value={version.id}>
-                  {index === 0 ? "Actual · " : ""}
+                  {index === 0 ? "Actual ·" : ""}
                   {new Date(version.created_at).toLocaleString("es-AR", {
                     day: "2-digit",
                     month: "2-digit",
@@ -140,7 +139,7 @@ export default function DossierPanel({ symbol }: DossierPanelProps) {
             type="button"
             onClick={() => void handleRefresh()}
             disabled={loading || refreshing}
-            className="rounded border border-amber-800/60 bg-amber-950/30 px-3 py-1 font-mono text-[10px] text-amber-400 transition-colors hover:border-amber-600 hover:text-amber-300 disabled:opacity-50"
+            className="border border-zinc-600 bg-zinc-900 px-3 py-1 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-50"
           >
             {refreshing ? "Generando…" : "Refresh"}
           </button>
@@ -185,10 +184,11 @@ function DossierContent({
     return (
       <div className="space-y-2">
         <p className="font-mono text-xs text-zinc-500">
-          Sin Dossier para ${symbol}. Usá Refresh para generar el análisis integral.
+          Sin Dossier para ${symbol}. Usá Refresh para generar el análisis
+          integral.
         </p>
         {refreshing && (
-          <p className="font-mono text-xs text-amber-500">Generando…</p>
+          <p className="font-mono text-xs text-zinc-400">Generando…</p>
         )}
       </div>
     );
@@ -213,9 +213,9 @@ function DossierContent({
         return (
           <section
             key={key}
-            className="space-y-2 rounded border border-zinc-800/80 bg-zinc-950/40 p-4"
+            className="space-y-2 border border-zinc-800/80 bg-zinc-950/40 p-4"
           >
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-amber-500">
+            <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400">
               {label}
             </h3>
             {key === "sentimiento" && sentimentStats && (
@@ -237,7 +237,8 @@ function DossierContent({
 
 function formatMcap(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "no disponible";
-  if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (value >= 1_000_000_000_000)
+    return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -275,27 +276,26 @@ function FundamentalsSnapshotPanel({
   ];
 
   return (
-    <div className="mb-2 space-y-2 rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5">
+    <div className="mb-2 space-y-2 border border-zinc-800 bg-zinc-950 px-2 py-1.5">
       <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
         <span>snapshot</span>
         <span className="text-zinc-600">·</span>
-        <span className="text-emerald-500/80">{snapshot.source || "none"}</span>
+        <span className="text-zinc-400">{snapshot.source || "none"}</span>
         {snapshot.asset_kind === "crypto" && (
           <>
             <span className="text-zinc-600">·</span>
-            <span className="text-amber-500/80">crypto</span>
+            <span className="text-zinc-500">crypto</span>
           </>
         )}
       </div>
       <div className="flex flex-wrap gap-2">
         {rows.map(({ label, value }) => (
           <span key={label} className="font-mono text-[10px] text-zinc-400">
-            <span className="text-zinc-500">{label}:</span>{" "}
+            <span className="text-zinc-500">{label}:</span>
+            {""}
             <span
               className={
-                value === "no disponible"
-                  ? "text-zinc-600"
-                  : "text-emerald-400/90"
+                value === "no disponible" ? "text-zinc-600" : "text-zinc-200"
               }
             >
               {value}
@@ -312,11 +312,7 @@ function FundamentalsSnapshotPanel({
   );
 }
 
-function SentimentStatsPanel({
-  stats,
-}: {
-  stats: Record<string, unknown>;
-}) {
+function SentimentStatsPanel({ stats }: { stats: Record<string, unknown> }) {
   const hours = stats.hours;
   const totalSignals = stats.total_signals;
   const withSentiment = stats.with_sentiment;
@@ -325,18 +321,24 @@ function SentimentStatsPanel({
   const bySourceType = stats.by_source_type;
 
   const sentimentEntries =
-    bySentiment && typeof bySentiment === "object" && !Array.isArray(bySentiment)
+    bySentiment &&
+    typeof bySentiment === "object" &&
+    !Array.isArray(bySentiment)
       ? Object.entries(bySentiment as Record<string, number>)
       : [];
 
   const sourceEntries =
-    bySourceType && typeof bySourceType === "object" && !Array.isArray(bySourceType)
+    bySourceType &&
+    typeof bySourceType === "object" &&
+    !Array.isArray(bySourceType)
       ? Object.entries(bySourceType as Record<string, number>)
       : [];
 
   const scalars = [
     hours != null ? { label: "ventana", value: `${hours}h` } : null,
-    totalSignals != null ? { label: "signals", value: String(totalSignals) } : null,
+    totalSignals != null
+      ? { label: "signals", value: String(totalSignals) }
+      : null,
     withSentiment != null
       ? { label: "con sentimiento", value: String(withSentiment) }
       : null,
@@ -354,13 +356,14 @@ function SentimentStatsPanel({
   }
 
   return (
-    <div className="mb-2 space-y-2 rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5">
+    <div className="mb-2 space-y-2 border border-zinc-800 bg-zinc-950 px-2 py-1.5">
       {scalars.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {scalars.map(({ label, value }) => (
             <span key={label} className="font-mono text-[10px] text-zinc-400">
-              <span className="text-zinc-500">{label}:</span>{" "}
-              <span className="text-emerald-400/90">{value}</span>
+              <span className="text-zinc-500">{label}:</span>
+              {""}
+              <span className="text-zinc-200">{value}</span>
             </span>
           ))}
         </div>
@@ -375,10 +378,11 @@ function SentimentStatsPanel({
             {sentimentEntries.map(([label, count]) => (
               <span
                 key={label}
-                className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300"
+                className="border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300"
               >
-                <span className="text-zinc-500">{label}</span>{" "}
-                <span className="text-emerald-400/90">{count}</span>
+                <span className="text-zinc-500">{label}</span>
+                {""}
+                <span className="text-zinc-200">{count}</span>
               </span>
             ))}
           </div>
@@ -394,10 +398,11 @@ function SentimentStatsPanel({
             {sourceEntries.map(([source, count]) => (
               <span
                 key={source}
-                className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300"
+                className="border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300"
               >
-                <span className="text-zinc-500">{source}</span>{" "}
-                <span className="text-emerald-400/90">{count}</span>
+                <span className="text-zinc-500">{source}</span>
+                {""}
+                <span className="text-zinc-200">{count}</span>
               </span>
             ))}
           </div>

@@ -1,4 +1,4 @@
-# X Scraper Terminal
+# MyTerm
 
 Terminal de inteligencia de noticias financieras y globales, alimentada por contenido scrapeado de X. Incluye un chatbot RAG para consultas por ticker, resúmenes y análisis sobre ese corpus.
 
@@ -184,8 +184,12 @@ _Avoid_: Auth, login, security
 Datos por usuario del Operator, distintos del Corpus compartido.
 
 **Operator Settings**:
-Preferencias persistidas en Supabase (`operator_settings`): watchlist personalizada, filtros de Signal Feed, layout. Reemplaza progresivamente vars de `.env` para el Operator.
+Preferencias persistidas en Supabase (`operator_settings` JSONB): filtros del Signal Feed (p. ej. Mis tickers), timezone/lookback del Daily PnL del Paper Bot, y prefs del Ticker Chart. El Ticker Watch tiene tabla propia (`ticker_watch`), no va en este JSONB. Reemplaza progresivamente `localStorage` y vars de `.env` para el Operator. Feature **F55**.
 _Avoid_: User profile, preferences table, config
+
+**Provenance**:
+Metadato de origen de un hecho que **no** es un Signal del Corpus: Market Data, FX Quote, fundamentals, stats determinísticas o lecturas de Chart Plan ancladas a precios. Incluye fuente, as_of/delay y lagunas (N/A). Distinto de **Citation** (que siempre apunta a un Signal). Feature **F32**.
+_Avoid_: Attribution tip, source footer tip, citation tip (como sinónimo de Provenance)
 
 **Chat Session**:
 Conversación del Research Chat guardada en Supabase (`chat_sessions` + `chat_messages`), con Citations y artifacts opcionales (p. ej. Chart card `price_chart`) serializados por mensaje assistant.
@@ -242,7 +246,7 @@ Síntesis multi-capa que alimenta un Dossier o una respuesta del Research Chat: 
 _Avoid_: Deep dive, comprehensive report, full analysis
 
 **Paper Bot**:
-Proceso always-on (Railway `xscraper-trader`) que opera un universo permitido (MVP: BTC y ETH) bajo una **Strategy** + **Risk Policy** vía un **Execution Venue**. Abre/cierra long y short, gestiona TP/SL en background y expone config/estado al Operator en `/bot`. Modo paper ahora; puerto listo para Hyperliquid (stub fail-closed). No es consejo de inversión; paper fills ≠ fills reales de exchange.
+Proceso always-on (Railway `xscraper-trader`) que opera un universo permitido (MVP: BTC y ETH) bajo una **Strategy** + **Risk Policy** vía un **Execution Venue**. Abre/cierra long y short, gestiona TP/SL en background y expone config/estado al Operator en `/bot` (posiciones open, **trade history** de Positions closed con realized PnL, fills/events, equity curve y **Daily PnL** agrupado por día calendario con timezone + lookback configurables en el cliente). Modo paper ahora; puerto listo para Hyperliquid (stub fail-closed). No es consejo de inversión; paper fills ≠ fills reales de exchange.
 _Avoid_: algo trading tip, autotrader tip, signal tip bot, on-chain bot
 
 **Strategy**:
@@ -250,7 +254,7 @@ Reglas determinísticas de entrada/salida del Paper Bot. MVP: **Donchian Breakou
 _Avoid_: trading tip engine, AI entry model, signal tip generator
 
 **Risk Policy**:
-Límites y defaults de tamaño (`size_usd` base × **leverage** = notional efectivo), take-profit y stop-loss del Paper Bot. MVP: estáticos en **Bot Config** (Operator). `qty = (size_usd × leverage) / mark`. Más adelante puede incorporar sentimiento del Corpus u otras variables sin cambiar el puerto del Execution Venue. Caps: `max_positions` ∈ [1, 10]; una sola Position open por símbolo.
+Límites y defaults de tamaño (`size_usd` base × **leverage** = notional efectivo), take-profit y stop-loss del Paper Bot. MVP: estáticos en **Bot Config** (Operator). `qty = (size_usd × leverage) / mark`. Más adelante puede incorporar sentimiento del Corpus u otras variables sin cambiar el puerto del Execution Venue. Caps: `max_positions` ∈ [1, 10]. Varias Positions open del mismo símbolo y lado (pyramid) hasta el tope; lado opuesto en el mismo símbolo queda bloqueado mientras haya open.
 _Avoid_: money management tip, Kelly tip, portfolio allocator
 
 **Trade Signal**:

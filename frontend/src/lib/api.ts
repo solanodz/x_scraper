@@ -11,6 +11,8 @@ import type {
   ChatArtifact,
   ChatCitation,
   DossierVersion,
+  OperatorSettings,
+  OperatorSettingsResponse,
   PriceChartArtifact,
   PriceChartCandle,
   Quote,
@@ -230,10 +232,7 @@ export async function addTickerWatch(
   const cleaned = symbol.replace(/^\$/, "").trim();
   const res = await fetch(`${API_URL}/watch`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ symbol: cleaned }),
   });
   if (!res.ok) {
@@ -267,10 +266,7 @@ export async function updateTickerWatchThesis(
     `${API_URL}/watch/${encodeURIComponent(normalized)}`,
     {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...(await authHeaders()),
-      },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(payload),
     },
   );
@@ -394,7 +390,9 @@ export async function fetchPriceCandles(
 
   // Fallback: API local sin redeploy o sin el endpoint nuevo
   if (backendRes.status === 404 || backendRes.status === 401) {
-    const localRes = await fetch(`/api/candles?${params}`, { cache: "no-store" });
+    const localRes = await fetch(`/api/candles?${params}`, {
+      cache: "no-store",
+    });
     if (localRes.ok) {
       return localRes.json();
     }
@@ -427,10 +425,7 @@ export async function createChatSession(
 ): Promise<import("./types").ChatSessionSummary> {
   const res = await fetch(`${API_URL}/chat/sessions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(title ? { title } : {}),
   });
   if (!res.ok) {
@@ -488,9 +483,9 @@ async function readSseStream(
         if (line.startsWith(":")) {
           continue;
         }
-        if (line.startsWith("event: ")) {
+        if (line.startsWith("event:")) {
           currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
+        } else if (line.startsWith("data:")) {
           const raw = line.slice(6);
           if (currentEvent === "citations") {
             callbacks.onCitations(JSON.parse(raw) as ChatCitation[]);
@@ -514,7 +509,9 @@ async function readSseStream(
             currentEvent = "";
           } else if (currentEvent === "meta") {
             try {
-              const meta = JSON.parse(raw) as import("./types").ResearchAnswerMeta;
+              const meta = JSON.parse(
+                raw,
+              ) as import("./types").ResearchAnswerMeta;
               if (meta?.path) callbacks.onMeta?.(meta);
             } catch {
               // ignore malformed meta
@@ -545,10 +542,7 @@ export async function streamChat(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
       query,
       session_id: sessionId ?? undefined,
@@ -570,10 +564,7 @@ export async function streamBriefing(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/chat/briefing`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
       session_id: sessionId ?? undefined,
     }),
@@ -591,11 +582,16 @@ function normalizeDossierSymbol(symbol: string): string {
   return symbol.replace(/^\$/, "").trim().toUpperCase();
 }
 
-export async function fetchDossier(symbol: string): Promise<DossierVersion | null> {
+export async function fetchDossier(
+  symbol: string,
+): Promise<DossierVersion | null> {
   const normalized = normalizeDossierSymbol(symbol);
-  const res = await fetch(`${API_URL}/dossier/${encodeURIComponent(normalized)}`, {
-    headers: await authHeaders(),
-  });
+  const res = await fetch(
+    `${API_URL}/dossier/${encodeURIComponent(normalized)}`,
+    {
+      headers: await authHeaders(),
+    },
+  );
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch dossier: ${res.status}`);
@@ -684,6 +680,30 @@ export type ChartPlanAnalyzeBody = {
   chart_view?: Record<string, unknown> | null;
 };
 
+export async function fetchOperatorSettings(): Promise<OperatorSettingsResponse> {
+  const res = await fetch(`${API_URL}/operator/settings`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch operator settings: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function patchOperatorSettings(
+  partial: Partial<OperatorSettings>,
+): Promise<OperatorSettingsResponse> {
+  const res = await fetch(`${API_URL}/operator/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify(partial),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update operator settings: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function getBotConfig(): Promise<BotConfig> {
   const res = await fetch(`${API_URL}/bot/config`, {
     headers: await authHeaders(),
@@ -699,10 +719,7 @@ export async function patchBotConfig(
 ): Promise<BotConfig> {
   const res = await fetch(`${API_URL}/bot/config`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await authHeaders()),
-    },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(partial),
   });
   if (!res.ok) {
@@ -713,9 +730,11 @@ export async function patchBotConfig(
 
 export async function listBotPositions(
   status?: "open" | "closed",
+  opts?: { limit?: number },
 ): Promise<BotPosition[]> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
   const query = params.toString();
   const res = await fetch(
     `${API_URL}/bot/positions${query ? `?${query}` : ""}`,
@@ -728,18 +747,26 @@ export async function listBotPositions(
 }
 
 export async function closeBotPosition(id: string): Promise<BotPosition> {
-  const res = await fetch(`${API_URL}/bot/positions/${encodeURIComponent(id)}/close`, {
-    method: "POST",
-    headers: await authHeaders(),
-  });
+  const res = await fetch(
+    `${API_URL}/bot/positions/${encodeURIComponent(id)}/close`,
+    {
+      method: "POST",
+      headers: await authHeaders(),
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to close bot position: ${res.status}`);
   }
   return res.json();
 }
 
-export async function listBotFills(): Promise<BotFill[]> {
-  const res = await fetch(`${API_URL}/bot/fills`, {
+export async function listBotFills(opts?: {
+  limit?: number;
+}): Promise<BotFill[]> {
+  const params = new URLSearchParams();
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const query = params.toString();
+  const res = await fetch(`${API_URL}/bot/fills${query ? `?${query}` : ""}`, {
     headers: await authHeaders(),
   });
   if (!res.ok) {
@@ -777,10 +804,7 @@ export async function streamChartPlanAnalyze(
       `${API_URL}/chart-plan/${encodeURIComponent(normalized)}/analyze`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...headers,
-        },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(payload),
         signal,
         async onopen(res) {

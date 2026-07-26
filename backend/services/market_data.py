@@ -514,34 +514,37 @@ def fetch_price_history(
     period: str = "1mo",
     *,
     include_candles: bool = False,
-    max_candles: int = 90,
+    max_candles: int = 260,
 ) -> dict[str, Any]:
     """Historial de precios vía yfinance (OHLC diario).
 
     Con include_candles=True incluye velas (cap max_candles) para Chart cards.
+    start/end/change_percent se calculan sobre la misma serie que se grafica
+    (no sobre el período completo si hubo truncado).
     """
     candles = _fetch_price_candles(symbol, period, interval="1d")
     if candles.get("error"):
         return candles
 
     all_candles = list(candles["candles"])
-    closes = [float(c["close"]) for c in all_candles]
-    if not closes:
+    if not all_candles:
         return {
             "error": "sin datos históricos",
             "symbol": candles.get("symbol"),
             "period": candles.get("period"),
         }
 
+    cap = max(1, int(max_candles))
+    series = all_candles[-cap:] if include_candles else all_candles
+    closes = [float(c["close"]) for c in series]
+    highs = [float(c["high"]) for c in series]
+    lows = [float(c["low"]) for c in series]
+
     start_price = closes[0]
     end_price = closes[-1]
     change_percent = (
         (end_price - start_price) / start_price * 100 if start_price else 0.0
     )
-    highs = [float(c["high"]) for c in all_candles]
-    lows = [float(c["low"]) for c in all_candles]
-    cap = max(1, min(int(max_candles), 90))
-    chart_candles = all_candles[-cap:] if include_candles else None
 
     payload: dict[str, Any] = {
         "symbol": candles["symbol"],
@@ -554,9 +557,12 @@ def fetch_price_history(
         "low": round(min(lows), 2),
         "data_points": len(closes),
     }
-    if chart_candles is not None:
-        payload["candles"] = chart_candles
-        payload["closes"] = [float(c["close"]) for c in chart_candles]
+    if include_candles:
+        payload["candles"] = series
+        payload["closes"] = closes
+        if len(all_candles) > len(series):
+            payload["candles_truncated"] = True
+            payload["period_data_points"] = len(all_candles)
     return payload
 
 

@@ -175,7 +175,9 @@ def run_tick(
         status="open",
         limit=50,
     )
-    open_symbols = {p["symbol"] for p in open_after}
+    open_sides: dict[str, set[str]] = {}
+    for p in open_after:
+        open_sides.setdefault(str(p["symbol"]).upper(), set()).add(str(p["side"]))
     last_closed: dict[str, datetime | None] = {}
     for sym in symbols:
         last_closed[sym] = bot_repo.last_closed_at_for_symbol(
@@ -202,7 +204,7 @@ def run_tick(
         armed=True,
         max_positions=int(config["max_positions"]),
         open_count=len(open_after),
-        open_symbols=open_symbols,
+        open_sides=open_sides,
         cooldown_seconds=int(config.get("cooldown_seconds") or 0),
         last_closed_at=last_closed,
         seen_keys=seen,
@@ -218,9 +220,8 @@ def run_tick(
                 "reason": reason,
             }
         )
-        # Holding a position re-emits the same Donchian breakout every tick —
-        # logging symbol_already_open floods bot_events (100s/day) without value.
-        if reason == "symbol_already_open":
+        # Opposite-side while holding re-emits every tick — don't flood Activity.
+        if reason == "opposite_side_open":
             return
         kind = "skip_duplicate" if reason == "duplicate_bar" else "skip"
         bot_repo.insert_event(

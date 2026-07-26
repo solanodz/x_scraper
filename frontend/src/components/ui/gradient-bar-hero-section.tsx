@@ -85,13 +85,7 @@ const GradientBars = () => {
   );
 };
 
-function Navbar({
-  ctaHref,
-  ctaLabel,
-}: {
-  ctaHref: string;
-  ctaLabel: string;
-}) {
+function Navbar({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -102,7 +96,7 @@ function Navbar({
             ▮
           </span>
           <span className="font-sans text-sm font-semibold tracking-tight text-zinc-100">
-            X Scraper Terminal
+            MyTerm
           </span>
         </Link>
 
@@ -175,9 +169,9 @@ export function GradientBarHeroSection({
 
       <div className="relative z-10 mx-auto max-w-7xl pt-20 text-center sm:pt-28">
         <h1 className="mx-auto max-w-3xl animate-[landing-fadeIn_0.7s_ease-out_both] font-sans text-4xl font-semibold leading-[1.08] tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
-          Inteligencia financiera
+          MyTerm
           <span className="block pb-1 font-normal italic leading-[1.15] text-zinc-400">
-            desde el Corpus de X.
+            Inteligencia financiera desde el Corpus de X.
           </span>
         </h1>
 

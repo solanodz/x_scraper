@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import ChatMarkdown, { isBriefingAssistantMessage } from "@/components/ChatMarkdown";
+import ChatMarkdown, {
+  isBriefingAssistantMessage,
+} from "@/components/ChatMarkdown";
 import ChatSessionSidebar from "@/components/ChatSessionSidebar";
 import PriceChartCard from "@/components/chat/PriceChartCard";
 import ResearchStepLoader from "@/components/ResearchStepLoader";
@@ -31,16 +33,16 @@ function ResearchPathChips({ meta }: { meta: ResearchAnswerMeta }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span
-        className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
+        className={`border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
           isFast
-            ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-400"
-            : "border-sky-800/50 bg-sky-950/30 text-sky-400"
+            ? "border-zinc-500 bg-zinc-800 text-zinc-200"
+            : "border-zinc-700 bg-zinc-900 text-zinc-400"
         }`}
       >
         {isFast ? "Rápido" : "Research"}
       </span>
       {meta.summary_only && (
-        <span className="rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400">
+        <span className="border border-amber-800/50 bg-amber-950/20 px-1.5 py-0.5 font-mono text-[9px] text-amber-500/90">
           Solo summary
         </span>
       )}
@@ -90,9 +92,7 @@ function recordsToMessages(records: ChatMessageRecord[]): ChatMessage[] {
   }));
 }
 
-export default function ResearchChat({
-  onCitationClick,
-}: ResearchChatProps) {
+export default function ResearchChat({ onCitationClick }: ResearchChatProps) {
   const router = useRouter();
   const handleDossierClick = useCallback(
     (symbol: string) => {
@@ -162,7 +162,7 @@ export default function ResearchChat({
         const initialId =
           stored && list.some((s) => s.id === stored)
             ? stored
-            : list[0]?.id ?? null;
+            : (list[0]?.id ?? null);
 
         if (cancelled) return;
 
@@ -175,7 +175,9 @@ export default function ResearchChat({
         }
       } catch {
         if (!cancelled) {
-          setHistoryError("Historial no disponible (¿migración chat aplicada?)");
+          setHistoryError(
+            "Historial no disponible (¿migración chat aplicada?)",
+          );
           setMessages([]);
         }
       } finally {
@@ -253,7 +255,9 @@ export default function ResearchChat({
           {
             onSession: (nextSessionId) => {
               persistActiveSession(nextSessionId);
-              refreshSessions().then(setSessions).catch(() => undefined);
+              refreshSessions()
+                .then(setSessions)
+                .catch(() => undefined);
             },
             onStep: (step: ResearchStep) => {
               setMessages((prev) => {
@@ -378,7 +382,9 @@ export default function ResearchChat({
         {
           onSession: (nextSessionId) => {
             persistActiveSession(nextSessionId);
-            refreshSessions().then(setSessions).catch(() => undefined);
+            refreshSessions()
+              .then(setSessions)
+              .catch(() => undefined);
           },
           onStep: (step: ResearchStep) => {
             setMessages((prev) => {
@@ -496,7 +502,6 @@ export default function ResearchChat({
     void runBriefing();
   }
 
-
   return (
     <section className="flex h-full min-h-0 flex-row bg-zinc-900">
       <ChatSessionSidebar
@@ -513,7 +518,7 @@ export default function ResearchChat({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center border-b border-zinc-800 px-4 py-2">
-          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
+          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-zinc-400">
             Research Chat
           </h2>
         </div>
@@ -526,15 +531,15 @@ export default function ResearchChat({
               </p>
             )}
             {historyError && (
-              <p className="text-center font-mono text-xs text-amber-600">
+              <p className="text-center font-mono text-xs text-zinc-400">
                 {historyError}
               </p>
             )}
             {!loading && messages.length === 0 && !historyError && (
               <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
                 <p className="max-w-sm font-mono text-xs leading-relaxed text-zinc-500">
-                  Preguntá por tickers, precios, noticias o análisis cruzado — ej.
-                  &quot;¿cómo está NVDA y qué dicen en X?&quot;
+                  Preguntá por tickers, precios, noticias o análisis cruzado —
+                  ej. &quot;¿cómo está NVDA y qué dicen en X?&quot;
                 </p>
               </div>
             )}
@@ -542,7 +547,7 @@ export default function ResearchChat({
               msg.role === "user" ? (
                 <div
                   key={i}
-                  className="ml-auto max-w-[85%] rounded-2xl bg-zinc-800 px-4 py-2.5"
+                  className="ml-auto max-w-[85%] bg-zinc-800 px-4 py-2.5"
                 >
                   <p className="font-mono text-xs leading-relaxed text-zinc-100">
                     {msg.content}
@@ -551,14 +556,9 @@ export default function ResearchChat({
               ) : (
                 <div key={i} className="mr-auto w-full max-w-[85%] space-y-2">
                   {msg.meta && <ResearchPathChips meta={msg.meta} />}
-                  {streaming &&
-                    i === messages.length - 1 &&
-                    !msg.content && (
-                      <ResearchStepLoader
-                        steps={msg.steps ?? []}
-                        active
-                      />
-                    )}
+                  {streaming && i === messages.length - 1 && !msg.content && (
+                    <ResearchStepLoader steps={msg.steps ?? []} active />
+                  )}
                   {(msg.content ||
                     !(streaming && i === messages.length - 1)) && (
                     <ChatMarkdown
@@ -604,12 +604,12 @@ export default function ResearchChat({
               onChange={(e) => setInput(e.target.value)}
               placeholder="Preguntá por tickers, precios, noticias…"
               disabled={streaming}
-              className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-amber-600 focus:outline-none disabled:opacity-50"
+              className="min-w-0 flex-1 border border-zinc-700 bg-zinc-950 px-4 py-2.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={streaming || !input.trim()}
-              className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 font-sans text-xs text-zinc-300 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
+              className="border border-zinc-700 bg-zinc-800 px-4 py-2.5 font-sans text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-300 disabled:opacity-50"
             >
               {streaming ? "…" : "Send"}
             </button>

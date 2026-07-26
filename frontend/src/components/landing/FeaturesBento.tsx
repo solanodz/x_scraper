@@ -3,15 +3,78 @@
 import { useEffect, useRef, useState } from "react";
 
 const MOCK_SIGNALS_MINI = [
-  { ticker: "$NVDA", author: "@unusual_whales", text: "Call volume surging 3x ahead of earnings", badge: "x", time: "4m", bull: true },
-  { ticker: "$AAPL", author: "@markgurman", text: "Apple in talks with OpenAI for iOS 20", badge: "x", time: "11m", bull: true },
-  { ticker: "$TSLA", author: "Reuters", text: "Q2 deliveries miss consensus by 8%", badge: "news", time: "18m", bull: false },
-  { ticker: "$GLD", author: "@goldtelegraph_", text: "Gold ATH as central banks buy reserves", badge: "x", time: "25m", bull: true },
-  { ticker: "$META", author: "@alexheath", text: "Cutting 5% lowest performers, AI pivot", badge: "x", time: "32m", bull: false },
-  { ticker: "$AMZN", author: "@WSJ", text: "AWS revenue beats estimates by 12%", badge: "news", time: "41m", bull: true },
-  { ticker: "$MSFT", author: "@satloopy", text: "Azure AI services up 47% YoY", badge: "x", time: "48m", bull: true },
-  { ticker: "$AMD", author: "@unusual_whales", text: "Put volume spiking ahead of guidance", badge: "x", time: "55m", bull: false },
-  { ticker: "$GOOGL", author: "@business", text: "Gemini 3 launch boosts ad revenue outlook", badge: "news", time: "1h", bull: true },
+  {
+    ticker: "$NVDA",
+    author: "@unusual_whales",
+    text: "Call volume surging 3x ahead of earnings",
+    badge: "x",
+    time: "4m",
+    bull: true,
+  },
+  {
+    ticker: "$AAPL",
+    author: "@markgurman",
+    text: "Apple in talks with OpenAI for iOS 20",
+    badge: "x",
+    time: "11m",
+    bull: true,
+  },
+  {
+    ticker: "$TSLA",
+    author: "Reuters",
+    text: "Q2 deliveries miss consensus by 8%",
+    badge: "news",
+    time: "18m",
+    bull: false,
+  },
+  {
+    ticker: "$GLD",
+    author: "@goldtelegraph_",
+    text: "Gold ATH as central banks buy reserves",
+    badge: "x",
+    time: "25m",
+    bull: true,
+  },
+  {
+    ticker: "$META",
+    author: "@alexheath",
+    text: "Cutting 5% lowest performers, AI pivot",
+    badge: "x",
+    time: "32m",
+    bull: false,
+  },
+  {
+    ticker: "$AMZN",
+    author: "@WSJ",
+    text: "AWS revenue beats estimates by 12%",
+    badge: "news",
+    time: "41m",
+    bull: true,
+  },
+  {
+    ticker: "$MSFT",
+    author: "@satloopy",
+    text: "Azure AI services up 47% YoY",
+    badge: "x",
+    time: "48m",
+    bull: true,
+  },
+  {
+    ticker: "$AMD",
+    author: "@unusual_whales",
+    text: "Put volume spiking ahead of guidance",
+    badge: "x",
+    time: "55m",
+    bull: false,
+  },
+  {
+    ticker: "$GOOGL",
+    author: "@business",
+    text: "Gemini 3 launch boosts ad revenue outlook",
+    badge: "news",
+    time: "1h",
+    bull: true,
+  },
 ];
 
 const SUGGESTED_QUERIES = [
@@ -23,17 +86,43 @@ const SUGGESTED_QUERIES = [
 ];
 
 const MOCK_CHAT_TURNS = [
-  { role: "user" as const, text: "¿Qué está diciendo el Corpus de NVDA ahora?" },
-  { role: "ai" as const, paragraphs: [
-    { heading: null, body: "En las últimas 48h hay varios Signals sobre NVDA (noticias + X). Resumen anclado al Corpus — no es un forecast." },
-    { heading: "Narrativa", body: "Aparece volumen de opciones y menciones pre-earnings en cuentas de mercado; el Detail marca Solo summary cuando el artículo no tiene body completo." },
-    { heading: "Mercado", body: "Quote delayed ~15 min: precio y variación % desde Market Data. Sin predicción de target." },
-  ], citations: ["@unusual_whales", "Reuters", "Signal cluster"] },
+  {
+    role: "user" as const,
+    text: "¿Qué está diciendo el Corpus de NVDA ahora?",
+  },
+  {
+    role: "ai" as const,
+    paragraphs: [
+      {
+        heading: null,
+        body: "En las últimas 48h hay varios Signals sobre NVDA (noticias + X). Resumen anclado al Corpus — no es un forecast.",
+      },
+      {
+        heading: "Narrativa",
+        body: "Aparece volumen de opciones y menciones pre-earnings en cuentas de mercado; el Detail marca Solo summary cuando el artículo no tiene body completo.",
+      },
+      {
+        heading: "Mercado",
+        body: "Quote delayed ~15 min: precio y variación % desde Market Data. Sin predicción de target.",
+      },
+    ],
+    citations: ["@unusual_whales", "Reuters", "Signal cluster"],
+  },
   { role: "user" as const, text: "¿Y los riesgos que menciona el Corpus?" },
-  { role: "ai" as const, paragraphs: [
-    { heading: "Lagunas", body: "Si un campo de fundamentals o un artículo es summary-only, el chat lo declara — no inventa PE ni flujo institucional." },
-    { heading: "Contraste", body: "Podés pedir Briefing del Watch o abrir el Dossier para profundidad; el Paper Bot opera aparte en paper." },
-  ], citations: ["Dossier NVDA", "Corpus 7d"] },
+  {
+    role: "ai" as const,
+    paragraphs: [
+      {
+        heading: "Lagunas",
+        body: "Si un campo de fundamentals o un artículo es summary-only, el chat lo declara — no inventa PE ni flujo institucional.",
+      },
+      {
+        heading: "Contraste",
+        body: "Podés pedir Briefing del Watch o abrir el Dossier para profundidad; el Paper Bot opera aparte en paper.",
+      },
+    ],
+    citations: ["Dossier NVDA", "Corpus 7d"],
+  },
 ];
 
 function useInView(threshold = 0.35) {
@@ -258,7 +347,10 @@ function ResearchChatDemo({ active }: { active: boolean }) {
   useEffect(() => {
     const node = scrollerRef.current;
     if (!node || visibleCount === 0) return;
-    node.scrollTo({ top: node.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior: reduced ? "auto" : "smooth",
+    });
   }, [visibleCount, reduced]);
 
   return (
@@ -269,9 +361,14 @@ function ResearchChatDemo({ active }: { active: boolean }) {
       <div className="space-y-4">
         {MOCK_CHAT_TURNS.slice(0, visibleCount).map((turn, ti) =>
           turn.role === "user" ? (
-            <div key={`${ti}-${visibleCount}`} className="landing-chat-bubble flex justify-end">
+            <div
+              key={`${ti}-${visibleCount}`}
+              className="landing-chat-bubble flex justify-end"
+            >
               <div className="max-w-[75%] bg-zinc-800 px-3 py-2">
-                <p className="font-sans text-[11px] text-zinc-200">{turn.text}</p>
+                <p className="font-sans text-[11px] text-zinc-200">
+                  {turn.text}
+                </p>
               </div>
             </div>
           ) : (
@@ -282,7 +379,9 @@ function ResearchChatDemo({ active }: { active: boolean }) {
                   className="mt-2 font-sans text-[11px] leading-relaxed text-zinc-300 first:mt-0"
                 >
                   {p.heading && (
-                    <span className="font-semibold text-zinc-100">{p.heading}: </span>
+                    <span className="font-semibold text-zinc-100">
+                      {p.heading}:{" "}
+                    </span>
                   )}
                   {p.body}
                 </p>
@@ -357,7 +456,10 @@ function mulberry32(seed: number) {
 }
 
 /** Candles [open, high, low, close] 0–100 — random walk con shocks irregulares. */
-function buildMockCandles(count = 78, seed = 0xc4a7): Array<[number, number, number, number]> {
+function buildMockCandles(
+  count = 78,
+  seed = 0xc4a7,
+): Array<[number, number, number, number]> {
   const rand = mulberry32(seed);
   const out: Array<[number, number, number, number]> = [];
   let price = 45 + rand() * 16;
@@ -372,9 +474,17 @@ function buildMockCandles(count = 78, seed = 0xc4a7): Array<[number, number, num
 
     // Mechas cortas la mayoría del tiempo; largas solo a veces.
     const wickUp =
-      rand() < 0.18 ? 1 + rand() * 6 : rand() < 0.55 ? rand() * 1.8 : 0.2 + rand() * 0.8;
+      rand() < 0.18
+        ? 1 + rand() * 6
+        : rand() < 0.55
+          ? rand() * 1.8
+          : 0.2 + rand() * 0.8;
     const wickDown =
-      rand() < 0.18 ? 1 + rand() * 6 : rand() < 0.55 ? rand() * 1.8 : 0.2 + rand() * 0.8;
+      rand() < 0.18
+        ? 1 + rand() * 6
+        : rand() < 0.55
+          ? rand() * 1.8
+          : 0.2 + rand() * 0.8;
     const high = Math.min(98, Math.max(open, close) + wickUp);
     const low = Math.max(2, Math.min(open, close) - wickDown);
 
@@ -466,7 +576,13 @@ function buildOracleSeries(count = 64, seed = 0x0a5c) {
   const values: number[] = [];
   let v = 42 + rand() * 16;
   for (let i = 0; i < count; i++) {
-    v = Math.min(92, Math.max(8, v + (rand() - 0.48) * 9 + (rand() < 0.1 ? (rand() - 0.5) * 18 : 0)));
+    v = Math.min(
+      92,
+      Math.max(
+        8,
+        v + (rand() - 0.48) * 9 + (rand() < 0.1 ? (rand() - 0.5) * 18 : 0),
+      ),
+    );
     values.push(v);
   }
   const signal = values.map((_, i) => {
@@ -541,7 +657,11 @@ function MockOracleOscillator() {
         <defs>
           <linearGradient id="oracleTopFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="rgb(34,197,94)" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="rgb(250,204,14)" stopOpacity="0.18" />
+            <stop
+              offset="100%"
+              stopColor="rgb(250,204,14)"
+              stopOpacity="0.18"
+            />
           </linearGradient>
           <linearGradient id="oracleBotFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="rgb(250,204,14)" stopOpacity="0.18" />
@@ -575,8 +695,14 @@ function MockOracleOscillator() {
           stroke="#3f3f46"
           strokeWidth={0.6}
         />
-        <path d={baselineFillPath(values, w, h, "above")} fill="url(#oracleTopFill)" />
-        <path d={baselineFillPath(values, w, h, "below")} fill="url(#oracleBotFill)" />
+        <path
+          d={baselineFillPath(values, w, h, "above")}
+          fill="url(#oracleTopFill)"
+        />
+        <path
+          d={baselineFillPath(values, w, h, "below")}
+          fill="url(#oracleBotFill)"
+        />
         <polyline
           points={seriesPolyline(values, w, h)}
           fill="none"
@@ -663,13 +789,7 @@ function MockRsiPane() {
           stroke="#ef4444"
           strokeWidth={1.5}
         />
-        <rect
-          x={bearX - 2}
-          y={bearY - 8}
-          width={4}
-          height={4}
-          fill="#ef4444"
-        />
+        <rect x={bearX - 2} y={bearY - 8} width={4} height={4} fill="#ef4444" />
         <text
           x={bearX + 5}
           y={bearY - 4}
@@ -751,8 +871,8 @@ export default function FeaturesBento() {
             <div className="p-6 pb-0 sm:p-8 sm:pb-0">
               <p className="font-mono text-sm text-zinc-300">Chart Plan</p>
               <p className="mt-2 max-w-md font-sans text-sm leading-relaxed text-zinc-400">
-                Lecturas de mercado Operator-first con datos del Corpus.
-                Sugiere niveles y escenarios, vos mantenés el control.
+                Lecturas de mercado Operator-first con datos del Corpus. Sugiere
+                niveles y escenarios, vos mantenés el control.
               </p>
             </div>
             <div className="mt-4 px-3 pb-3 sm:px-5 sm:pb-5">
@@ -777,7 +897,9 @@ export default function FeaturesBento() {
             className="flex h-[420px] flex-col overflow-hidden border border-zinc-800 bg-zinc-900/50 lg:col-span-2"
           >
             <div className="shrink-0 p-6 pb-4 sm:p-8 sm:pb-4">
-              <p className="font-mono text-sm text-zinc-300">Queries sugeridas</p>
+              <p className="font-mono text-sm text-zinc-300">
+                Queries sugeridas
+              </p>
               <p className="mt-2 font-sans text-sm leading-relaxed text-zinc-400">
                 Preguntas típicas al Corpus (precios, Signals, contraste) — sin
                 templates de forecast inventado.

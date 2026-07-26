@@ -65,8 +65,26 @@ export const CHART_PRESETS: ChartPreset[] = [
   { id: "5Y", label: "5Y", interval: "1wk", period: "5y" },
 ];
 
-export const CHART_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "1d", "1wk"] as const;
-export const CHART_PERIODS = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"] as const;
+export const CHART_INTERVALS = [
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "1d",
+  "1wk",
+] as const;
+export const CHART_PERIODS = [
+  "1d",
+  "5d",
+  "1mo",
+  "3mo",
+  "6mo",
+  "1y",
+  "2y",
+  "5y",
+  "max",
+] as const;
 
 export const SMA_LENGTH_MIN = 5;
 export const SMA_LENGTH_MAX = 200;
@@ -95,7 +113,11 @@ export function clampOscillatorPeriod(period: number): number {
 }
 
 export function clampOracleSignalPeriod(period: number): number {
-  return clampLength(period, ORACLE_SIGNAL_PERIOD_MIN, ORACLE_SIGNAL_PERIOD_MAX);
+  return clampLength(
+    period,
+    ORACLE_SIGNAL_PERIOD_MIN,
+    ORACLE_SIGNAL_PERIOD_MAX,
+  );
 }
 
 /** Resumen corto para el chip del desplegable Indicators. */
@@ -108,7 +130,7 @@ export function indicatorsSummary(prefs: ChartViewConfig): string {
   if (prefs.volume) parts.push("Vol");
   if (prefs.oscillator.enabled) parts.push(`RSI${prefs.oscillator.period}`);
   if (prefs.oracle.enabled) parts.push(`Oracle${prefs.oracle.period}`);
-  return parts.length > 0 ? parts.join(" · ") : "None";
+  return parts.length > 0 ? parts.join(" ·") : "None";
 }
 
 export const DEFAULT_TICKER_CHART_PREFS: TickerChartPrefs = {
@@ -133,8 +155,13 @@ export function presetById(id: ChartPresetId): ChartPreset {
   return CHART_PRESETS.find((p) => p.id === id) ?? CHART_PRESETS[3];
 }
 
-export function matchPresetId(interval: string, period: string): ChartPresetId | null {
-  const hit = CHART_PRESETS.find((p) => p.interval === interval && p.period === period);
+export function matchPresetId(
+  interval: string,
+  period: string,
+): ChartPresetId | null {
+  const hit = CHART_PRESETS.find(
+    (p) => p.interval === interval && p.period === period,
+  );
   return hit?.id ?? null;
 }
 
@@ -158,22 +185,33 @@ export function normalizeTickerChartPrefs(
   const base = DEFAULT_TICKER_CHART_PREFS;
   const smaALength = clampSmaLength(raw?.smaA?.length ?? base.smaA.length);
   const smaBLength = clampSmaLength(raw?.smaB?.length ?? base.smaB.length);
-  const donchianPeriod = clampDonchianPeriod(raw?.donchian?.period ?? base.donchian.period);
+  const donchianPeriod = clampDonchianPeriod(
+    raw?.donchian?.period ?? base.donchian.period,
+  );
   const oscillatorPeriod = clampOscillatorPeriod(
     raw?.oscillator?.period ?? base.oscillator.period,
   );
-  const oraclePeriod = clampOscillatorPeriod(raw?.oracle?.period ?? base.oracle.period);
+  const oraclePeriod = clampOscillatorPeriod(
+    raw?.oracle?.period ?? base.oracle.period,
+  );
   const oracleSignalPeriod = clampOracleSignalPeriod(
     raw?.oracle?.signalPeriod ?? base.oracle.signalPeriod,
   );
 
-  const interval = typeof raw?.interval === "string" && raw.interval ? raw.interval : base.interval;
-  const period = typeof raw?.period === "string" && raw.period ? raw.period : base.period;
+  const interval =
+    typeof raw?.interval === "string" && raw.interval
+      ? raw.interval
+      : base.interval;
+  const period =
+    typeof raw?.period === "string" && raw.period ? raw.period : base.period;
 
   let presetId: ChartPresetId | null | undefined = raw?.presetId;
   if (presetId === undefined) {
     presetId = matchPresetId(interval, period);
-  } else if (presetId != null && !CHART_PRESETS.some((p) => p.id === presetId)) {
+  } else if (
+    presetId != null &&
+    !CHART_PRESETS.some((p) => p.id === presetId)
+  ) {
     presetId = matchPresetId(interval, period);
   }
 
@@ -207,7 +245,10 @@ export function normalizeTickerChartPrefs(
   };
 }
 
-export function applyPreset(id: ChartPresetId, current?: Partial<TickerChartPrefs>): TickerChartPrefs {
+export function applyPreset(
+  id: ChartPresetId,
+  current?: Partial<TickerChartPrefs>,
+): TickerChartPrefs {
   const preset = presetById(id);
   return normalizeTickerChartPrefs({
     ...DEFAULT_TICKER_CHART_PREFS,
@@ -223,17 +264,56 @@ export function loadTickerChartPrefs(): TickerChartPrefs {
   try {
     const raw = window.localStorage.getItem(TICKER_CHART_PREFS_KEY);
     if (!raw) return { ...DEFAULT_TICKER_CHART_PREFS };
-    return normalizeTickerChartPrefs(JSON.parse(raw) as Partial<TickerChartPrefs>);
+    return normalizeTickerChartPrefs(
+      JSON.parse(raw) as Partial<TickerChartPrefs>,
+    );
   } catch {
     return { ...DEFAULT_TICKER_CHART_PREFS };
   }
 }
 
-export function saveTickerChartPrefs(prefs: TickerChartPrefs): void {
+/** Soft-sync: lee Operator Settings y actualiza cache local si hay prefs. */
+export async function hydrateTickerChartPrefsFromServer(): Promise<TickerChartPrefs> {
+  const local = loadTickerChartPrefs();
+  try {
+    const { fetchOperatorSettings } = await import("@/lib/api");
+    const res = await fetchOperatorSettings();
+    const remote = res.settings.ticker_chart;
+    if (!remote || typeof remote !== "object" || Object.keys(remote).length === 0) {
+      return local;
+    }
+    const merged = normalizeTickerChartPrefs({
+      ...local,
+      ...(remote as Partial<TickerChartPrefs>),
+    });
+    saveTickerChartPrefs(merged, { syncRemote: false });
+    return merged;
+  } catch {
+    return local;
+  }
+}
+
+export function saveTickerChartPrefs(
+  prefs: TickerChartPrefs,
+  opts?: { syncRemote?: boolean },
+): void {
   if (typeof window === "undefined") return;
   try {
     const normalized = normalizeTickerChartPrefs(prefs);
-    window.localStorage.setItem(TICKER_CHART_PREFS_KEY, JSON.stringify(normalized));
+    window.localStorage.setItem(
+      TICKER_CHART_PREFS_KEY,
+      JSON.stringify(normalized),
+    );
+    if (opts?.syncRemote === false) return;
+    void import("@/lib/api")
+      .then(({ patchOperatorSettings }) =>
+        patchOperatorSettings({
+          ticker_chart: normalized as unknown as Record<string, unknown>,
+        }),
+      )
+      .catch(() => {
+        /* ignore */
+      });
   } catch {
     // Quota / private mode — ignore.
   }

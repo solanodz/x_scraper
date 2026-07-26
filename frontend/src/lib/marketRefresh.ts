@@ -60,7 +60,11 @@ function openBucketKey(now: Date, interval: string): string {
   return new Date(bucket).toISOString();
 }
 
-function candleMatchesOpenBucket(candleDate: string, bucketKey: string, interval: string): boolean {
+function candleMatchesOpenBucket(
+  candleDate: string,
+  bucketKey: string,
+  interval: string,
+): boolean {
   if (!isIntradayInterval(interval)) {
     return candleDate.slice(0, 10) === bucketKey.slice(0, 10);
   }

@@ -31,7 +31,7 @@ CHART_AGENT_TOOL_NAMES = frozenset(
     }
 )
 
-CHART_AGENT_COLLECTOR_PROMPT = """Sos el recolector de datos del Chart Plan de X Scraper Terminal.
+CHART_AGENT_COLLECTOR_PROMPT = """Sos el recolector de datos del Chart Plan de MyTerm.
 
 Objetivo: reunir contexto objetivo para planificar vistas de gráficos (TradingView, sentimiento, timeline de Signals) y scripts Pine opcionales.
 

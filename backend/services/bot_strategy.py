@@ -25,7 +25,9 @@ class StrategyContext:
     armed: bool
     max_positions: int
     open_count: int
-    open_symbols: set[str]
+    # symbol -> sides currently open (e.g. {"BTC": {"long"}}).
+    # Same-side pyramid OK until max_positions; opposite side blocked.
+    open_sides: dict[str, set[str]]
     cooldown_seconds: int
     # symbol -> last closed_at (aware datetime or None)
     last_closed_at: dict[str, datetime | None]
@@ -92,8 +94,10 @@ def filter_trade_signal(
     """Aplica Risk Policy / filtros. Retorna (ok, skip_reason)."""
     if not ctx.armed:
         return False, "not_armed"
-    if signal.symbol in ctx.open_symbols:
-        return False, "symbol_already_open"
+    open_on_symbol = ctx.open_sides.get(signal.symbol) or set()
+    if open_on_symbol and signal.side not in open_on_symbol:
+        # Long open → block short (and vice versa); same-side may pyramid.
+        return False, "opposite_side_open"
     if ctx.open_count >= ctx.max_positions:
         return False, "max_positions"
     key = (signal.symbol, signal.side, signal.bar_ts)
@@ -118,7 +122,9 @@ def collect_signals(
     accepted: list[TradeSignal] = []
     # Copia mutable del contexto para filtros secuenciales en el mismo tick
     open_count = ctx.open_count
-    open_symbols = set(ctx.open_symbols)
+    open_sides: dict[str, set[str]] = {
+        sym: set(sides) for sym, sides in ctx.open_sides.items()
+    }
     seen = set(ctx.seen_keys)
     for symbol, candles in candles_by_symbol.items():
         signal = evaluate_donchian_breakout(symbol, candles, period=period)
@@ -128,7 +134,7 @@ def collect_signals(
             armed=ctx.armed,
             max_positions=ctx.max_positions,
             open_count=open_count,
-            open_symbols=open_symbols,
+            open_sides=open_sides,
             cooldown_seconds=ctx.cooldown_seconds,
             last_closed_at=ctx.last_closed_at,
             seen_keys=seen,
@@ -141,6 +147,6 @@ def collect_signals(
             continue
         accepted.append(signal)
         open_count += 1
-        open_symbols.add(symbol)
+        open_sides.setdefault(signal.symbol, set()).add(signal.side)
         seen.add((signal.symbol, signal.side, signal.bar_ts))
     return accepted

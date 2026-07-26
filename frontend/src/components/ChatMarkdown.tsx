@@ -53,7 +53,7 @@ interface ChatMarkdownProps {
 }
 
 const linkClassName =
-  "text-amber-400 underline decoration-amber-800/60 underline-offset-2 transition-colors hover:text-amber-300";
+  "text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition-colors hover:text-zinc-200";
 
 const briefingLinkClassName =
   "text-zinc-400 underline decoration-zinc-600/50 underline-offset-2 transition-colors hover:text-zinc-300";
@@ -102,7 +102,7 @@ function createBaseComponents(
       </h1>
     ),
     h2: ({ children }) => (
-      <h2 className="mb-2 mt-3 font-sans text-xs font-semibold uppercase tracking-wide text-amber-500/90 first:mt-0">
+      <h2 className="mb-2 mt-3 font-sans text-xs font-semibold uppercase tracking-wide text-zinc-400 first:mt-0">
         {children}
       </h2>
     ),
@@ -196,24 +196,24 @@ function createBaseComponents(
       const isBlock = className?.includes("language-");
       if (isBlock) {
         return (
-          <code className="block overflow-x-auto rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-emerald-300/90">
+          <code className="block overflow-x-auto border border-zinc-800 bg-zinc-950 px-2 py-1.5 font-mono text-[11px] text-zinc-300">
             {children}
           </code>
         );
       }
       return (
-        <code className="rounded bg-zinc-800 px-1 py-0.5 font-mono text-[11px] text-emerald-300/90">
+        <code className="bg-zinc-800 px-1 py-0.5 font-mono text-[11px] text-zinc-300">
           {children}
         </code>
       );
     },
     pre: ({ children }) => (
-      <pre className="mb-2 overflow-x-auto rounded border border-zinc-800 bg-zinc-950 p-2 last:mb-0">
+      <pre className="mb-2 overflow-x-auto border border-zinc-800 bg-zinc-950 p-2 last:mb-0">
         {children}
       </pre>
     ),
     table: ({ children }) => (
-      <div className="mb-3 overflow-x-auto rounded-md border border-zinc-800 last:mb-0">
+      <div className="mb-3 overflow-x-auto border border-zinc-800 last:mb-0">
         <table className="w-full min-w-[16rem] border-collapse font-mono text-[11px] leading-snug text-zinc-200">
           {children}
         </table>
@@ -223,7 +223,9 @@ function createBaseComponents(
       <thead className="bg-zinc-900/90 text-zinc-400">{children}</thead>
     ),
     tbody: ({ children }) => (
-      <tbody className="[&_tr:nth-child(even)]:bg-zinc-950/60">{children}</tbody>
+      <tbody className="[&_tr:nth-child(even)]:bg-zinc-950/60">
+        {children}
+      </tbody>
     ),
     th: ({ children }) => (
       <th className="whitespace-nowrap border-b border-zinc-700 px-2.5 py-1.5 text-left font-semibold">
@@ -426,10 +428,7 @@ export default function ChatMarkdown({
   onDossierClick,
   variant = "default",
 }: ChatMarkdownProps) {
-  const urlToId = useMemo(
-    () => citationUrlIndex(citations ?? []),
-    [citations],
-  );
+  const urlToId = useMemo(() => citationUrlIndex(citations ?? []), [citations]);
 
   const components = useMemo(
     () => createBaseComponents(urlToId, onCitationClick, onDossierClick),

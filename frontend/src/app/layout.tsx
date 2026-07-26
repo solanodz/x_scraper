@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "X Scraper Terminal",
+  title: "MyTerm",
   description:
     "Terminal de inteligencia financiera: Corpus de X, Research Chat, Dossier y Chart Plan.",
 };

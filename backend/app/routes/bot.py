@@ -84,12 +84,15 @@ def patch_bot_config(
 @router.get("/positions", response_model=list[BotPosition])
 def get_bot_positions(
     status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
     user: dict | None = Depends(get_current_user),
 ) -> list[BotPosition]:
     _require_bot_tables()
     operator_id = operator_id_from_user(user)
     try:
-        rows = bot_repo.list_positions(operator_id=operator_id, status=status)
+        rows = bot_repo.list_positions(
+            operator_id=operator_id, status=status, limit=limit
+        )
     except bot_repo.BotRepoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return [_position_to_schema(r) for r in rows]
@@ -132,11 +135,12 @@ def post_close_position(
 
 @router.get("/fills", response_model=list[BotFill])
 def get_bot_fills(
+    limit: int = Query(default=50, ge=1, le=500),
     user: dict | None = Depends(get_current_user),
 ) -> list[BotFill]:
     _require_bot_tables()
     operator_id = operator_id_from_user(user)
-    rows = bot_repo.list_fills(operator_id=operator_id)
+    rows = bot_repo.list_fills(operator_id=operator_id, limit=limit)
     return [_fill_to_schema(r) for r in rows]
 
 

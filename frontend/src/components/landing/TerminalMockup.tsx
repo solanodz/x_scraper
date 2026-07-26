@@ -147,7 +147,8 @@ export default function TerminalMockup() {
       className="overflow-hidden border border-b-0 border-zinc-800 bg-zinc-900 text-left shadow-[0_-8px_60px_rgba(0,0,0,0.7)]"
       style={{
         maskImage: "linear-gradient(to bottom, black 78%, transparent 94%)",
-        WebkitMaskImage: "linear-gradient(to bottom, black 78%, transparent 94%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, black 78%, transparent 94%)",
       }}
     >
       {/* ── Header ── */}
@@ -155,7 +156,7 @@ export default function TerminalMockup() {
         <div className="flex items-center gap-3">
           <span className="font-mono text-sm text-zinc-300">▮</span>
           <span className="font-sans text-[11px] font-semibold text-zinc-100 sm:text-xs">
-            X Scraper Terminal
+            MyTerm
           </span>
           <div className="flex items-center gap-1">
             <span className="border border-zinc-700 bg-zinc-900 px-2 py-0.5 font-sans text-[9px] font-semibold text-zinc-200 sm:text-[10px]">

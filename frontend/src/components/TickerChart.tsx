@@ -150,7 +150,10 @@ export function TickerChart({
     }
 
     if (indicators.donchian.enabled) {
-      const channel = buildDonchianLineData(candles, indicators.donchian.period);
+      const channel = buildDonchianLineData(
+        candles,
+        indicators.donchian.period,
+      );
       const upper = chart.addSeries(
         LineSeries,
         {
@@ -226,10 +229,7 @@ export function TickerChart({
             const rect = entries[0]?.contentRect;
             if (!rect) return;
             const width = Math.max(1, Math.floor(rect.width));
-            const nextHeight = Math.max(
-              120,
-              Math.floor(height ?? rect.height),
-            );
+            const nextHeight = Math.max(120, Math.floor(height ?? rect.height));
             if (width > 0 && nextHeight > 0) {
               chart.applyOptions({ width, height: nextHeight });
             }
@@ -261,7 +261,7 @@ export function TickerChart({
   if (candles.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center rounded border border-zinc-800 bg-zinc-950 font-mono text-xs text-zinc-500 ${className}`}
+        className={`flex items-center justify-center border border-zinc-800 bg-zinc-950 font-mono text-xs text-zinc-500 ${className}`}
         style={height != null ? { height } : undefined}
       >
         {`Sin velas para $${symbol}`}
@@ -272,7 +272,7 @@ export function TickerChart({
   return (
     <div
       ref={containerRef}
-      className={`w-full overflow-hidden rounded border border-zinc-800 bg-zinc-950 ${className}`}
+      className={`w-full overflow-hidden border border-zinc-800 bg-zinc-950 ${className}`}
       style={height != null ? { height } : { height: "100%", minHeight: 240 }}
       data-symbol={symbol}
     />

@@ -150,8 +150,20 @@ export function chartYDomain(rows: IndicatorChartRow[]): [number, number] {
   let min = Infinity;
   let max = -Infinity;
   for (const row of rows) {
-    min = Math.min(min, row.low, row.donchianLower ?? row.low, row.sma20 ?? row.low, row.sma50 ?? row.low);
-    max = Math.max(max, row.high, row.donchianUpper ?? row.high, row.sma20 ?? row.high, row.sma50 ?? row.high);
+    min = Math.min(
+      min,
+      row.low,
+      row.donchianLower ?? row.low,
+      row.sma20 ?? row.low,
+      row.sma50 ?? row.low,
+    );
+    max = Math.max(
+      max,
+      row.high,
+      row.donchianUpper ?? row.high,
+      row.sma20 ?? row.high,
+      row.sma50 ?? row.high,
+    );
   }
   const padding = (max - min) * 0.06 || 1;
   const yMin = min > 0 ? Math.max(min * 0.98, min - padding) : min - padding;
@@ -210,12 +222,17 @@ export function buildDonchianLineData(
 }
 
 /** Volume histogram data (green/red by candle direction). */
-export function buildVolumeHistogramData(candles: PriceCandle[]): LwcVolumePoint[] {
+export function buildVolumeHistogramData(
+  candles: PriceCandle[],
+): LwcVolumePoint[] {
   return dedupeByTime(
     candles.map((c) => ({
       time: candleDateToLwcTime(c.date),
       value: c.volume,
-      color: c.close >= c.open ? "rgba(52, 211, 153, 0.45)" : "rgba(248, 113, 113, 0.45)",
+      color:
+        c.close >= c.open
+          ? "rgba(52, 211, 153, 0.45)"
+          : "rgba(248, 113, 113, 0.45)",
     })),
   );
 }
@@ -480,7 +497,9 @@ export function buildOracleOscillatorData(
     const d = rsi[i];
     const e = dem[i];
     if (a == null || c == null || d == null || e == null) continue;
-    oracleRaw[i] = clamp01to100(0.3 * a + 0.3 * b + 0.2 * c + 0.1 * d + 0.1 * e);
+    oracleRaw[i] = clamp01to100(
+      0.3 * a + 0.3 * b + 0.2 * c + 0.1 * d + 0.1 * e,
+    );
   }
 
   const oracle: LwcTimeValuePoint[] = [];
@@ -622,14 +641,14 @@ export function detectRsiDivergences(
 }
 
 export const INDICATOR_COLORS = {
-  sma20: "#f59e0b",
-  sma50: "#38bdf8",
-  smaA: "#f59e0b",
-  smaB: "#38bdf8",
-  donchianUpper: "#a78bfa",
-  donchianLower: "#a78bfa",
-  fib: "#71717a",
-  rsi: "#38bdf8",
+  sma20: "#a1a1aa",
+  sma50: "#e4e4e7",
+  smaA: "#a1a1aa",
+  smaB: "#e4e4e7",
+  donchianUpper: "#71717a",
+  donchianLower: "#71717a",
+  fib: "#52525b",
+  rsi: "#d4d4d8",
   rsiBull: "#22c55e",
   rsiBear: "#ef4444",
   oracle: "#e4e4e7",

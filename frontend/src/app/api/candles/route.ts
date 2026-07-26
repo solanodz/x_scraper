@@ -30,17 +30,18 @@ const VALID_PERIODS = new Set([
   "5y",
 ]);
 
-const VALID_INTERVALS = new Set([
-  "1m",
-  "5m",
-  "15m",
-  "30m",
-  "1h",
-  "1d",
-  "1wk",
-]);
+const VALID_INTERVALS = new Set(["1m", "5m", "15m", "30m", "1h", "1d", "1wk"]);
 
-const PERIOD_ORDER = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y"] as const;
+const PERIOD_ORDER = [
+  "1d",
+  "5d",
+  "1mo",
+  "3mo",
+  "6mo",
+  "1y",
+  "2y",
+  "5y",
+] as const;
 const INTRADAY_INTERVALS = new Set(["1m", "5m", "15m", "30m", "1h"]);
 
 function normalizeSymbol(raw: string): string {
@@ -67,8 +68,12 @@ function clampPeriodForInterval(period: string, interval: string): string {
   }
   if (!maxPeriod) return period;
 
-  const periodIdx = PERIOD_ORDER.indexOf(period as (typeof PERIOD_ORDER)[number]);
-  const maxIdx = PERIOD_ORDER.indexOf(maxPeriod as (typeof PERIOD_ORDER)[number]);
+  const periodIdx = PERIOD_ORDER.indexOf(
+    period as (typeof PERIOD_ORDER)[number],
+  );
+  const maxIdx = PERIOD_ORDER.indexOf(
+    maxPeriod as (typeof PERIOD_ORDER)[number],
+  );
   if (periodIdx < 0 || maxIdx < 0) return maxPeriod;
   return periodIdx > maxIdx ? maxPeriod : period;
 }
@@ -82,8 +87,12 @@ function formatCandleDate(tsSeconds: number, interval: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const symbol = normalizeSymbol(request.nextUrl.searchParams.get("symbol") ?? "");
-  const interval = normalizeInterval(request.nextUrl.searchParams.get("interval"));
+  const symbol = normalizeSymbol(
+    request.nextUrl.searchParams.get("symbol") ?? "",
+  );
+  const interval = normalizeInterval(
+    request.nextUrl.searchParams.get("interval"),
+  );
   const period = clampPeriodForInterval(
     normalizePeriod(request.nextUrl.searchParams.get("period")),
     interval,

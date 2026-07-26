@@ -42,7 +42,7 @@ export default function ChatSessionSidebar({
           type="button"
           onClick={onNewChat}
           disabled={controlsDisabled}
-          className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border border-zinc-700 px-2 py-0.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Nueva
         </button>
@@ -53,7 +53,7 @@ export default function ChatSessionSidebar({
           type="button"
           onClick={onBriefing}
           disabled={streaming || watchEmpty || disabled}
-          className="w-full rounded border border-amber-800/60 bg-amber-950/30 px-2 py-1.5 font-mono text-[10px] text-amber-400 transition-colors hover:border-amber-600 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full border border-zinc-600 bg-zinc-900 px-2 py-1.5 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Briefing
         </button>
@@ -80,14 +80,14 @@ export default function ChatSessionSidebar({
                     disabled={controlsDisabled}
                     className={`w-full border-l-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       selected
-                        ? "border-amber-500 bg-zinc-900/80"
+                        ? "border-zinc-400 bg-zinc-900/80"
                         : "border-transparent hover:bg-zinc-900/50"
                     }`}
                   >
                     <span
                       className={`block truncate font-mono text-[10px] ${
                         selected
-                          ? "font-semibold text-amber-400"
+                          ? "font-semibold text-zinc-300"
                           : "text-zinc-300"
                       }`}
                     >

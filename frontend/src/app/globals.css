@@ -5,8 +5,9 @@
   --foreground: #fafafa;
   --panel: #18181b;
   --border: #27272a;
-  --accent-amber: #f59e0b;
-  --accent-green: #10b981;
+  --accent-neutral: #a1a1aa;
+  --accent-positive: #10b981;
+  --accent-negative: #ef4444;
 }
 
 @theme inline {
@@ -126,4 +127,3 @@ body {
     background-size: 200px 200px;
   }
 }
-

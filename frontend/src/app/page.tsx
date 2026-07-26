@@ -58,9 +58,9 @@ export default function LandingPage() {
               Todo lo que se dice del mercado, en un solo workspace
             </h2>
             <p className="mx-auto mt-6 max-w-2xl font-sans text-base leading-relaxed text-zinc-400">
-              X Scraper Terminal junta lo que se dice en X y en noticias, lo
-              indexa en un Corpus, y te deja investigarlo. Cada afirmación
-              viene con su fuente.
+              MyTerm junta lo que se dice en X y en noticias, lo indexa en un
+              Corpus, y te deja investigarlo. Cada afirmación viene con su
+              fuente.
             </p>
           </div>
         </section>

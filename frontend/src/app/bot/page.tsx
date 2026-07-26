@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +23,7 @@ import TerminalHeader from "@/components/TerminalHeader";
 import TickerLogo from "@/components/TickerLogo";
 import {
   closeBotPosition,
+  fetchOperatorSettings,
   fetchQuotes,
   fetchTickerLogos,
   getBotConfig,
@@ -21,7 +31,16 @@ import {
   listBotFills,
   listBotPositions,
   patchBotConfig,
+  patchOperatorSettings,
 } from "@/lib/api";
+import {
+  BOT_PNL_LOOKBACKS,
+  BOT_PNL_TIMEZONES,
+  buildDailyPnl,
+  loadBotPnlPrefs,
+  saveBotPnlPrefs,
+  type BotPnlPrefs,
+} from "@/lib/botDailyPnl";
 import type { BotConfig, BotEvent, BotFill, BotPosition } from "@/lib/types";
 
 const SYMBOL_OPTIONS = ["BTC", "ETH"] as const;
@@ -34,7 +53,7 @@ const BOT_POLL_MS = 15_000;
 const MARK_POLL_MS = 3_000;
 
 const INPUT =
-  "w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-200 outline-none focus:border-zinc-600";
+  "w-full border border-zinc-800 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-200 outline-none focus:border-zinc-600";
 const LABEL =
   "mb-1 block font-sans text-[10px] uppercase tracking-wide text-zinc-500";
 
@@ -143,6 +162,136 @@ function sideClass(side: string): string {
   return side === "long" ? "text-emerald-500" : "text-red-500";
 }
 
+const ACTIVITY_KIND_LABEL: Record<string, string> = {
+  error: "Error",
+  heartbeat: "Heartbeat",
+  open: "Opened",
+  close: "Closed",
+  trade_signal: "Signal",
+  skip: "Skipped",
+  skip_duplicate: "Duplicate",
+};
+
+const ACTIVITY_REASON_LABEL: Record<string, string> = {
+  symbol_already_open: "position already open",
+  opposite_side_open: "opposite side already open",
+  duplicate_bar: "same bar already processed",
+  max_positions: "max positions reached",
+  cooldown: "cooldown active",
+  no_breakout: "no breakout",
+  manual: "manual close",
+  tp: "take profit",
+  sl: "stop loss",
+  take_profit: "take profit",
+  stop_loss: "stop loss",
+};
+
+function humanizeToken(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  if (ACTIVITY_REASON_LABEL[key]) return ACTIVITY_REASON_LABEL[key];
+  return raw.replace(/_/g, "");
+}
+
+function activityKindLabel(kind: string): string {
+  return ACTIVITY_KIND_LABEL[kind] ?? humanizeToken(kind);
+}
+
+function formatActivityDetail(ev: BotEvent): string {
+  const p = ev.payload ?? {};
+  const side = typeof p.side === "string" ? p.side.toLowerCase() : null;
+  const reasonRaw = typeof p.reason === "string" ? p.reason : null;
+  const reason = reasonRaw ? humanizeToken(reasonRaw) : null;
+  const pnl =
+    typeof p.realized_pnl === "number" && Number.isFinite(p.realized_pnl)
+      ? p.realized_pnl
+      : typeof p.realized_pnl === "string" &&
+          Number.isFinite(Number(p.realized_pnl))
+        ? Number(p.realized_pnl)
+        : null;
+  const entry =
+    typeof p.entry_price === "number"
+      ? p.entry_price
+      : typeof p.entry_price === "string"
+        ? Number(p.entry_price)
+        : null;
+
+  switch (ev.kind) {
+    case "error": {
+      const err = p.error;
+      return typeof err === "string" && err ? err : "Something went wrong";
+    }
+    case "heartbeat": {
+      if (p.armed === false) return "Paused — only managing TP/SL";
+      if (p.armed === true) return "Armed tick";
+      const note = typeof p.note === "string" ? humanizeToken(p.note) : null;
+      return note ?? "Tick";
+    }
+    case "open": {
+      const parts = [
+        side ? side : null,
+        entry != null && Number.isFinite(entry)
+          ? `@ ${formatNum(entry, 2)}`
+          : null,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join("") : "Position opened";
+    }
+    case "close": {
+      const parts = [
+        reason,
+        pnl != null ? `PnL ${formatUsd(pnl)}` : null,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" ·") : "Position closed";
+    }
+    case "trade_signal": {
+      const strat =
+        typeof p.strategy_reason === "string"
+          ? humanizeToken(p.strategy_reason)
+          : reason;
+      const parts = [side, strat].filter(Boolean);
+      return parts.length > 0 ? parts.join(" ·") : "Entry signal";
+    }
+    case "skip":
+    case "skip_duplicate": {
+      const parts = [reason ?? "skipped", side].filter(Boolean);
+      return parts.join(" ·");
+    }
+    default: {
+      if (reason) return reason;
+      if (typeof p.error === "string") return p.error;
+      return activityKindLabel(ev.kind);
+    }
+  }
+}
+
+function activityKindClass(kind: string): string {
+  if (kind === "error") return "text-red-400";
+  if (kind === "open" || kind === "trade_signal") return "text-emerald-500/90";
+  if (kind === "close") return "text-zinc-300";
+  if (kind === "skip" || kind === "skip_duplicate") return "text-amber-500/80";
+  return "text-zinc-500";
+}
+
+/** Exit = last fill when a position has ≥2 fills (open + close). */
+function exitPriceByPosition(fills: BotFill[]): Record<string, number> {
+  const byPos = new Map<string, BotFill[]>();
+  for (const f of fills) {
+    const list = byPos.get(f.position_id) ?? [];
+    list.push(f);
+    byPos.set(f.position_id, list);
+  }
+  const out: Record<string, number> = {};
+  for (const [id, list] of byPos) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return ta - tb;
+    });
+    out[id] = list[list.length - 1]!.price;
+  }
+  return out;
+}
+
 function clampInt(
   raw: string,
   min: number,
@@ -158,7 +307,8 @@ type EquityPoint = { t: string; label: string; equity: number; pnl: number };
 
 function buildStats(open: BotPosition[], closed: BotPosition[]) {
   const realized = closed.reduce(
-    (sum, p) => sum + (Number.isFinite(p.realized_pnl) ? Number(p.realized_pnl) : 0),
+    (sum, p) =>
+      sum + (Number.isFinite(p.realized_pnl) ? Number(p.realized_pnl) : 0),
     0,
   );
   const unrealized = open.reduce((sum, p) => {
@@ -243,6 +393,9 @@ function BotPageContent() {
   const [liveMarks, setLiveMarks] = useState<Record<string, number>>({});
   const [marksUpdatedAt, setMarksUpdatedAt] = useState<number | null>(null);
   const [configOpen, setConfigOpen] = useState(true);
+  const [pnlPrefs, setPnlPrefs] = useState<BotPnlPrefs>(() =>
+    loadBotPnlPrefs(),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -252,6 +405,26 @@ function BotPageContent() {
       })
       .catch(() => {
         if (!cancelled) setLogos({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchOperatorSettings()
+      .then((res) => {
+        if (cancelled) return;
+        const next: BotPnlPrefs = {
+          timeZone: res.settings.bot_pnl.timeZone,
+          lookbackDays: res.settings.bot_pnl.lookbackDays,
+        };
+        setPnlPrefs(next);
+        saveBotPnlPrefs(next);
+      })
+      .catch(() => {
+        /* keep localStorage fallback */
       });
     return () => {
       cancelled = true;
@@ -283,58 +456,61 @@ function BotPageContent() {
     }
   }, []);
 
-  const loadAll = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = opts?.silent === true;
-    if (!silent) {
-      setLoading(true);
-      setError(null);
-    }
-    try {
-      const [cfg, openPositions, closed, recentFills, recentEvents] =
-        await Promise.all([
-          getBotConfig(),
-          listBotPositions("open"),
-          listBotPositions("closed"),
-          listBotFills(),
-          listBotEvents(),
-        ]);
-      setConfig(cfg);
-      // Don't clobber an in-progress config edit on background polls.
+  const loadAll = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
       if (!silent) {
-        setForm(configToForm(cfg));
+        setLoading(true);
+        setError(null);
       }
-      setPositions(openPositions);
-      setClosedPositions(closed);
-      setFills(recentFills);
-      setEvents(recentEvents);
+      try {
+        const [cfg, openPositions, closed, recentFills, recentEvents] =
+          await Promise.all([
+            getBotConfig(),
+            listBotPositions("open"),
+            listBotPositions("closed", { limit: 500 }),
+            listBotFills({ limit: 500 }),
+            listBotEvents(),
+          ]);
+        setConfig(cfg);
+        // Don't clobber an in-progress config edit on background polls.
+        if (!silent) {
+          setForm(configToForm(cfg));
+        }
+        setPositions(openPositions);
+        setClosedPositions(closed);
+        setFills(recentFills);
+        setEvents(recentEvents);
 
-      const quoteSymbols = [
-        ...new Set([
-          ...openPositions.map((p) => p.symbol.toUpperCase()),
-          ...(cfg.symbols ?? []).map((s) => s.toUpperCase()),
-        ]),
-      ];
-      await refreshMarks(quoteSymbols);
+        const quoteSymbols = [
+          ...new Set([
+            ...openPositions.map((p) => p.symbol.toUpperCase()),
+            ...(cfg.symbols ?? []).map((s) => s.toUpperCase()),
+          ]),
+        ];
+        await refreshMarks(quoteSymbols);
 
-      if (silent) setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!silent) {
-        setError(msg);
-        setConfig(null);
-        setForm(null);
-        setPositions([]);
-        setClosedPositions([]);
-        setFills([]);
-        setEvents([]);
-        setLiveMarks({});
-      } else {
-        setError(msg);
+        if (silent) setError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!silent) {
+          setError(msg);
+          setConfig(null);
+          setForm(null);
+          setPositions([]);
+          setClosedPositions([]);
+          setFills([]);
+          setEvents([]);
+          setLiveMarks({});
+        } else {
+          setError(msg);
+        }
+      } finally {
+        if (!silent) setLoading(false);
       }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [refreshMarks]);
+    },
+    [refreshMarks],
+  );
 
   useEffect(() => {
     void loadAll();
@@ -386,6 +562,34 @@ function BotPageContent() {
     () => buildStats(markedOpen, closedPositions),
     [markedOpen, closedPositions],
   );
+
+  const dailyPnl = useMemo(
+    () => buildDailyPnl(closedPositions, pnlPrefs),
+    [closedPositions, pnlPrefs],
+  );
+
+  const exitPrices = useMemo(() => exitPriceByPosition(fills), [fills]);
+
+  const tradeHistory = useMemo(() => {
+    return [...closedPositions].sort((a, b) => {
+      const ta = a.closed_at ? new Date(a.closed_at).getTime() : 0;
+      const tb = b.closed_at ? new Date(b.closed_at).getTime() : 0;
+      return tb - ta;
+    });
+  }, [closedPositions]);
+
+  const activity = events;
+
+  function updatePnlPrefs(patch: Partial<BotPnlPrefs>) {
+    setPnlPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveBotPnlPrefs(next);
+      void patchOperatorSettings({ bot_pnl: next }).catch(() => {
+        /* offline / 503 — local cache still applies */
+      });
+      return next;
+    });
+  }
 
   async function handleToggleArmed() {
     if (!config) return;
@@ -468,7 +672,6 @@ function BotPageContent() {
                   </h1>
                   <span className="font-mono text-[10px] text-zinc-500">
                     paper · HL off · start ${formatNum(PAPER_START_USD, 0)}
-                    
                   </span>
                 </div>
                 <p className="mt-1 font-sans text-xs text-zinc-500">
@@ -484,7 +687,7 @@ function BotPageContent() {
                 <button
                   type="button"
                   onClick={() => setConfigOpen((v) => !v)}
-                  className="rounded border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 lg:hidden"
+                  className="border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 lg:hidden"
                 >
                   {configOpen ? "Hide config" : "Config"}
                 </button>
@@ -492,7 +695,7 @@ function BotPageContent() {
                   type="button"
                   onClick={() => void loadAll()}
                   disabled={loading}
-                  className="rounded border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
+                  className="border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
                 >
                   Reload
                 </button>
@@ -500,14 +703,14 @@ function BotPageContent() {
                   type="button"
                   onClick={() => void handleToggleArmed()}
                   disabled={!config || arming || loading}
-                  className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 font-sans text-xs font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+                  className="border border-zinc-700 bg-zinc-900 px-3 py-1.5 font-sans text-xs font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
                 >
                   {arming ? "…" : config?.armed ? "Armed" : "Paused"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfigOpen((v) => !v)}
-                  className="hidden rounded border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 lg:inline-flex"
+                  className="hidden border border-zinc-800 px-2.5 py-1.5 font-sans text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 lg:inline-flex"
                 >
                   {configOpen ? "Hide config" : "Show config"}
                 </button>
@@ -517,42 +720,51 @@ function BotPageContent() {
             {loading && (
               <p className="font-mono text-xs text-zinc-600">Loading…</p>
             )}
-            {error && (
-              <p className="font-mono text-xs text-red-500">{error}</p>
-            )}
+            {error && <p className="font-mono text-xs text-red-500">{error}</p>}
 
             {!loading && !error && form && config && (
               <>
-                {/* Compact metrics + chart — secondary */}
-                <div className="space-y-2 border-b border-zinc-800/80 pb-4">
+                {/* Compact metrics + equity / daily PnL */}
+                <div className="space-y-3 border-b border-zinc-800/80 pb-4">
                   <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[11px] text-zinc-500">
                     <span>
-                      Equity{" "}
+                      Equity{""}
                       <span className="text-zinc-300">
                         ${formatNum(stats.equity, 2)}
                       </span>
                     </span>
                     <span>
-                      PnL{" "}
+                      PnL{""}
                       <span className={signedClass(stats.total)}>
                         {formatUsd(stats.total)}
                       </span>
                     </span>
+                    <span title="Realized PnL for today in selected timezone">
+                      Today{""}
+                      <span className={signedClass(dailyPnl.todayPnl)}>
+                        {formatUsd(dailyPnl.todayPnl)}
+                      </span>
+                      {dailyPnl.todayTrades > 0 ? (
+                        <span className="text-zinc-600">
+                          {""}· {dailyPnl.todayTrades}t
+                        </span>
+                      ) : null}
+                    </span>
                     <span>
-                      Real{" "}
+                      Real{""}
                       <span className={signedClass(stats.realized)}>
                         {formatUsd(stats.realized)}
                       </span>
                     </span>
                     <span>
-                      Unreal{" "}
+                      Unreal{""}
                       <span className={signedClass(stats.unrealized)}>
                         {formatUsd(stats.unrealized)}
                       </span>
                     </span>
                     {marksUpdatedAt != null ? (
                       <span className="text-zinc-600" title="Last live mark">
-                        mark{" "}
+                        mark{""}
                         <span className="text-zinc-500">
                           {new Date(marksUpdatedAt).toLocaleTimeString(
                             undefined,
@@ -566,13 +778,13 @@ function BotPageContent() {
                       </span>
                     ) : null}
                     <span>
-                      Trades{" "}
+                      Trades{""}
                       <span className="text-zinc-400">
                         {stats.trades}c / {stats.openCount}o
                       </span>
                     </span>
                     <span>
-                      Win{" "}
+                      Win{""}
                       <span
                         className={
                           stats.winRate == null
@@ -588,74 +800,181 @@ function BotPageContent() {
                       </span>
                     </span>
                     <span>
-                      AvgW{" "}
+                      AvgW{""}
                       <span className={signedClass(stats.avgWin)}>
                         {formatUsd(stats.avgWin)}
                       </span>
                     </span>
                     <span>
-                      AvgL{" "}
+                      AvgL{""}
                       <span className={signedClass(stats.avgLoss)}>
                         {formatUsd(stats.avgLoss)}
                       </span>
                     </span>
                   </div>
-                  <div className="h-28 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={stats.curve}
-                        margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-                      >
-                        <defs>
-                          <linearGradient
-                            id="equityFill"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div>
+                      <p className="mb-1 font-mono text-[10px] uppercase tracking-wide text-zinc-600">
+                        Equity curve
+                      </p>
+                      <div className="h-28 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={stats.curve}
+                            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
                           >
-                            <stop
-                              offset="0%"
-                              stopColor={
-                                stats.total >= 0 ? "#10b981" : "#ef4444"
-                              }
-                              stopOpacity={0.25}
+                            <defs>
+                              <linearGradient
+                                id="equityFill"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor={
+                                    stats.total >= 0 ? "#10b981" : "#ef4444"
+                                  }
+                                  stopOpacity={0.25}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor={
+                                    stats.total >= 0 ? "#10b981" : "#ef4444"
+                                  }
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <XAxis dataKey="label" hide />
+                            <YAxis hide domain={["auto", "auto"]} />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#09090b",
+                                border: "1px solid #27272a",
+                                borderRadius: 6,
+                                fontSize: 10,
+                                fontFamily: "ui-monospace, monospace",
+                              }}
+                              labelStyle={{ color: "#a1a1aa" }}
+                              formatter={(value) => [
+                                `$${formatNum(Number(value), 2)}`,
+                                "Equity",
+                              ]}
                             />
-                            <stop
-                              offset="100%"
-                              stopColor={
-                                stats.total >= 0 ? "#10b981" : "#ef4444"
-                              }
-                              stopOpacity={0}
+                            <Area
+                              type="monotone"
+                              dataKey="equity"
+                              stroke={stats.total >= 0 ? "#10b981" : "#ef4444"}
+                              fill="url(#equityFill)"
+                              strokeWidth={1.5}
+                              isAnimationActive={false}
                             />
-                          </linearGradient>
-                        </defs>
-                        <XAxis dataKey="label" hide />
-                        <YAxis hide domain={["auto", "auto"]} />
-                        <Tooltip
-                          contentStyle={{
-                            background: "#09090b",
-                            border: "1px solid #27272a",
-                            borderRadius: 6,
-                            fontSize: 10,
-                            fontFamily: "ui-monospace, monospace",
-                          }}
-                          labelStyle={{ color: "#a1a1aa" }}
-                          formatter={(value) => [
-                            `$${formatNum(Number(value), 2)}`,
-                            "Equity",
-                          ]}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="equity"
-                          stroke={stats.total >= 0 ? "#10b981" : "#ef4444"}
-                          fill="url(#equityFill)"
-                          strokeWidth={1.5}
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-600">
+                          Daily PnL
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <select
+                            className="border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 outline-none focus:border-zinc-600"
+                            value={pnlPrefs.timeZone}
+                            onChange={(e) =>
+                              updatePnlPrefs({ timeZone: e.target.value })
+                            }
+                            aria-label="PnL timezone"
+                          >
+                            {BOT_PNL_TIMEZONES.map((tz) => (
+                              <option key={tz} value={tz}>
+                                {tz
+                                  .replace("America/", "")
+                                  .replace("Europe/", "EU/")}
+                              </option>
+                            ))}
+                            {!BOT_PNL_TIMEZONES.includes(
+                              pnlPrefs.timeZone as (typeof BOT_PNL_TIMEZONES)[number],
+                            ) && (
+                              <option value={pnlPrefs.timeZone}>
+                                {pnlPrefs.timeZone}
+                              </option>
+                            )}
+                          </select>
+                          <select
+                            className="border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 outline-none focus:border-zinc-600"
+                            value={pnlPrefs.lookbackDays}
+                            onChange={(e) =>
+                              updatePnlPrefs({
+                                lookbackDays: Number(e.target.value) || 30,
+                              })
+                            }
+                            aria-label="PnL lookback days"
+                          >
+                            {BOT_PNL_LOOKBACKS.map((d) => (
+                              <option key={d} value={d}>
+                                {d}d
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="h-28 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={dailyPnl.series}
+                            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                          >
+                            <XAxis
+                              dataKey="label"
+                              tick={{ fill: "#52525b", fontSize: 9 }}
+                              interval="preserveStartEnd"
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis hide domain={["auto", "auto"]} />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#09090b",
+                                border: "1px solid #27272a",
+                                borderRadius: 6,
+                                fontSize: 10,
+                                fontFamily: "ui-monospace, monospace",
+                              }}
+                              labelStyle={{ color: "#a1a1aa" }}
+                              formatter={(value, _name, item) => {
+                                const trades =
+                                  (item?.payload as { trades?: number })
+                                    ?.trades ?? 0;
+                                return [
+                                  `${formatUsd(Number(value))} · ${trades}t`,
+                                  "Day",
+                                ];
+                              }}
+                            />
+                            <Bar dataKey="pnl" isAnimationActive={false}>
+                              {dailyPnl.series.map((row) => (
+                                <Cell
+                                  key={row.day}
+                                  fill={
+                                    row.pnl > 0
+                                      ? "#10b981"
+                                      : row.pnl < 0
+                                        ? "#ef4444"
+                                        : "#3f3f46"
+                                  }
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -667,7 +986,7 @@ function BotPageContent() {
                       {positions.length}
                     </span>
                   </h2>
-                  <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/30">
+                  <div className="overflow-x-auto border border-zinc-800 bg-zinc-900/30">
                     <table className="w-full min-w-[640px] border-collapse text-left">
                       <thead>
                         <tr className="border-b border-zinc-800 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
@@ -718,7 +1037,7 @@ function BotPageContent() {
                                   {p.side}
                                 </td>
                                 <td className="px-3 py-2.5">
-                                  ${formatNum(p.size_usd)} ·{" "}
+                                  ${formatNum(p.size_usd)} ·{""}
                                   {formatNum(p.leverage, 1)}x
                                   {p.leverage != null &&
                                   p.size_usd != null &&
@@ -734,7 +1053,7 @@ function BotPageContent() {
                                   {formatNum(p.mark_price, 4)}
                                   {live ? (
                                     <span
-                                      className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80"
+                                      className="ml-1 inline-block h-1.5 w-1.5 bg-emerald-500/80"
                                       title="Live quote"
                                     />
                                   ) : null}
@@ -751,7 +1070,7 @@ function BotPageContent() {
                                   <span className="text-emerald-500">
                                     {formatNum(p.tp_price, 2)}
                                   </span>
-                                  {" / "}
+                                  {" /"}
                                   <span className="text-red-500">
                                     {formatNum(p.sl_price, 2)}
                                   </span>
@@ -763,7 +1082,7 @@ function BotPageContent() {
                                       void handleClosePosition(p.id)
                                     }
                                     disabled={closingId === p.id}
-                                    className="rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
+                                    className="border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
                                   >
                                     {closingId === p.id ? "…" : "Close"}
                                   </button>
@@ -777,20 +1096,109 @@ function BotPageContent() {
                   </div>
                 </section>
 
+                {/* Trade history — closed positions with realized PnL */}
+                <section>
+                  <h2 className="mb-3 font-sans text-sm font-semibold text-zinc-100">
+                    Trade history
+                    <span className="ml-2 font-mono text-xs font-normal text-zinc-500">
+                      {tradeHistory.length}
+                    </span>
+                  </h2>
+                  <div className="overflow-x-auto border border-zinc-800 bg-zinc-900/30">
+                    <table className="w-full min-w-[720px] border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-zinc-800 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+                          <th className="px-3 py-2 font-medium">Closed</th>
+                          <th className="px-3 py-2 font-medium">Symbol</th>
+                          <th className="px-3 py-2 font-medium">Side</th>
+                          <th className="px-3 py-2 font-medium">Entry</th>
+                          <th className="px-3 py-2 font-medium">Exit</th>
+                          <th className="px-3 py-2 font-medium">Size</th>
+                          <th className="px-3 py-2 font-medium">PnL</th>
+                          <th className="px-3 py-2 font-medium">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tradeHistory.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={8}
+                              className="px-3 py-5 text-center font-mono text-xs text-zinc-600"
+                            >
+                              No closed trades yet
+                            </td>
+                          </tr>
+                        ) : (
+                          tradeHistory.map((p) => {
+                            const exit = exitPrices[p.id];
+                            const pnl = p.realized_pnl ?? null;
+                            return (
+                              <tr
+                                key={p.id}
+                                className="border-b border-zinc-800/60 font-mono text-[11px] text-zinc-300 last:border-b-0"
+                              >
+                                <td className="whitespace-nowrap px-3 py-2.5 text-zinc-500">
+                                  {formatTs(p.closed_at)}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="inline-flex items-center gap-1.5 text-zinc-100">
+                                    <TickerLogo
+                                      symbol={p.symbol}
+                                      logoUrl={logos[p.symbol]}
+                                      size="xs"
+                                    />
+                                    {p.symbol}
+                                  </span>
+                                </td>
+                                <td
+                                  className={`px-3 py-2.5 uppercase ${sideClass(p.side)}`}
+                                >
+                                  {p.side}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {formatNum(p.entry_price, 4)}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {exit != null ? formatNum(exit, 4) : "—"}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  ${formatNum(p.size_usd)} ·{""}
+                                  {formatNum(p.leverage, 1)}x
+                                </td>
+                                <td
+                                  className={`px-3 py-2.5 ${signedClass(pnl)}`}
+                                >
+                                  {formatUsd(pnl)}
+                                </td>
+                                <td className="px-3 py-2.5 text-zinc-500">
+                                  {p.close_reason ?? "—"}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
                 <div className="grid gap-4 lg:grid-cols-2">
                   <section>
-                    <h2 className="mb-3 font-sans text-sm font-semibold text-zinc-100">
+                    <h2 className="mb-2 font-sans text-sm font-semibold text-zinc-100">
                       Fills
+                      <span className="ml-2 font-mono text-xs font-normal text-zinc-500">
+                        {fills.length}
+                      </span>
                     </h2>
-                    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/30">
-                      <table className="w-full min-w-[360px] border-collapse text-left">
-                        <thead>
-                          <tr className="border-b border-zinc-800/80 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-                            <th className="px-3 py-2 font-medium">Time</th>
-                            <th className="px-3 py-2 font-medium">Symbol</th>
-                            <th className="px-3 py-2 font-medium">Side</th>
-                            <th className="px-3 py-2 font-medium">Price</th>
-                            <th className="px-3 py-2 font-medium">Qty</th>
+                    <div className="max-h-48 overflow-auto border border-zinc-800 bg-zinc-900/30">
+                      <table className="w-full min-w-[320px] border-collapse text-left">
+                        <thead className="sticky top-0 z-10 bg-zinc-950">
+                          <tr className="border-b border-zinc-800/80 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
+                            <th className="px-2 py-1.5 font-medium">Time</th>
+                            <th className="px-2 py-1.5 font-medium">Symbol</th>
+                            <th className="px-2 py-1.5 font-medium">Side</th>
+                            <th className="px-2 py-1.5 font-medium">Price</th>
+                            <th className="px-2 py-1.5 font-medium">Qty</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -798,32 +1206,32 @@ function BotPageContent() {
                             <tr>
                               <td
                                 colSpan={5}
-                                className="px-3 py-5 text-center font-mono text-xs text-zinc-600"
+                                className="px-2 py-4 text-center font-mono text-[10px] text-zinc-600"
                               >
                                 None yet
                               </td>
                             </tr>
                           ) : (
-                            fills.slice(0, 20).map((f) => (
+                            fills.map((f) => (
                               <tr
                                 key={f.id}
-                                className="border-b border-zinc-800/60 font-mono text-[11px] text-zinc-300 last:border-b-0"
+                                className="border-b border-zinc-800/60 font-mono text-[10px] text-zinc-300 last:border-b-0"
                               >
-                                <td className="whitespace-nowrap px-3 py-2 text-zinc-500">
+                                <td className="whitespace-nowrap px-2 py-1 text-zinc-500">
                                   {formatTs(f.created_at)}
                                 </td>
-                                <td className="px-3 py-2 text-zinc-100">
+                                <td className="px-2 py-1 text-zinc-100">
                                   {f.symbol}
                                 </td>
                                 <td
-                                  className={`px-3 py-2 uppercase ${sideClass(f.side)}`}
+                                  className={`px-2 py-1 uppercase ${sideClass(f.side)}`}
                                 >
                                   {f.side}
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-2 py-1">
                                   {formatNum(f.price, 4)}
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-2 py-1">
                                   {formatNum(f.qty, 6)}
                                 </td>
                               </tr>
@@ -835,49 +1243,60 @@ function BotPageContent() {
                   </section>
 
                   <section>
-                    <h2 className="mb-3 font-sans text-sm font-semibold text-zinc-100">
-                      Events
+                    <h2 className="mb-2 font-sans text-sm font-semibold text-zinc-100">
+                      Activity
+                      <span className="ml-2 font-mono text-xs font-normal text-zinc-500">
+                        {activity.length}
+                      </span>
                     </h2>
-                    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/30">
-                      <table className="w-full min-w-[360px] border-collapse text-left">
-                        <thead>
-                          <tr className="border-b border-zinc-800/80 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-                            <th className="px-3 py-2 font-medium">Time</th>
-                            <th className="px-3 py-2 font-medium">Kind</th>
-                            <th className="px-3 py-2 font-medium">Symbol</th>
-                            <th className="px-3 py-2 font-medium">Detail</th>
+                    <div className="max-h-48 overflow-auto border border-zinc-800 bg-zinc-900/30">
+                      <table className="w-full min-w-[320px] border-collapse text-left">
+                        <thead className="sticky top-0 z-10 bg-zinc-950">
+                          <tr className="border-b border-zinc-800/80 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
+                            <th className="px-2 py-1.5 font-medium">Time</th>
+                            <th className="px-2 py-1.5 font-medium">Type</th>
+                            <th className="px-2 py-1.5 font-medium">Symbol</th>
+                            <th className="px-2 py-1.5 font-medium">Detail</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {events.length === 0 ? (
+                          {activity.length === 0 ? (
                             <tr>
                               <td
                                 colSpan={4}
-                                className="px-3 py-5 text-center font-mono text-xs text-zinc-600"
+                                className="px-2 py-4 text-center font-mono text-[10px] text-zinc-600"
                               >
                                 None yet
                               </td>
                             </tr>
                           ) : (
-                            events.slice(0, 20).map((ev) => (
-                              <tr
-                                key={ev.id}
-                                className="border-b border-zinc-800/60 font-mono text-[11px] text-zinc-300 last:border-b-0"
-                              >
-                                <td className="whitespace-nowrap px-3 py-2 text-zinc-500">
-                                  {formatTs(ev.created_at)}
-                                </td>
-                                <td className="px-3 py-2">{ev.kind}</td>
-                                <td className="px-3 py-2">
-                                  {ev.symbol ?? "—"}
-                                </td>
-                                <td className="max-w-[180px] truncate px-3 py-2 text-zinc-500">
-                                  {ev.payload
-                                    ? JSON.stringify(ev.payload)
-                                    : "—"}
-                                </td>
-                              </tr>
-                            ))
+                            activity.map((ev) => {
+                              const detail = formatActivityDetail(ev);
+                              return (
+                                <tr
+                                  key={ev.id}
+                                  className="border-b border-zinc-800/60 font-mono text-[10px] text-zinc-300 last:border-b-0"
+                                >
+                                  <td className="whitespace-nowrap px-2 py-1 text-zinc-500">
+                                    {formatTs(ev.created_at)}
+                                  </td>
+                                  <td
+                                    className={`whitespace-nowrap px-2 py-1 ${activityKindClass(ev.kind)}`}
+                                  >
+                                    {activityKindLabel(ev.kind)}
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    {ev.symbol ?? "—"}
+                                  </td>
+                                  <td
+                                    className="max-w-[200px] truncate px-2 py-1 text-zinc-500"
+                                    title={detail}
+                                  >
+                                    {detail}
+                                  </td>
+                                </tr>
+                              );
+                            })
                           )}
                         </tbody>
                       </table>
@@ -916,17 +1335,13 @@ function BotPageContent() {
                       key={sym}
                       type="button"
                       onClick={() => toggleSymbol(sym)}
-                      className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 font-mono text-xs ${
+                      className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-xs ${
                         active
                           ? "border-zinc-500 text-zinc-100"
                           : "border-zinc-800 text-zinc-600 opacity-60"
                       }`}
                     >
-                      <TickerLogo
-                        symbol={sym}
-                        logoUrl={logos[sym]}
-                        size="xs"
-                      />
+                      <TickerLogo symbol={sym} logoUrl={logos[sym]} size="xs" />
                       {sym}
                     </button>
                   );
@@ -948,7 +1363,11 @@ function BotPageContent() {
                         max_positions: clampInt(e.target.value, 1, 10, 1),
                       })
                     }
+                    title="Same-side pyramid OK (e.g. 2× long BTC); opposite side blocked"
                   />
+                  <span className="mt-1 block font-mono text-[9px] leading-snug text-zinc-600">
+                    Same side can stack; opposite side blocked
+                  </span>
                 </label>
                 <label>
                   <span className={LABEL}>Size USD (× lev = notional)</span>
@@ -1080,7 +1499,7 @@ function BotPageContent() {
               <button
                 type="submit"
                 disabled={saving || form.symbols.length === 0}
-                className="w-full rounded border border-zinc-700 px-3 py-2 font-sans text-xs text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+                className="w-full border border-zinc-700 px-3 py-2 font-sans text-xs text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save config"}
               </button>
@@ -1091,7 +1510,6 @@ function BotPageContent() {
     </div>
   );
 }
-
 
 export default function BotPage() {
   return (

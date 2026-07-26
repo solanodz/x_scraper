@@ -37,7 +37,10 @@ export default function ResizableSplit({
   const clampSecondSize = useCallback(
     (next: number, containerSize: number) => {
       const maxSecond = containerSize - minFirst - HANDLE_SIZE;
-      return Math.min(Math.max(next, minSecond), Math.max(minSecond, maxSecond));
+      return Math.min(
+        Math.max(next, minSecond),
+        Math.max(minSecond, maxSecond),
+      );
     },
     [minFirst, minSecond],
   );
@@ -111,21 +114,13 @@ export default function ResizableSplit({
         type="button"
         aria-label="Resize panels"
         onMouseDown={startDrag}
-        className={`shrink-0 bg-zinc-900 transition-colors hover:bg-amber-600/25 active:bg-amber-600/40 ${handleClass}`}
-        style={
-          isHorizontal
-            ? { width: HANDLE_SIZE }
-            : { height: HANDLE_SIZE }
-        }
+        className={`shrink-0 bg-zinc-900 transition-colors hover:bg-zinc-700/40 active:bg-zinc-600/50 ${handleClass}`}
+        style={isHorizontal ? { width: HANDLE_SIZE } : { height: HANDLE_SIZE }}
       />
 
       <div
         className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden"
-        style={
-          isHorizontal
-            ? { width: secondSize }
-            : { height: secondSize }
-        }
+        style={isHorizontal ? { width: secondSize } : { height: secondSize }}
       >
         {second}
       </div>

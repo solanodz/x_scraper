@@ -36,7 +36,7 @@ export default function TickerLogo({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-900 ${SIZE_CLASS[size]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-zinc-700 bg-zinc-900 ${SIZE_CLASS[size]} ${className}`}
       aria-hidden
     >
       {showImage ? (

@@ -58,7 +58,7 @@ export function isDeltaSection(title: string): boolean {
 /** Títulos de sección — chip con fondo para legibilidad. */
 export function briefingSectionTitleClass(title: string): string {
   const chip =
-    "inline-block rounded-sm px-2.5 py-1 font-sans text-xs uppercase tracking-wide";
+    "inline-block px-2.5 py-1 font-sans text-xs uppercase tracking-wide";
   if (isPrioritySection(title)) {
     return `${chip} mt-0 mb-3 bg-zinc-600/50 font-bold text-zinc-100`;
   }
@@ -74,8 +74,7 @@ export function briefingSubheadingClass(
   inDeltaSection: boolean,
   inPrioritySection = false,
 ): string {
-  const chip =
-    "inline-block rounded-sm px-2 py-0.5 font-mono text-xs font-semibold";
+  const chip = "inline-block px-2 py-0.5 font-mono text-xs font-semibold";
   if (inDeltaSection) {
     const deltaTone = deltaSubheadingSentiment(label);
     if (deltaTone === "positive") {
@@ -95,10 +94,10 @@ export function briefingSubheadingClass(
 export function briefingSectionWrapperClass(title: string): string | null {
   const norm = normalizeSectionTitle(title);
   if (norm === "desde el último briefing") {
-    return "mb-3 rounded-r-sm border-l-2 border-zinc-600/60 bg-zinc-900/40 py-2 pl-3 pr-1";
+    return "mb-3 border-l-2 border-zinc-600/60 bg-zinc-900/40 py-2 pl-3 pr-1";
   }
   if (norm === "prioridad alta") {
-    return "mb-3 rounded-sm border border-zinc-700 bg-zinc-700/25 py-3 px-3";
+    return "mb-3 border border-zinc-700 bg-zinc-700/25 py-3 px-3";
   }
   return null;
 }
@@ -154,15 +153,13 @@ export const sentimentBlockClass: Record<
   NonNullable<SentimentMarker>,
   string
 > = {
-  positive:
-    "border-l-2 border-emerald-500/80 bg-emerald-950/30 pl-2.5 py-1 rounded-r-sm",
-  negative:
-    "border-l-2 border-red-600 bg-red-950/50 pl-2.5 py-1 rounded-r-sm",
+  positive: "border-l-2 border-emerald-500/80 bg-emerald-950/30 pl-2.5 py-1",
+  negative: "border-l-2 border-red-600 bg-red-950/50 pl-2.5 py-1",
 };
 
 export function sentimentParagraphClass(text: string): string {
   const marker = sentimentFromText(text) ?? alignmentSentiment(text);
-  const base = "mb-2 leading-relaxed last:mb-0 ";
+  const base = "mb-2 leading-relaxed last:mb-0";
   if (marker === "positive") {
     return `${base}${sentimentBlockClass.positive} ${sentimentTextClass.positive}`;
   }

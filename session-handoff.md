@@ -12,11 +12,11 @@
 
 ## Blockers
 
-- Redeploy API + frontend (y Worker F38) para ver todo en prod.
+- Ninguno de deploy: Railway API ACTIVE en F53; Vercel production Ready en `6321708`.
 
 ## Next
 
-Fuera del grill: smoke prod o nueva feature a elegir.
+Smoke prod: Mis tickers, Refresh Dossier fundamentals, chat chip Rápido, landing.
 
 ## Do not touch
 

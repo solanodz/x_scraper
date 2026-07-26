@@ -315,12 +315,21 @@ export function TickerOscillatorPane({
       onApisReadyRef.current?.([]);
       for (const cleanup of cleanups) cleanup();
     };
-  }, [symbol, candles, oscillator, oracle, height, active, showOracle, showRsi]);
+  }, [
+    symbol,
+    candles,
+    oscillator,
+    oracle,
+    height,
+    active,
+    showOracle,
+    showRsi,
+  ]);
 
   if (!active) {
     return (
       <div
-        className={`relative w-full overflow-hidden rounded border border-zinc-800 bg-zinc-950 ${className}`}
+        className={`relative w-full overflow-hidden border border-zinc-800 bg-zinc-950 ${className}`}
         style={{ height }}
         data-symbol={symbol}
         data-pane="oscillator"
@@ -345,7 +354,7 @@ export function TickerOscillatorPane({
     >
       {showOracle && (
         <div
-          className="relative overflow-hidden rounded border border-zinc-800 bg-zinc-950"
+          className="relative overflow-hidden border border-zinc-800 bg-zinc-950"
           style={{ height }}
         >
           <span className="pointer-events-none absolute left-2 top-1.5 z-10 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
@@ -356,7 +365,7 @@ export function TickerOscillatorPane({
       )}
       {showRsi && (
         <div
-          className="relative overflow-hidden rounded border border-zinc-800 bg-zinc-950"
+          className="relative overflow-hidden border border-zinc-800 bg-zinc-950"
           style={{ height }}
         >
           <span className="pointer-events-none absolute left-2 top-1.5 z-10 font-mono text-[9px] uppercase tracking-wide text-zinc-500">

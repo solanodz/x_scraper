@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { clearAccessTokenCache, isSupabaseConfigured, refreshIngest } from "@/lib/api";
+import {
+  clearAccessTokenCache,
+  isSupabaseConfigured,
+  refreshIngest,
+} from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import TickerWatchPopover from "@/components/TickerWatchPopover";
 
@@ -11,12 +15,14 @@ const NAV_ITEMS = [
   {
     href: "/terminal",
     label: "Terminal",
-    match: (path: string) => path === "/terminal" || path.startsWith("/terminal/"),
+    match: (path: string) =>
+      path === "/terminal" || path.startsWith("/terminal/"),
   },
   {
     href: "/research",
     label: "Research",
-    match: (path: string) => path === "/research" || path.startsWith("/research/"),
+    match: (path: string) =>
+      path === "/research" || path.startsWith("/research/"),
   },
   {
     href: "/dossier",
@@ -28,13 +34,21 @@ const NAV_ITEMS = [
     label: "Bot",
     match: (path: string) => path === "/bot" || path.startsWith("/bot/"),
   },
+  {
+    href: "/settings",
+    label: "Settings",
+    match: (path: string) =>
+      path === "/settings" || path.startsWith("/settings/"),
+  },
 ] as const;
 
 interface TerminalHeaderProps {
   onRefreshComplete?: () => void;
 }
 
-export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProps) {
+export default function TerminalHeader({
+  onRefreshComplete,
+}: TerminalHeaderProps) {
   const pathname = usePathname();
   const [refreshing, setRefreshing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -67,9 +81,9 @@ export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProp
     <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-2">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-sm text-amber-500">▮</span>
+          <span className="font-mono text-sm text-zinc-400">▮</span>
           <h1 className="font-sans text-sm font-semibold tracking-wide text-zinc-100">
-            X Scraper Terminal
+            MyTerm
           </h1>
         </div>
         <nav className="flex items-center gap-1" aria-label="Principal">
@@ -79,9 +93,9 @@ export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProp
               <Link
                 key={href}
                 href={href}
-                className={`rounded px-2.5 py-1 font-sans text-xs transition-colors ${
+                className={` px-2.5 py-1 font-sans text-xs transition-colors ${
                   active
-                    ? "bg-amber-950/40 font-semibold text-amber-400"
+                    ? "bg-zinc-800 font-semibold text-zinc-300"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
                 }`}
               >
@@ -93,14 +107,14 @@ export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProp
       </div>
       <div className="flex items-center gap-3">
         {status && (
-          <span className="font-mono text-xs text-emerald-500">{status}</span>
+          <span className="font-mono text-xs text-zinc-400">{status}</span>
         )}
         <TickerWatchPopover />
         <button
           type="button"
           onClick={handleRefresh}
           disabled={refreshing || signingOut}
-          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 font-sans text-xs text-zinc-300 transition-colors hover:border-amber-600 hover:text-amber-400 disabled:opacity-50"
+          className="border border-zinc-700 bg-zinc-900 px-3 py-1 font-sans text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-300 disabled:opacity-50"
         >
           {refreshing ? "Refreshing…" : "Refresh"}
         </button>
@@ -109,7 +123,7 @@ export default function TerminalHeader({ onRefreshComplete }: TerminalHeaderProp
             type="button"
             onClick={handleSignOut}
             disabled={signingOut}
-            className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 font-sans text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
+            className="border border-zinc-700 bg-zinc-900 px-3 py-1 font-sans text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50"
           >
             {signingOut ? "Cerrando…" : "Cerrar sesión"}
           </button>

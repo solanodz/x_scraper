@@ -5,11 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   authHeaders,
   createSignalStreamUrl,
+  fetchOperatorSettings,
   fetchSignalCount,
   fetchSignals,
   fetchTickerWatch,
   getAccessToken,
   isSupabaseConfigured,
+  patchOperatorSettings,
 } from "@/lib/api";
 import {
   activeFilterLabels,
@@ -153,8 +155,32 @@ export default function SignalFeed({
     };
   }, []);
 
+  // Hydrate Mis tickers (watchOnly) from Operator Settings.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchOperatorSettings()
+      .then((res) => {
+        if (cancelled) return;
+        const watchOnly = Boolean(res.settings.feed_filters?.watchOnly);
+        setFilterDraft((prev) => {
+          if (prev.watchOnly === watchOnly) return prev;
+          return { ...prev, watchOnly };
+        });
+      })
+      .catch(() => {
+        /* defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadMoreSignals = useCallback(async () => {
-    if (loadingMore || totalAvailable == null || loadedOffset >= totalAvailable) {
+    if (
+      loadingMore ||
+      totalAvailable == null ||
+      loadedOffset >= totalAvailable
+    ) {
       return;
     }
     setLoadingMore(true);
@@ -176,7 +202,11 @@ export default function SignalFeed({
   }, [activeFilters, loadedOffset, loadingMore, totalAvailable]);
 
   const loadAllSignals = useCallback(async () => {
-    if (loadingMore || totalAvailable == null || loadedOffset >= totalAvailable) {
+    if (
+      loadingMore ||
+      totalAvailable == null ||
+      loadedOffset >= totalAvailable
+    ) {
       return;
     }
     setLoadingMore(true);
@@ -261,26 +291,43 @@ export default function SignalFeed({
 
   function applyFilters(override?: FeedFilterDraft) {
     const next = override ?? filterDraft;
+    const prevWatchOnly = filterDraft.watchOnly;
     if (override) setFilterDraft(next);
     setActiveFilters(draftToQuery(next, watchSymbols));
     setLoadedOffset(0);
     setLoading(true);
+    if (next.watchOnly !== prevWatchOnly) {
+      void patchOperatorSettings({
+        feed_filters: { watchOnly: next.watchOnly },
+      }).catch(() => {
+        /* ignore */
+      });
+    }
   }
 
   function clearFilters() {
+    const wasWatchOnly = filterDraft.watchOnly;
     setFilterDraft(EMPTY_FEED_FILTERS);
     setActiveFilters({});
     setLoadedOffset(0);
     setLoading(true);
+    if (wasWatchOnly) {
+      void patchOperatorSettings({
+        feed_filters: { watchOnly: false },
+      }).catch(() => {
+        /* ignore */
+      });
+    }
   }
 
   // Si el Watch cambia con Mis tickers activo, re-aplicar el filtro.
+  // También aplica tras hidratar watchOnly desde Operator Settings.
   useEffect(() => {
     if (!watchLoaded || !filterDraft.watchOnly) return;
     setActiveFilters(draftToQuery(filterDraft, watchSymbols));
     setLoadedOffset(0);
     setLoading(true);
-  }, [watchSymbols, watchLoaded]); // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambiar Watch
+  }, [watchSymbols, watchLoaded, filterDraft.watchOnly]); // eslint-disable-line react-hooks/exhaustive-deps -- Watch + hydrate
 
   const filterLabels = activeFilterLabels(activeFilters);
   const hasMoreFromApi =
@@ -292,12 +339,12 @@ export default function SignalFeed({
     <section className="flex h-full min-h-0 flex-col bg-zinc-900">
       <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-1.5">
         <div className="flex min-w-0 items-baseline gap-2">
-          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-amber-500">
+          <h2 className="font-sans text-xs font-semibold uppercase tracking-wider text-zinc-400">
             Signal Feed
           </h2>
           {!loading && totalAvailable != null && !error && (
             <span className="truncate font-mono text-[10px] text-zinc-500">
-              {signals.length.toLocaleString("es-AR")} de{" "}
+              {signals.length.toLocaleString("es-AR")} de{""}
               {totalAvailable.toLocaleString("es-AR")} en pantalla
             </span>
           )}
@@ -323,7 +370,7 @@ export default function SignalFeed({
           {filterLabels.map((label) => (
             <span
               key={label}
-              className="rounded border border-emerald-900/50 bg-emerald-950/20 px-1.5 py-0.5 font-mono text-[9px] text-emerald-400"
+              className="border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-[9px] text-zinc-400"
             >
               {label}
             </span>
@@ -369,14 +416,14 @@ export default function SignalFeed({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="font-mono text-xs font-semibold text-amber-400">
+                  <span className="font-mono text-xs font-semibold text-zinc-300">
                     {displayAuthor(signal.username, signal.source_type)}
                   </span>
-                  <span className="shrink-0 rounded border border-zinc-700 px-1 font-mono text-[9px] uppercase text-zinc-500">
+                  <span className="shrink-0 border border-zinc-700 px-1 font-mono text-[9px] uppercase text-zinc-500">
                     {sourceBadgeLabel(signal.source_type)}
                   </span>
                   {clusterSourcesLabel(signal.cluster_sources) && (
-                    <span className="shrink-0 rounded border border-amber-900/50 bg-amber-950/30 px-1 font-mono text-[9px] text-amber-500">
+                    <span className="shrink-0 border border-zinc-700 bg-zinc-900 px-1 font-mono text-[9px] text-zinc-400">
                       {clusterSourcesLabel(signal.cluster_sources)}
                     </span>
                   )}
@@ -405,7 +452,7 @@ export default function SignalFeed({
                 <span className="ml-auto font-mono text-[10px] text-zinc-600">
                   {isXSignal(signal.source_type) ? (
                     <>
-                      ♥ {formatEngagement(signal.engagement.like_count)} · ↻{" "}
+                      ♥ {formatEngagement(signal.engagement.like_count)} · ↻{""}
                       {formatEngagement(signal.engagement.retweet_count)}
                     </>
                   ) : (
@@ -421,7 +468,7 @@ export default function SignalFeed({
               type="button"
               onClick={() => void loadMoreSignals()}
               disabled={loadingMore}
-              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-[11px] text-zinc-300 transition-colors hover:border-amber-700 hover:text-amber-400 disabled:opacity-50"
+              className="border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-300 disabled:opacity-50"
             >
               {loadingMore
                 ? "Cargando…"
@@ -435,7 +482,7 @@ export default function SignalFeed({
                 type="button"
                 onClick={() => void loadAllSignals()}
                 disabled={loadingMore}
-                className="font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-amber-500 hover:underline disabled:opacity-50"
+                className="font-mono text-[10px] text-zinc-500 underline-offset-2 hover:text-zinc-400 hover:underline disabled:opacity-50"
               >
                 Cargar todas ({totalAvailable!.toLocaleString("es-AR")})
               </button>

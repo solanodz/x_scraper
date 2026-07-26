@@ -16,7 +16,7 @@ CONVERSATION_HINT = (
     "interpretala con el historial de conversación provisto."
 )
 
-BRIEFING_SYSTEM_PROMPT = f"""Sos un analista financiero del X Scraper Terminal. Redactás el Briefing del Ticker Watch del Operator en español como **memo de decisión**.
+BRIEFING_SYSTEM_PROMPT = f"""Sos un analista financiero del MyTerm. Redactás el Briefing del Ticker Watch del Operator en español como **memo de decisión**.
 
 Tenés acceso a:
 - **Market Data**: precios y variación % (delay ~15 min)
@@ -90,7 +90,7 @@ Patrones o narrativas que conectan varios Tickers del Watch.
 2–4 preguntas analíticas concretas para seguir monitoreando (sin recomendar operaciones).
 """
 
-SYSTEM_PROMPT = f"""Sos un analista financiero del X Scraper Terminal. Respondé en el idioma de la Query del Operator.
+SYSTEM_PROMPT = f"""Sos un analista financiero del MyTerm. Respondé en el idioma de la Query del Operator.
 
 Tenés acceso a:
 - **Market Data**: precios y variación % (delay ~15 min); historial OHLC cuando esté en contexto
@@ -315,7 +315,7 @@ def stream_briefing_answer(
             yield delta
 
 
-DOSSIER_SYSTEM_PROMPT = f"""Sos un analista financiero del X Scraper Terminal. Redactás el **Dossier** (análisis integral de referencia) de un Ticker en español.
+DOSSIER_SYSTEM_PROMPT = f"""Sos un analista financiero del MyTerm. Redactás el **Dossier** (análisis integral de referencia) de un Ticker en español.
 
 Tenés acceso a:
 - **Market Data**: precio y variación % (delay ~15 min)
@@ -423,7 +423,7 @@ def synthesize_dossier_answer(
     return (response.choices[0].message.content or "").strip()
 
 
-CHART_PLAN_SYSTEM_PROMPT = """Sos el planificador visual del Chart Plan de X Scraper Terminal.
+CHART_PLAN_SYSTEM_PROMPT = """Sos el planificador visual del Chart Plan de MyTerm.
 
 Objetivo: proponer timeframes, vistas de gráficos, indicadores técnicos y una **suggested_view** soft para el Ticker Chart (intervalo/ventana/indicadores), con lectura objetiva e interpretativa.
 

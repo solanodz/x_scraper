@@ -56,13 +56,13 @@ export default function TerminalSelect<T extends string | number>({
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex w-full items-center justify-between gap-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-left transition-colors hover:border-zinc-600 focus:border-amber-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between gap-2 border border-zinc-700 bg-zinc-950 px-2 py-1 text-left transition-colors hover:border-zinc-600 focus:border-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
           {active?.label ?? "—"}
         </span>
         <span
-          className={`shrink-0 font-mono text-[10px] text-zinc-500 transition-transform ${open ? "rotate-180 text-amber-500" : ""}`}
+          className={`shrink-0 font-mono text-[10px] text-zinc-500 transition-transform ${open ? "rotate-180 text-zinc-400" : ""}`}
           aria-hidden
         >
           ▾
@@ -72,7 +72,7 @@ export default function TerminalSelect<T extends string | number>({
       {open && !disabled && (
         <ul
           role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-40 overflow-y-auto rounded border border-zinc-700 bg-zinc-950 py-1 shadow-lg shadow-black/40"
+          className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-40 overflow-y-auto border border-zinc-700 bg-zinc-950 py-1 shadow-lg shadow-black/40"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -94,15 +94,13 @@ export default function TerminalSelect<T extends string | number>({
                 >
                   <span
                     className={`min-w-0 truncate font-mono text-[10px] ${
-                      selected
-                        ? "font-semibold text-amber-400"
-                        : "text-zinc-300"
+                      selected ? "font-semibold text-zinc-300" : "text-zinc-300"
                     }`}
                   >
                     {option.label}
                   </span>
                   {selected && (
-                    <span className="shrink-0 font-mono text-[9px] uppercase text-amber-600">
+                    <span className="shrink-0 font-mono text-[9px] uppercase text-zinc-400">
                       ✓
                     </span>
                   )}

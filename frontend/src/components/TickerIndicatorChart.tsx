@@ -103,21 +103,26 @@ function ChartTooltip({
   if (!active || !payload?.[0]?.payload) return null;
   const row = payload[0].payload;
   return (
-    <div className="rounded border border-zinc-700 bg-zinc-950/95 px-2 py-1.5 font-mono text-[10px] text-zinc-300 shadow-lg">
+    <div className="border border-zinc-700 bg-zinc-950/95 px-2 py-1.5 font-mono text-[10px] text-zinc-300 shadow-lg">
       <p className="text-zinc-500">{formatDateLabel(row.date)}</p>
       <p>
-        O {row.open.toFixed(2)} · H {row.high.toFixed(2)} · L {row.low.toFixed(2)} · C{" "}
-        {row.close.toFixed(2)}
+        O {row.open.toFixed(2)} · H {row.high.toFixed(2)} · L{" "}
+        {row.low.toFixed(2)} · C {row.close.toFixed(2)}
       </p>
       {row.sma20 != null && (
-        <p style={{ color: INDICATOR_COLORS.sma20 }}>SMA 20: {row.sma20.toFixed(2)}</p>
+        <p style={{ color: INDICATOR_COLORS.sma20 }}>
+          SMA 20: {row.sma20.toFixed(2)}
+        </p>
       )}
       {row.sma50 != null && (
-        <p style={{ color: INDICATOR_COLORS.sma50 }}>SMA 50: {row.sma50.toFixed(2)}</p>
+        <p style={{ color: INDICATOR_COLORS.sma50 }}>
+          SMA 50: {row.sma50.toFixed(2)}
+        </p>
       )}
       {row.donchianUpper != null && row.donchianLower != null && (
         <p style={{ color: INDICATOR_COLORS.donchianUpper }}>
-          Donchian 20: {row.donchianLower.toFixed(2)} – {row.donchianUpper.toFixed(2)}
+          Donchian 20: {row.donchianLower.toFixed(2)} –{" "}
+          {row.donchianUpper.toFixed(2)}
         </p>
       )}
     </div>
@@ -152,7 +157,7 @@ export default function TickerIndicatorChart({
   if (loading) {
     return (
       <div
-        className={`flex items-center justify-center rounded border border-zinc-800 bg-zinc-950/60 ${className}`}
+        className={`flex items-center justify-center border border-zinc-800 bg-zinc-950/60 ${className}`}
       >
         <p className="font-mono text-xs text-zinc-500">Cargando velas…</p>
       </div>
@@ -162,7 +167,7 @@ export default function TickerIndicatorChart({
   if (error) {
     return (
       <div
-        className={`flex items-center justify-center rounded border border-zinc-800 bg-zinc-950/60 px-4 ${className}`}
+        className={`flex items-center justify-center border border-zinc-800 bg-zinc-950/60 px-4 ${className}`}
       >
         <p className="text-center font-mono text-xs text-red-400">{error}</p>
       </div>
@@ -172,7 +177,7 @@ export default function TickerIndicatorChart({
   if (rows.length < 5) {
     return (
       <div
-        className={`flex items-center justify-center rounded border border-zinc-800 bg-zinc-950/60 px-4 ${className}`}
+        className={`flex items-center justify-center border border-zinc-800 bg-zinc-950/60 px-4 ${className}`}
       >
         <p className="text-center font-mono text-xs text-zinc-500">
           Sin datos históricos suficientes para {symbol}.
@@ -190,7 +195,7 @@ export default function TickerIndicatorChart({
 
   return (
     <div className="space-y-2">
-      <div className={`rounded border border-zinc-800 bg-zinc-950/60 ${className}`}>
+      <div className={` border border-zinc-800 bg-zinc-950/60 ${className}`}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={rows}
@@ -265,7 +270,12 @@ export default function TickerIndicatorChart({
               isAnimationActive={false}
               connectNulls={false}
             />
-            <CandlestickLayer data={rows} yMin={yMin} yMax={yMax} barWidth={5} />
+            <CandlestickLayer
+              data={rows}
+              yMin={yMin}
+              yMax={yMax}
+              barWidth={5}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -274,8 +284,12 @@ export default function TickerIndicatorChart({
         <div className="flex flex-wrap gap-3 font-mono text-[9px] uppercase tracking-wide">
           <span style={{ color: INDICATOR_COLORS.sma20 }}>SMA 20</span>
           <span style={{ color: INDICATOR_COLORS.sma50 }}>SMA 50</span>
-          <span style={{ color: INDICATOR_COLORS.donchianUpper }}>Donchian 20</span>
-          <span style={{ color: INDICATOR_COLORS.fib }}>Fib 38.2 / 50 / 61.8</span>
+          <span style={{ color: INDICATOR_COLORS.donchianUpper }}>
+            Donchian 20
+          </span>
+          <span style={{ color: INDICATOR_COLORS.fib }}>
+            Fib 38.2 / 50 / 61.8
+          </span>
         </div>
         <FibLegend levels={fibLevels} />
       </div>

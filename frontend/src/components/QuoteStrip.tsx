@@ -61,7 +61,7 @@ export default function QuoteStrip() {
       <div className="border-b border-zinc-800 bg-zinc-950">
         <div className="flex items-center gap-3 px-4 py-1.5">
           {!loading && !unavailable && quotes.length > 0 && (
-            <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
+            <span className="shrink-0 border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
               15m delayed
             </span>
           )}
@@ -124,11 +124,11 @@ function QuoteItem({
     <button
       type="button"
       onClick={() => onSelect(quote.symbol)}
-      className="group flex shrink-0 items-center gap-2 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-zinc-900"
+      className="group flex shrink-0 items-center gap-2 px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-zinc-900"
       title={`Ver gráfico de ${quote.symbol}`}
     >
       <TickerLogo symbol={quote.symbol} logoUrl={quote.logo} size="xs" />
-      <span className="font-semibold text-zinc-300 group-hover:text-amber-400">
+      <span className="font-semibold text-zinc-300 group-hover:text-zinc-300">
         {quote.symbol}
       </span>
       {hasPrice ? (

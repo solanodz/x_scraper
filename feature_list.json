@@ -998,15 +998,16 @@
       "dependencies": [
         "F47"
       ],
-      "notes": "Desde soak: 432 skips symbol_already_open + confusión leverage. size_usd pasa a base; notional = size × lev. ADR-0015/CONTEXT actualizados.",
+      "notes": "Desde soak: 432 skips symbol_already_open + confusión leverage. size_usd pasa a base; notional = size × lev. Más tarde: pyramid same-side (reemplaza 1-por-símbolo); opposite_side_open silencioso.",
       "verification": [
         "PaperVenue open con leverage=4 → qty = (size_usd×4)/mark",
-        "run_tick con posición open + breakout: summary skipped incluye symbol_already_open pero bot_events no persiste esos skips",
+        "run_tick: same-side pyramid hasta max_positions; opposite side blocked (skip no persistido)",
         "python -m backend.scripts.verify_f47_paper_bot => OK"
       ],
       "evidence": [
         "2026-07-25: .venv/bin/python -m backend.scripts.verify_f47_paper_bot => OK (lev×qty + silent symbol_already_open)",
-        "2026-07-25: VERIFY_FEATURE=F50 ./scripts/verify_active.sh => OK"
+        "2026-07-25: VERIFY_FEATURE=F50 ./scripts/verify_active.sh => OK",
+        "2026-07-25: verify_f47 OK tras pyramid same-side / opposite_side_open"
       ]
     },
     {
@@ -1074,6 +1075,74 @@
         "2026-07-25: python -m backend.scripts.verify_f53 => OK (landing, empty states, meta+chips)",
         "2026-07-25: VERIFY_FEATURE=F53 ./scripts/verify_active.sh => OK"
       ]
+    },
+    {
+      "id": "F54",
+      "priority": 54,
+      "title": "Paper Bot: Daily PnL + trade history en /bot",
+      "user_visible_behavior": "En /bot el Operator ve PnL realizado por día (timezone y lookback 7/14/30/90 configurables) y una tabla Trade history de Positions closed (entry/exit/PnL/reason) en la misma página.",
+      "status": "passing",
+      "dependencies": [
+        "F47",
+        "F50"
+      ],
+      "notes": "Daily PnL derivado de bot_positions.closed_at + realized_pnl; prefs en localStorage. API positions/fills aceptan limit.",
+      "verification": [
+        "python -m backend.scripts.verify_f54_bot_pnl_history => OK",
+        "UI /bot: Daily PnL + selects TZ/lookback; métrica Today",
+        "UI /bot: sección Trade history con closed positions"
+      ],
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f54_bot_pnl_history => OK (TZ day keys + daily buckets + UI markers)",
+        "2026-07-25: VERIFY_FEATURE=F54 ./scripts/verify_active.sh => OK",
+        "2026-07-25: frontend npx tsc --noEmit => OK"
+      ]
+    },
+    {
+      "id": "F55",
+      "priority": 55,
+      "title": "Operator Settings persistidos (PnL TZ, Feed, Chart)",
+      "user_visible_behavior": "El Operator guarda en Settings (operator_settings) timezone/lookback del Daily PnL, Mis tickers del Feed y prefs básicas del Ticker Chart; al recargar o cambiar de dispositivo (mismo login) se restauran.",
+      "status": "passing",
+      "dependencies": [
+        "F10",
+        "F51",
+        "F54"
+      ],
+      "notes": "Grill docs/superpowers/specs/2026-07-25-operator-settings-and-provenance-grill.md. Tabla operator_settings ya existe; Ticker Watch sigue en ticker_watch. Orden: F55 antes que F32. Branding producto: MyTerm.",
+      "verification": [
+        "python -m backend.scripts.verify_f55_operator_settings => OK",
+        "GET/PATCH /operator/settings merge por clave top-level",
+        "UI Settings + /bot Daily PnL usa settings (no solo localStorage)",
+        "Mis tickers watchOnly restaura tras reload"
+      ],
+      "evidence": [
+        "2026-07-25: python -m backend.scripts.verify_f55_operator_settings => OK (defaults, lookback whitelist, shallow merge, OpenAPI GET+PATCH, UI Settings+/bot+Feed wire)",
+        "2026-07-25: VERIFY_FEATURE=F55 ./scripts/verify_active.sh => OK",
+        "2026-07-25: frontend npx tsc --noEmit => OK",
+        "Store local: infra/store/init/015_operator_settings.sql; Supabase ya tiene tabla desde 002 (+015 compat IF NOT EXISTS)"
+      ]
+    },
+    {
+      "id": "F32",
+      "priority": 32,
+      "title": "Provenance para datos no-Signal",
+      "user_visible_behavior": "Quotes, FX, fundamentals y stats no-Corpus muestran Provenance legible (fuente, as_of/delay, N/A); Citations de Signals no cambian. Visible en Dossier, quote cards y Research cuando afirma Market Data/FX/fundamentals.",
+      "status": "pending",
+      "dependencies": [
+        "F7",
+        "F30",
+        "F45",
+        "F52"
+      ],
+      "notes": "Grill docs/superpowers/specs/2026-07-25-operator-settings-and-provenance-grill.md. Provenance ≠ Citation (ADR-0009). Tipo hermano; no mezclar con id_str de Signal.",
+      "verification": [
+        "python -m backend.scripts.verify_f32_provenance => OK",
+        "quotes/fundamentals/FX incluyen provenance en contrato",
+        "UI: Dossier fundamentals + quote card muestran chip/línea",
+        "Regresión: Citation Corpus sigue abriendo Signal Detail"
+      ],
+      "evidence": []
     }
   ]
 }

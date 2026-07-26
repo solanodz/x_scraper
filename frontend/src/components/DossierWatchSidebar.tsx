@@ -96,19 +96,23 @@ export default function DossierWatchSidebar() {
     >
       <div
         className={`flex items-center border-b border-zinc-800 ${
-          collapsed ? "justify-center px-1 py-2" : "justify-between gap-1 px-3 py-2"
+          collapsed
+            ? "justify-center px-1 py-2"
+            : "justify-between gap-1 px-3 py-2"
         }`}
       >
         {!collapsed && (
-          <p className="font-mono text-[10px] uppercase tracking-wide text-amber-500">
+          <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-400">
             Ticker Watch
           </p>
         )}
         <button
           type="button"
           onClick={toggleCollapsed}
-          className="inline-flex items-center justify-center rounded border border-zinc-700 p-1 text-zinc-400 transition-colors hover:border-amber-700 hover:text-amber-400"
-          aria-label={collapsed ? "Expandir Ticker Watch" : "Colapsar Ticker Watch"}
+          className="inline-flex items-center justify-center border border-zinc-700 p-1 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+          aria-label={
+            collapsed ? "Expandir Ticker Watch" : "Colapsar Ticker Watch"
+          }
           title={collapsed ? "Expandir" : "Colapsar"}
         >
           <PanelToggleIcon collapsed={collapsed} />
@@ -125,7 +129,9 @@ export default function DossierWatchSidebar() {
           </p>
         )}
         {error && !collapsed && (
-          <p className="px-3 py-2 font-mono text-[10px] text-red-400">{error}</p>
+          <p className="px-3 py-2 font-mono text-[10px] text-red-400">
+            {error}
+          </p>
         )}
         {!loading && !error && entries.length === 0 && !collapsed && (
           <p className="px-3 py-2 font-mono text-[10px] text-zinc-500">
@@ -145,13 +151,11 @@ export default function DossierWatchSidebar() {
               title={`$${entry.symbol}`}
               aria-label={`$${entry.symbol}`}
               className={`relative flex items-center border-b border-zinc-800/60 font-mono text-[11px] transition-colors ${
-                collapsed
-                  ? "justify-center px-1 py-2.5"
-                  : "gap-2 px-3 py-2"
+                collapsed ? "justify-center px-1 py-2.5" : "gap-2 px-3 py-2"
               } ${
                 isActive
-                  ? "bg-amber-950/30 text-amber-300"
-                  : "text-zinc-300 hover:bg-zinc-900 hover:text-amber-400"
+                  ? "bg-zinc-900 text-zinc-200"
+                  : "text-zinc-300 hover:bg-zinc-900 hover:text-zinc-300"
               }`}
             >
               <TickerLogo
@@ -161,12 +165,12 @@ export default function DossierWatchSidebar() {
               />
               {!collapsed && (
                 <>
-                  <span className="font-semibold text-amber-400">
+                  <span className="font-semibold text-zinc-300">
                     ${entry.symbol}
                   </span>
                   {hasThesis && (
                     <span
-                      className="h-1.5 w-1.5 rounded-full bg-amber-500"
+                      className="h-1.5 w-1.5 bg-zinc-400"
                       aria-label="Thesis guardada"
                     />
                   )}
@@ -174,7 +178,7 @@ export default function DossierWatchSidebar() {
               )}
               {collapsed && hasThesis && (
                 <span
-                  className="absolute right-1 top-1 h-1 w-1 rounded-full bg-amber-500"
+                  className="absolute right-1 top-1 h-1 w-1 bg-zinc-400"
                   aria-label="Thesis guardada"
                 />
               )}

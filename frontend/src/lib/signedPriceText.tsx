@@ -25,7 +25,7 @@ export function colorizeSignedPriceString(text: string): ReactNode {
 
   while ((match = re.exec(text)) !== null) {
     const full = match[0];
-    // Branch A: ±amount%  |  Branch B: ±$amount
+    // Branch A: ±amount% | Branch B: ±$amount
     const sign = match[1] ?? match[4] ?? "";
     const amount = match[2] ?? match[5] ?? "";
     const unit = match[3] ?? "";

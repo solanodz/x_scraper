@@ -28,25 +28,33 @@ function sparklinePoints(closes: number[]): string | null {
 }
 
 function resolveChangePercent(artifact: PriceChartArtifact): number | null {
+  // Source of truth = serie dibujada (evita % de ventana completa vs sparkline truncado).
+  const closes = artifact.candles.map((c) => c.close);
+  if (closes.length >= 2 && closes[0] !== 0) {
+    return ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
+  }
   if (
     typeof artifact.change_percent === "number" &&
     Number.isFinite(artifact.change_percent)
   ) {
     return artifact.change_percent;
   }
-  const closes = artifact.candles.map((c) => c.close);
-  if (closes.length < 2) return null;
-  const start =
-    typeof artifact.start_price === "number" &&
-    Number.isFinite(artifact.start_price)
-      ? artifact.start_price
-      : closes[0];
-  const end =
-    typeof artifact.end_price === "number" && Number.isFinite(artifact.end_price)
-      ? artifact.end_price
-      : closes[closes.length - 1];
-  if (!Number.isFinite(start) || start === 0) return null;
-  return ((end - start) / start) * 100;
+  return null;
+}
+
+function formatPeriodLabel(period: string, interval?: string): string {
+  const raw = period.trim().toLowerCase();
+  const labels: Record<string, string> = {
+    "1mo": "1 mes",
+    "3mo": "3 meses",
+    "6mo": "6 meses",
+    "1y": "1 año",
+    "5d": "5 días",
+    "1d": "1 día",
+  };
+  const periodLabel = labels[raw] ?? period.toUpperCase();
+  if (!interval || interval === "1d") return periodLabel;
+  return `${periodLabel} · ${interval}`;
 }
 
 interface PriceChartCardProps {
@@ -78,9 +86,12 @@ export default function PriceChartCard({ artifact }: PriceChartCardProps) {
   const positive = (changePct ?? 0) >= 0;
   const stroke = positive ? "#34d399" : "#f87171";
   const endPrice =
-    typeof artifact.end_price === "number" && Number.isFinite(artifact.end_price)
-      ? artifact.end_price
-      : closes[closes.length - 1];
+    closes.length > 0
+      ? closes[closes.length - 1]
+      : typeof artifact.end_price === "number" &&
+          Number.isFinite(artifact.end_price)
+        ? artifact.end_price
+        : null;
   const symbol = artifact.symbol.trim().toUpperCase();
   // Divisas no tienen Dossier/Chart Plan — no navegar a /dossier?ticker=USD.
   const isFxCode = FX_CURRENCY_CODES.has(symbol);
@@ -94,7 +105,7 @@ export default function PriceChartCard({ artifact }: PriceChartCardProps) {
       type="button"
       onClick={openDossier}
       disabled={isFxCode}
-      className="group w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2.5 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-900/90 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-950/80"
+      className="group w-full max-w-sm border border-zinc-800 bg-zinc-950/80 px-3 py-2.5 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-900/90 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-950/80"
       aria-label={
         isFxCode
           ? `Cotización FX ${artifact.symbol} (sin Dossier)`
@@ -106,9 +117,8 @@ export default function PriceChartCard({ artifact }: PriceChartCardProps) {
           <span className="font-mono text-sm font-semibold text-zinc-100">
             {artifact.symbol}
           </span>
-          <span className="truncate font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-            {artifact.period}
-            {artifact.interval ? ` · ${artifact.interval}` : ""}
+          <span className="truncate font-mono text-[10px] tracking-wide text-zinc-500">
+            {formatPeriodLabel(artifact.period, artifact.interval)}
           </span>
         </div>
         <div className="shrink-0 text-right font-mono text-[11px]">

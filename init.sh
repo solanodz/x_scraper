@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "== X Scraper Terminal :: init =="
+echo "== MyTerm :: init =="
 
 # --- Python (scraper / backend) ---
 if [ -d ".venv" ]; then
